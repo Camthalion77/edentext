@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { zipSync, strToU8, unzipSync, strFromU8 } from 'fflate';
 import { buildDocx } from '../src/lib/export/docx';
 import { importDocx } from '../src/lib/import/docx';
+import { buildOdt } from '../src/lib/export/odt';
+import { importOdt } from '../src/lib/import/odt';
 import { builtinStyleSheet } from '../src/lib/styles/styleSheet';
 import { HEADER_SHADE } from '../src/lib/editor/extensions/tableHeaderRow';
 
@@ -636,6 +638,7 @@ describe('DOCX import: alignment inherited from a paragraph style', () => {
     <w:p><w:r><w:t>Inherits justify from Standard</w:t></w:r></w:p>
     <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>Direct center wins</w:t></w:r></w:p>
     <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Heading based on Standard</w:t></w:r></w:p>
+    <w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:t>Direct left wins</w:t></w:r></w:p>
     <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr>
   </w:body></w:document>`;
   const stylesXml = `<?xml version="1.0"?><w:styles ${W}>
@@ -650,8 +653,11 @@ describe('DOCX import: alignment inherited from a paragraph style', () => {
     expect(doc.content![0].attrs?.textAlign).toBeUndefined();
     expect(res.styles.paragraph['Standard'].para.textAlign).toBe('justify');
   });
-  it('lets a direct w:jc override the style', () => {
+  it('lets a direct w:jc override the style, the page\'s own edge too', async () => {
     expect(doc.content![1].attrs.textAlign).toBe('center');
+    expect(doc.content![3].attrs.textAlign).toBe('left');
+    const odt = importOdt(await buildOdt(doc, undefined, 'portrait', undefined, null, 'A4', res.styles));
+    expect((odt.content as N).content[3].attrs.textAlign).toBe('left');
   });
   it('leaves a heading based on the default style free of direct alignment', () => {
     expect(doc.content![2].type).toBe('heading');

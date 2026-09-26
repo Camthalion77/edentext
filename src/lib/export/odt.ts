@@ -1402,8 +1402,8 @@ export function writingModeOf(dir: 'ltr' | 'rtl' | null | undefined): string | n
   return dir === 'rtl' ? 'rl-tb' : dir === 'ltr' ? 'lr-tb' : null;
 }
 
-// Extract the overridable paragraph properties from a node's attrs. Left
-// alignment yields null (it's the Standard-style default, so no override needed).
+// Extract the overridable paragraph properties from a node's attrs. A left alignment the
+// block carries is written too: its style may justify (importers set it only then).
 function paraStyleFromAttrs(attrs: TiptapNode['attrs'], withIndents = true): ParaStyle {
   const ta = attrs?.textAlign as AlignValue | undefined;
   const cm = (v: unknown) => (withIndents && typeof v === 'number' && v !== 0 ? v : null);
@@ -1417,7 +1417,7 @@ function paraStyleFromAttrs(attrs: TiptapNode['attrs'], withIndents = true): Par
   }
   const border = (v: unknown) => (typeof v === 'string' && v && v !== 'none' ? v : null);
   return {
-    align: ta === 'center' || ta === 'right' || ta === 'justify' ? ta : null,
+    align: ta === 'left' || ta === 'center' || ta === 'right' || ta === 'justify' ? ta : null,
     spaceBefore: typeof sb === 'number' ? sb : null,
     spaceAfter: typeof sa === 'number' ? sa : null,
     lineHeight,

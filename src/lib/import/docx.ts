@@ -1242,7 +1242,8 @@ function convertParagraph(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault:
   // Alignment: direct w:pPr/w:jc wins, else resolve it from the style chain (the default
   // paragraph style commonly carries justify), so style-level alignment isn't lost.
   const directJc = fc(ppr, 'jc');
-  const jcVal = directJc ? wVal(directJc) : ctx.styles.paragraphAlign(pStyle ? wVal(pStyle) : null);
+  const styleJc = ctx.styles.paragraphAlign(pStyle ? wVal(pStyle) : null);
+  const jcVal = directJc ? wVal(directJc) : styleJc;
   const styleId = styleIdOf(ppr, ctx);
   // w:bidi — the block's own base direction; resolved first, alignment suppression
   // depends on it (the base direction decides which edge is the unset default).
@@ -1252,7 +1253,7 @@ function convertParagraph(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault:
   // registry — except in a cell, which carries no style name, so its chain is baked in
   // over the table style's w:pPr (probed: that ranks *below* the paragraph style).
   const attrs = blockAttrs(ppr, kind, level, directJc ? jcVal : null,
-    kind === 'cell' ? ctx.styles.paragraphSpacing(styleId, ctx.cellSpacing) : {}, bidi ?? ctx.pageRtl);
+    kind === 'cell' ? ctx.styles.paragraphSpacing(styleId, ctx.cellSpacing) : {}, bidi ?? ctx.pageRtl, styleJc);
   applyContextualSpacing(el, ppr, ctx, styleId, attrs);
   // The editor has no rule node, so Word's horizontal line becomes its paragraph's own
   // bottom rule — a real w:pBdr keeps precedence, only one line can be drawn.
@@ -1419,17 +1420,19 @@ function headingLevelOf(ppr: Element | null, ctx: Ctx): number | null {
 // Spacing = the style chain's w:spacing (styleSpacing, resolved by the caller) overridden
 // per-attribute by DIRECT w:pPr; indent comes from direct w:pPr only. jcVal is resolved
 // through the chain by the caller.
-function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number | null, jcVal: string | null, styleSpacing: ParaSpacing, rtl = false): Record<string, unknown> {
+function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number | null, jcVal: string | null, styleSpacing: ParaSpacing, rtl = false, styleJc: string | null = null): Record<string, unknown> {
   const attrs: Record<string, unknown> = {};
 
   if (jcVal === 'center') attrs.textAlign = 'center';
   else if (jcVal === 'both' || jcVal === 'distribute') attrs.textAlign = 'justify';
   else {
     // start/end are physical like left/right: LibreOffice writes an rtl paragraph's
-    // physical left as w:jc="start" (probed). The direction's own edge stays unset.
-    const align = jcVal === 'right' || jcVal === 'end' ? 'right'
-      : jcVal === 'left' || jcVal === 'start' ? 'left' : null;
-    if (align && align !== (rtl ? 'right' : 'left')) attrs.textAlign = align;
+    // physical left as w:jc="start" (probed). The direction's own edge stays unset
+    // unless it overrides a style that aligns otherwise.
+    const edge = (v: string | null) => v === 'right' || v === 'end' ? 'right'
+      : v === 'left' || v === 'start' ? 'left' : v;
+    const align = edge(jcVal) === 'right' || edge(jcVal) === 'left' ? edge(jcVal) : null;
+    if (align && (align !== (rtl ? 'right' : 'left') || (styleJc != null && edge(styleJc) !== align))) attrs.textAlign = align;
   }
 
   const sp = ppr ? fc(ppr, 'spacing') : null;
