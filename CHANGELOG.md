@@ -574,6 +574,18 @@ merely unimplemented belongs in the list above, not here.
   against one line wrong once. A real fix needs a hidden-block attr that
   pagination and `collectChapterStarts` (`Editor.svelte`) both understand.
   Noted 2026-08-12.
+- Closing CJK punctuation cannot hang into the margin. Both word processors let
+  a line end in `）` or `。` one that would not otherwise fit (Word
+  `w:overflowPunct`, LibreOffice's hanging punctuation, both on by default), and
+  the browser wraps it instead — measured on a form line of exactly the text
+  width plus half a character: one line in both, two here, and every later line
+  on that page one lower. Root cause: Chromium implements neither
+  `hanging-punctuation` nor `text-spacing-trim: allow-end` (probed, both
+  unsupported). Noted 2026-09-26.
+- The space between an ideograph and a Latin letter or digit is ⅛ em, the step
+  `text-autospace` has; Word sets ¼ em and LibreOffice ⅕ em (measured). CSS has
+  no amount for it, so a line mixing both scripts runs ~1mm short per few
+  boundaries. Noted 2026-09-26.
 - **Deliberate, not a defect:** a table of contents shows live page numbers.
   LibreOffice and Word print the numbers cached in the file until the reader
   updates the index, so a document whose cache is stale disagrees with us (the
