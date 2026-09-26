@@ -12,9 +12,11 @@ declare module '@tiptap/core' {
 
 // Typing over a mixed selection makes the contenteditable insert a span carrying the
 // computed style — a whole CSS stack, which is no font name the picker or either file
-// can use. The first family is what renders, so that is the name the mark keeps.
+// can use. The first family is what renders, so that is the name the mark keeps — past
+// the half-width space a balanced document puts in front (storage/balanceSpaces.ts).
 export function firstFontFamily(value: string | null | undefined): string | null {
-  const first = String(value ?? '').split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+  const first = String(value ?? '').split(',').map((f) => f.trim().replace(/^['"]|['"]$/g, ''))
+    .find((f) => f !== 'EdenText Space');
   return first && !first.startsWith('var(') ? first : null;
 }
 

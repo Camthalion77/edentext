@@ -244,7 +244,7 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
   const sectPr = fc(body, 'sectPr');
   const contentWidthCm = sectionContentWidthCm(sectPr);
   const leftMarginCm = twipToCm(intAttr(fc(sectPr, 'pgMar'), W, 'left') ?? 1440);
-  const ctx: Ctx = { styles, styleNames, usedStyles: new Set(), charStyleNames, usedCharStyles: new Set(), warnings, files, rels: parseRels(files['word/_rels/document.xml.rels']), imageCache: new Map(), convertedImages, listCounters: new Map(), usedListStyles: new Map(), contentWidthCm, leftMarginCm, pageRtl: sectPrRtl(sectPr), mainLang: docLangs.main, hyphenate: docAutoHyphenation(files), cellSpacing: {}, tblIndToText: tblIndIsToText(files), accents: themeAccents(themeDoc), themeColors: themeColors(themeDoc), openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), commentDefs: docxComments(files), bibSources: docxSources(files), citationStyle: docxCitationStyle(files), notes: [], noteParts: {
+  const ctx: Ctx = { styles, styleNames, usedStyles: new Set(), charStyleNames, usedCharStyles: new Set(), warnings, files, rels: parseRels(files['word/_rels/document.xml.rels']), imageCache: new Map(), convertedImages, listCounters: new Map(), usedListStyles: new Map(), contentWidthCm, leftMarginCm, pageRtl: sectPrRtl(sectPr), mainLang: docLangs.main, hyphenate: docSetting(files, 'autoHyphenation'), cellSpacing: {}, tblIndToText: tblIndIsToText(files), accents: themeAccents(themeDoc), themeColors: themeColors(themeDoc), openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), commentDefs: docxComments(files), bibSources: docxSources(files), citationStyle: docxCitationStyle(files), notes: [], noteParts: {
     footnote: noteParts(files, 'footnotes', 'footnote'),
     endnote: noteParts(files, 'endnotes', 'endnote'),
   }, noteBookmarks: new Map() };
@@ -339,7 +339,8 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
     // The first section's, as the margins and the paper are.
     lineGrid: docxLineGrid(groups[0]?.sectPr ?? finalSectPr),
     foldMarks: docxFoldMarks(files),
-    hyphenate: docAutoHyphenation(files),
+    // Word's Layout ▸ Hyphenation.
+    hyphenate: docSetting(files, 'autoHyphenation'),
     recordChanges: docRecordsChanges(files),
     pageNumbering: docNumbering,
     orientation: docPaper.orientation,
@@ -349,7 +350,8 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
     // Word document — its own ODF default adds them (probed).
     spacingModel: 'max' as const,
     // Word applies space above at a page top unless its own compatibility flag says not to.
-    spacingAtPageStart: !docSuppressSpaceAfterBreak(files),
+    spacingAtPageStart: !docSetting(files, 'suppressSpBfAfterPgBrk'),
+    balanceSpaces: docSetting(files, 'balanceSingleByteDoubleByteWidth'),
     header: first.header,
     footer: first.footer,
     headerFirst: first.differentFirstPage ? first.headerFirst : null,
@@ -3504,25 +3506,13 @@ function docxPageNumbering(sectPr: Element | null): PageNumbering {
   };
 }
 
-// Word's Layout ▸ Hyphenation, from settings.xml (absent = off, as in Word).
-// w:suppressSpBfAfterPgBrk — Word's own "no space above the block that opens a page",
-// the flag LibreOffice reads into AddParaTableSpacingAtStart.
-function docSuppressSpaceAfterBreak(files: Record<string, Uint8Array>): boolean {
+// An on/off switch in settings.xml (absent = off, as in Word), wherever it nests — the
+// document-wide flags, and the compatibility options under w:compat.
+function docSetting(files: Record<string, Uint8Array>, name: string): boolean {
   const bytes = files['word/settings.xml'];
   if (!bytes) return false;
   try {
-    const el = parseXml(strFromU8(bytes)).getElementsByTagNameNS(W, 'suppressSpBfAfterPgBrk')[0];
-    return !!el && onOff(el);
-  } catch {
-    return false;
-  }
-}
-
-function docAutoHyphenation(files: Record<string, Uint8Array>): boolean {
-  const bytes = files['word/settings.xml'];
-  if (!bytes) return false;
-  try {
-    const el = parseXml(strFromU8(bytes)).getElementsByTagNameNS(W, 'autoHyphenation')[0];
+    const el = parseXml(strFromU8(bytes)).getElementsByTagNameNS(W, name)[0];
     return !!el && onOff(el);
   } catch {
     return false;

@@ -80,6 +80,9 @@ export interface OdtImportResult {
   decor: PageDecor;
   lineNumbering: LineNumbering;
   lineGrid: LineGrid;
+  // Every space at half the font size (settings.xml BalanceSpacesAndIdeographicSpaces,
+  // Word's w:balanceSingleByteDoubleByteWidth).
+  balanceSpaces: boolean;
   // Fold + punch marks in the left margin (the export's named header lines).
   foldMarks: boolean;
   // Automatic hyphenation (ODF fo:hyphenate on the base style, Word w:autoHyphenation).
@@ -917,6 +920,7 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
     tabIntervalCm: resolver.defaultTabInterval(),
     spacingModel: odfSpacingModel(files),
     spacingAtPageStart: odfSpacingAtPageStart(files),
+    balanceSpaces: /BalanceSpacesAndIdeographicSpaces"[^>]*>true</.test(files['settings.xml'] ? strFromU8(files['settings.xml']) : ''),
     header,
     footer,
     headerFirst,

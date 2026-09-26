@@ -45,6 +45,7 @@
   import { loadPageNumbering, savePageNumbering, DEFAULT_PAGE_NUMBERING, type PageNumbering } from './lib/storage/pageNumbering';
   import { loadPageDecor, savePageDecor, EMPTY_PAGE_DECOR, type PageDecor } from './lib/storage/pageDecor';
   import { loadLineNumbering, saveLineNumbering, DEFAULT_LINE_NUMBERING, type LineNumbering } from './lib/storage/lineNumbering';
+  import { loadBalanceSpaces, saveBalanceSpaces } from './lib/storage/balanceSpaces';
   import { loadLineGrid, saveLineGrid, DEFAULT_LINE_GRID, type LineGrid } from './lib/storage/lineGrid';
   import { loadFoldMarks, saveFoldMarks } from './lib/storage/foldMarks';
   import { printMarkup } from './lib/storage/printMarkup.svelte';
@@ -270,6 +271,7 @@
   let pageDecor: PageDecor = $state(loadPageDecor());
   let lineNumbering: LineNumbering = $state(loadLineNumbering());
   let lineGrid: LineGrid = $state(loadLineGrid());
+  let balanceSpaces = $state(loadBalanceSpaces());
   let foldMarks = $state(loadFoldMarks());
   // The switch keeps the user's wish; only A4 portrait, the paper DIN 5008 describes,
   // actually draws and exports the marks. Import and templates set the flag too, so
@@ -367,6 +369,7 @@
     savePageDecor(pageDecor);
     saveLineNumbering(lineNumbering);
     saveLineGrid(lineGrid);
+    saveBalanceSpaces(balanceSpaces);
     saveFoldMarks(foldMarks);
   });
 
@@ -684,6 +687,7 @@
     pageDecor = { ...EMPTY_PAGE_DECOR };
     lineNumbering = { ...DEFAULT_LINE_NUMBERING };
     lineGrid = { ...DEFAULT_LINE_GRID };
+    balanceSpaces = false;
     foldMarks = false;
     // Recording belongs to the document, so a new one starts off, as it does in both.
     setRecordChanges(false);
@@ -863,6 +867,7 @@
       pageDecor = result.decor;
       lineNumbering = result.lineNumbering;
       lineGrid = result.lineGrid;
+      balanceSpaces = result.balanceSpaces;
       foldMarks = result.foldMarks === true;
       // The file says whether it goes on recording; ours is not the setting that counts.
       setRecordChanges(result.recordChanges);
@@ -1000,7 +1005,7 @@
     return odf && { ...odf, other: documentLanguageOther };
   }
   function exportArgs() {
-    return [pageMargins, pageOrientation, hfOpts(), exportLanguage(), pageFormat, styleSheet(), tabIntervalCm, spacingModel, pageRtl, noteSettings(), docProps, hyphenate, pageNumbering, pageDecor, lineNumbering, recordChanges(), foldMarksOn, spacingAtPageStart, embeddedFonts(), lineGrid] as const;
+    return [pageMargins, pageOrientation, hfOpts(), exportLanguage(), pageFormat, styleSheet(), tabIntervalCm, spacingModel, pageRtl, noteSettings(), docProps, hyphenate, pageNumbering, pageDecor, lineNumbering, recordChanges(), foldMarksOn, spacingAtPageStart, embeddedFonts(), lineGrid, balanceSpaces] as const;
   }
 
   async function buildBytes(kind: DocumentFormat, json: TiptapNode): Promise<Uint8Array> {
@@ -1697,6 +1702,7 @@
     {pageDecor}
     {lineNumbering}
     {lineGrid}
+    {balanceSpaces}
     foldMarks={foldMarksOn}
     commentAuthor={docProps.author}
     bind:extraHfSections

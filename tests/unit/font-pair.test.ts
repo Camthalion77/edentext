@@ -32,7 +32,7 @@ describe('font pair rendering', () => {
     const style = ed.view.dom.querySelector('span')!.getAttribute('style')!;
     expect(style).toContain('--font-asian: "Yu Mincho"');
     expect(style).not.toContain('--font-west:');
-    expect(style).toContain('font-family: var(--font-west), "Yu Mincho", var(--font-tail)');
+    expect(style).toContain('font-family: var(--font-space,) var(--font-west), "Yu Mincho", var(--font-tail)');
   });
 
   it('parses its own spans back into both attrs', () => {
@@ -56,7 +56,7 @@ describe('font pair rendering', () => {
 
   it('names a run\'s own fonts first in its font-family, for HTML copied out', () => {
     const ed = makeEditor(doc(run('mixed 漢字', { fontFamily: 'Georgia', fontFamilyAsian: 'SimSun' })));
-    expect(ed.view.dom.querySelector('span')!.getAttribute('style')).toContain('font-family: "Georgia", "SimSun", var(--font-serif)');
+    expect(ed.view.dom.querySelector('span')!.getAttribute('style')).toContain('font-family: var(--font-space,) "Georgia", "SimSun", var(--font-serif)');
   });
 
   it('gives a style both variables and a sans tail for the heading font', () => {

@@ -259,16 +259,16 @@ function westNames(name: string): string {
   return `"${cssString(name)}"`;
 }
 
-// Text takes the western font, then the asian one, then the western family's generic
-// tail (last, so `serif` cannot catch Han text first). Each is a variable inheriting on its
-// own; the half an element names is also spelled out, so copied HTML names a real font.
+// Text takes the western font, then the asian one, then the western family's generic tail
+// (last, so `serif` cannot catch Han text first), each a variable inheriting on its own, and
+// a balanced document's --font-space before all three. Named halves are spelled out too.
 export function fontPairDeclarations(west?: string | null, asian?: string | null): string[] {
   if (!west && !asian) return [];
   const out: string[] = [];
   const tail = `var(${west === 'Liberation Sans' || west === 'Arial' ? '--font-heading' : '--font-serif'})`;
   if (west) out.push(`--font-west: ${westNames(west)}`, `--font-tail: ${tail}`);
   if (asian) out.push(`--font-asian: "${cssString(asian)}"`);
-  out.push(`font-family: ${[
+  out.push(`font-family: var(--font-space,) ${[
     west ? westNames(west) : 'var(--font-west)',
     asian ? `"${cssString(asian)}"` : 'var(--font-asian, var(--font-tail))',
     west ? tail : 'var(--font-tail)',

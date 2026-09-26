@@ -84,6 +84,18 @@
   src: url('../assets/fonts/EdenSymbols.woff2') format('woff2');
 }
 
+/* A space at half the font size, what a document balancing single- and double-byte
+   widths sets (storage/balanceSpaces.ts): Liberation Serif's space with a 0.5em advance,
+   so the line keeps its metrics. (SIL Open Font License, as Liberation.) */
+@font-face {
+  font-family: 'EdenText Space';
+  font-style: normal;
+  font-weight: 1 1000;
+  font-display: block;
+  src: url('../assets/fonts/EdenSpace.woff2') format('woff2');
+  unicode-range: U+20;
+}
+
 /* STIX Two Math — a font with an OpenType MATH table is what makes MathML typeset:
    without one Chromium drops ∑ and ϕ entirely and leaves brackets glyph-height next
    to a fraction. Word uses Cambria Math for the same job. (OFL — see

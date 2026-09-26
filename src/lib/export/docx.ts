@@ -1948,17 +1948,18 @@ function patchPackedXml(bytes: Uint8Array): Uint8Array {
   return zipSync(out);
 }
 
-// Post-pack pass: no space above the block that opens a page — Word keeps it in the
-// compatibility set, where LibreOffice reads it into AddParaTableSpacingAtStart.
-function applySpacingAtStartDocx(bytes: Uint8Array): Uint8Array {
+// Post-pack pass: compatibility options, which the docx lib cannot write — flags in
+// CT_Compat's order, since they go in ahead of its own w:compatSetting entries.
+function applyCompatDocx(bytes: Uint8Array, flags: string[]): Uint8Array {
+  if (!flags.length) return bytes;
   const files = unzipSync(bytes);
   const setBytes = files['word/settings.xml'];
   if (!setBytes) return bytes;
   const xml = strFromU8(setBytes);
-  if (xml.includes('w:suppressSpBfAfterPgBrk')) return bytes;
+  const els = flags.filter((f) => !xml.includes(`w:${f}`)).map((f) => `<w:${f}/>`).join('');
   files['word/settings.xml'] = strToU8(/<w:compat\b[^>]*>/.test(xml)
-    ? xml.replace(/(<w:compat\b[^>]*>)/, '$1<w:suppressSpBfAfterPgBrk/>')
-    : xml.replace(/(<w:settings\b[^>]*>)/, '$1<w:compat><w:suppressSpBfAfterPgBrk/></w:compat>'));
+    ? xml.replace(/(<w:compat\b[^>]*>)/, `$1${els}`)
+    : xml.replace(/(<w:settings\b[^>]*>)/, `$1<w:compat>${els}</w:compat>`));
   const out: Record<string, [Uint8Array, { level: 6 }]> = {};
   for (const [path, data] of Object.entries(files)) out[path] = [data, { level: 6 }];
   return zipSync(out);
@@ -3107,6 +3108,7 @@ export async function buildDocx(
   spacingAtPageStart = true,
   fonts: EmbeddedFont[] = [],
   lineGrid: LineGrid = DEFAULT_LINE_GRID,
+  balanceSpaces = false,
 ): Promise<Uint8Array> {
   docLangTag = localeTag(language ? language.language : 'en');
   // Before the walk: every picture the file can hold has to be a raster by then, and
@@ -3358,7 +3360,11 @@ export async function buildDocx(
   const bidi = applyParagraphFlagsDocx(rtl ? applyBidiDocx(mirrored) : mirrored);
   const dims = pageDimsCm(pageFormat, orientation);
   const foldMarked = applyFoldMarksDocx(bidi, foldMarks, dims.w * 10);
-  const spaced = spacingAtPageStart ? foldMarked : applySpacingAtStartDocx(foldMarked);
+  // No space above the block opening a page is Word's w:suppressSpBfAfterPgBrk.
+  const spaced = applyCompatDocx(foldMarked, [
+    ...(balanceSpaces ? ['balanceSingleByteDoubleByteWidth'] : []),
+    ...(spacingAtPageStart ? [] : ['suppressSpBfAfterPgBrk']),
+  ]);
   const marked = applyEmbeddedFontsDocx(spaced, fonts);
   if (isEmptyPageDecor(decor)) return patchPackedXml(orderDocxSettings(marked));
   const pt = (cm: number) => (cm / 2.54) * 72;
