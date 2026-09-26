@@ -92,8 +92,10 @@ export function mainOfPair(west: string | null, asian: string | null, asianText:
 }
 
 // "For all text": the pick becomes the main language, and a main language of the other
-// script moves to the other slot, so the text in that script keeps its language.
+// script moves to the other slot, so the text in that script keeps its language. No
+// language clears both slots, as LibreOffice's "None" does.
 export function pickDocumentLanguage(main: DocumentLanguage, other: string | null, code: DocumentLanguage): { main: DocumentLanguage; other: string | null } {
+  if (code === NO_LANGUAGE) return { main: code, other: null };
   const was = tagForLanguage(main);
   const next = tagForLanguage(code);
   return { main: code, other: was && next && isAsianTag(was) !== isAsianTag(next) ? was : other };

@@ -69,6 +69,7 @@ describe('the document pair', () => {
     expect(pickDocumentLanguage('de', null, 'zh-CN')).toEqual({ main: 'zh-CN', other: 'de-DE' });
     expect(pickDocumentLanguage('zh-CN', 'de-DE', 'zh-TW')).toEqual({ main: 'zh-TW', other: 'de-DE' });
     expect(pickDocumentLanguage('zh-CN', 'de-DE', 'en')).toEqual({ main: 'en', other: 'zh-CN' });
+    expect(pickDocumentLanguage('zh-CN', 'en-US', 'none')).toEqual({ main: 'none', other: null });
   });
 
   it('checks an East Asian document in its western language', () => {
