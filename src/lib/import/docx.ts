@@ -332,7 +332,8 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
     notes: docNoteSettings(files),
     margins: withMirror(first.margins ?? sect.margins, mirrored),
     rtl: sectPrRtl(finalSectPr),
-    decor: docxPageDecor(docDoc, finalSectPr, files),
+    decor: docxPageDecor(docDoc, finalSectPr, files,
+      shownHeaderParts([...groups.map((g) => g.sectPr), finalSectPr], ctx, oddEven)),
     lineNumbering: docxLineNumbering(finalSectPr),
     foldMarks: docxFoldMarks(files),
     hyphenate: docAutoHyphenation(files),
@@ -3196,7 +3197,9 @@ function closingSectPr(el: Element): Element | null {
 // The page's own decoration: Word keeps the background on w:document, the border in the
 // section, and the watermark as a VML fontwork shape in a header part — the same three
 // places LibreOffice writes them (probed).
-function docxPageDecor(docDoc: Document, sectPr: Element | null, files: Record<string, Uint8Array>): PageDecor {
+function docxPageDecor(
+  docDoc: Document, sectPr: Element | null, files: Record<string, Uint8Array>, headers: Set<string>,
+): PageDecor {
   const bg = fc(docDoc.documentElement, 'background')?.getAttributeNS(W, 'color');
   const borders = fc(sectPr, 'pgBorders');
   const top = borders ? fc(borders, 'top') : null;
@@ -3210,7 +3213,7 @@ function docxPageDecor(docDoc: Document, sectPr: Element | null, files: Record<s
           color: color && color !== 'auto' ? `#${color}` : '#000000',
           paddingCm: Math.round(((intAttr(top, W, 'space') ?? 0) / 72) * 2.54 * 100) / 100 }
       : null,
-    watermark: docxWatermark(files),
+    watermark: docxWatermark(files, headers),
   });
 }
 
@@ -3220,11 +3223,28 @@ function docxFoldMarks(files: Record<string, Uint8Array>): boolean {
     /^word\/header\d*\.xml$/.test(path) && strFromU8(files[path]).includes(FOLD_MARK_NAME));
 }
 
+// The header parts a page shows: a section's default, its first only under w:titlePg,
+// its even only with odd/even on. Both word processors draw nothing from the rest.
+function shownHeaderParts(sectPrs: (Element | null)[], ctx: Ctx, oddEven: boolean): Set<string> {
+  const out = new Set<string>();
+  for (const sect of sectPrs) {
+    const titlePgEl = fc(sect, 'titlePg');
+    const titlePg = !!titlePgEl && onOff(titlePgEl);
+    for (const ref of sect ? fcAll(sect, 'headerReference') : []) {
+      const type = ref.getAttributeNS(W, 'type') || 'default';
+      if ((type === 'first' && !titlePg) || (type === 'even' && !oddEven)) continue;
+      const target = ctx.rels.get(ref.getAttributeNS(R, 'id') ?? '')?.target;
+      if (target) out.add(`word/${target.replace(/^\/+/, '')}`);
+    }
+  }
+  return out;
+}
+
 // The VML shape Word and LibreOffice both name PowerPlusWaterMarkObject, in whichever
-// header part carries it. Its text rides v:textpath, its angle the style's rotation.
-function docxWatermark(files: Record<string, Uint8Array>): unknown {
-  for (const path of Object.keys(files)) {
-    if (!/^word\/header\d*\.xml$/.test(path)) continue;
+// shown header part carries it. Its text rides v:textpath, its angle the style's rotation.
+function docxWatermark(files: Record<string, Uint8Array>, headers: Set<string>): unknown {
+  for (const path of headers) {
+    if (!files[path]) continue;
     const xml = strFromU8(files[path]);
     const i = xml.indexOf(WATERMARK_NAME);
     if (i < 0) continue;

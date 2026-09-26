@@ -1033,6 +1033,22 @@ describe('DOCX import: a mid-body section break starts a new page', () => {
   });
 });
 
+describe('DOCX import: a watermark only from a header a page shows', () => {
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml"';
+  const build = (type: string, titlePg: boolean) => importDocx(zipSync({
+    'word/document.xml': strToU8(`<?xml version="1.0"?><w:document ${NS}><w:body><w:p/><w:sectPr>`
+      + `<w:headerReference w:type="${type}" r:id="rIdH"/>${titlePg ? '<w:titlePg/>' : ''}</w:sectPr></w:body></w:document>`),
+    'word/_rels/document.xml.rels': strToU8('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rIdH" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/></Relationships>'),
+    'word/header1.xml': strToU8(`<?xml version="1.0"?><w:hdr ${NS}><w:p><w:r><w:pict><v:shape id="PowerPlusWaterMarkObject1">`
+      + '<v:textpath string="DRAFT"/></v:shape></w:pict></w:r></w:p></w:hdr>'),
+  })).decor as { watermark: { text: string } | null };
+
+  it('takes it from the default header', () => expect(build('default', false).watermark?.text).toBe('DRAFT'));
+  it('takes it from a first-page header under titlePg', () => expect(build('first', true).watermark?.text).toBe('DRAFT'));
+  it('leaves it off when the first-page header is not in use', () => expect(build('first', false).watermark).toBeNull());
+});
+
 describe('DOCX named paragraph styles', () => {
   const sheet = builtinStyleSheet();
   sheet.paragraph['Merksatz'] = {
