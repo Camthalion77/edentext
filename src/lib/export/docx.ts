@@ -2927,11 +2927,14 @@ function paragraphStyleOf(style: Style): IParagraphStyleOptions {
   const spacing: Record<string, number> = {};
   if (p.spaceBefore != null) spacing.before = ptToTwip(p.spaceBefore);
   if (p.spaceAfter != null) spacing.after = ptToTwip(p.spaceAfter);
-  // A proportional spacing is a factor of the single line (240 twips).
+  // A proportional spacing is a factor of the single line (240 twips), a fixed one pt.
   const factor = Number(p.lineHeight);
+  const fixedPt = /pt$/.test(p.lineHeight ?? '') ? parseFloat(p.lineHeight!) : NaN;
   if (Number.isFinite(factor) && factor > 0 && factor !== 1) spacing.line = Math.round(factor * 240);
+  else if (fixedPt > 0) spacing.line = ptToTwip(fixedPt);
   const paragraph: Record<string, unknown> = {};
-  if (Object.keys(spacing).length) paragraph.spacing = { ...spacing, ...(spacing.line ? { lineRule: LineRuleType.AUTO } : {}) };
+  const lineRule = fixedPt > 0 ? LineRuleType.EXACT : LineRuleType.AUTO;
+  if (Object.keys(spacing).length) paragraph.spacing = { ...spacing, ...(spacing.line ? { lineRule } : {}) };
   if (p.textAlign) paragraph.alignment = alignOf({ textAlign: p.textAlign });
   if (p.indent != null) paragraph.indent = { left: cmToTwip(p.indent) };
   if (style.outlineLevel) paragraph.keepNext = true;

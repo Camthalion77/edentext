@@ -782,9 +782,6 @@ const HEADING_DEFAULTS = HEADING_STYLE_OVERRIDES.map(h => ({
 const DEFAULT_FONTS = new Set(['times new roman', 'liberation serif']);
 const DEFAULT_HEADING_FONTS = new Set(['arial', 'liberation sans']);
 
-// ODF line spacing multiplies the font's natural line height; see lineHeight.ts.
-const LINE_HEIGHT_RATIO = 1.15;
-
 // odf-kit emits each list level at margin-left = level × 1.27cm (label-alignment).
 // A top-level list's margin beyond this level-1 base is its whole-list indent.
 const LIST_BASE_MARGIN_CM = 1.27;
@@ -1462,7 +1459,7 @@ type BlockDefaults = {
   indentPt: number;
   // The named style's line spacing as an ODF factor; a block declaring the same one adds
   // nothing, but a block that declares 100% under a 115% style is direct formatting.
-  lineHeight: number;
+  lineHeight: string;
   // The style's own alignment and flow flags (Title centres, Heading keeps with next).
   textAlign: string | null;
   keepNext: boolean;
@@ -1507,11 +1504,16 @@ function withFont(set: Set<string>, family: string | null | undefined): Set<stri
   return out;
 }
 
-// fo:line-height as a factor; null for a length or `normal`, which is not a percentage.
-function linePercent(lh: string | undefined): number | null {
-  if (!lh || !lh.endsWith('%')) return null;
-  const p = parseFloat(lh);
-  return Number.isFinite(p) ? Math.round(p) / 100 : null;
+// fo:line-height as the model spells it: a factor ('1.5') for a percentage, a fixed
+// height ('28pt') for a length; null for `normal` or anything unreadable.
+function lineSpacing(lh: string | undefined): string | null {
+  if (!lh || lh === 'normal') return null;
+  if (lh.endsWith('%')) {
+    const p = parseFloat(lh);
+    return Number.isFinite(p) ? String(Math.round(p) / 100) : null;
+  }
+  const pt = lengthToPt(lh);
+  return pt != null && pt > 0 ? `${snapPt(pt)}pt` : null;
 }
 
 // fo:text-align → the editor's four values (start/end read as an LTR page), or null.
@@ -1531,7 +1533,7 @@ function blockDefaults(resolver: StyleResolver, named: string | null, headingLev
     marginTopPt: hdef ? hdef.marginTopPt : 0,
     marginBottomPt: hdef ? hdef.marginBottomPt : 0,
     indentPt: 0,
-    lineHeight: 1,
+    lineHeight: '1',
     textAlign: null,
     keepNext: false,
     keepLines: false,
@@ -1563,7 +1565,7 @@ function blockDefaults(resolver: StyleResolver, named: string | null, headingLev
     marginTopPt: lengthToPt(para['fo:margin-top']) ?? 0,
     marginBottomPt: lengthToPt(para['fo:margin-bottom']) ?? 0,
     indentPt: lengthToPt(para['fo:margin-left']) ?? 0,
-    lineHeight: linePercent(para['fo:line-height']) ?? 1,
+    lineHeight: lineSpacing(para['fo:line-height']) ?? '1',
     textAlign: odfTextAlign(para['fo:text-align']),
     keepNext: para['fo:keep-with-next'] === 'always',
     keepLines: para['fo:keep-together'] === 'always',
@@ -1611,13 +1613,10 @@ function paraPropsFromOdf(props: PropMap): ParaProps {
   if (mt != null) out.spaceBefore = snapPt(mt);
   if (mb != null) out.spaceAfter = snapPt(mb);
   if (ml != null) out.indent = Math.round(ml * 100) / 100;
-  // The ODF percentage itself, as everywhere else in the model (blockAttrs, both DOCX
-  // paths, and the export, which writes it straight back out as a percentage).
-  const lh = props['fo:line-height'];
-  if (lh && lh.endsWith('%')) {
-    const mult = parseFloat(lh) / 100;
-    if (Number.isFinite(mult)) out.lineHeight = String(Math.round(mult * 100) / 100);
-  }
+  // The ODF percentage itself, or a fixed height, as everywhere else in the model
+  // (blockAttrs, both DOCX paths, and the export, which writes either straight back).
+  const lh = lineSpacing(props['fo:line-height']);
+  if (lh) out.lineHeight = lh;
   const bg = props['fo:background-color'];
   if (bg && bg !== 'transparent') out.backgroundColor = normalizeColor(bg) ?? undefined;
   let pad: number | null = null;
@@ -1992,23 +1991,8 @@ function blockAttrs(paraProps: PropMap, textProps: PropMap, defaults: BlockDefau
   const base = paraProps['style:writing-mode'] === 'rl-tb' ? 'right' : defaults.textAlign ?? 'left';
   if (ta !== null && ta !== base) attrs.textAlign = ta;
 
-  const lh = paraProps['fo:line-height'];
-  if (lh && lh !== 'normal') {
-    let mult: number | null = null;
-    if (lh.endsWith('%')) {
-      const p = parseFloat(lh);
-      if (Number.isFinite(p)) mult = p / 100;
-    } else {
-      // Fixed line height: best-effort multiplier against the resolved font size.
-      const pt = lengthToPt(lh);
-      const fontPt = lengthToPt(textProps['fo:font-size']) ?? defaults.fontSizePt;
-      if (pt != null && fontPt > 0) mult = pt / (fontPt * LINE_HEIGHT_RATIO);
-    }
-    if (mult != null) {
-      mult = Math.round(mult * 100) / 100;
-      if (Math.abs(mult - defaults.lineHeight) > 0.01) attrs.lineHeight = String(mult);
-    }
-  }
+  const lh = lineSpacing(paraProps['fo:line-height']);
+  if (lh != null && lh !== defaults.lineHeight) attrs.lineHeight = lh;
 
   const defTop = defaults.marginTopPt;
   const defBottom = defaults.marginBottomPt;

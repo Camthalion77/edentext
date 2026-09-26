@@ -997,6 +997,14 @@ function tocLevelStyles(ctx: Ctx, maxLevel: number, kind: IndexKind = 'toc'): (s
   return out.some(Boolean) ? Array.from(out, (s) => s ?? null) : null;
 }
 
+// w:spacing's line as the model spells it: a factor of the single line (240) under
+// "auto", a fixed height in pt under "exact". "atLeast" has no model value yet.
+function lineSpacing(line: number | null, rule: string | null): string | null {
+  if (line == null) return null;
+  if (!rule || rule === 'auto') return String(round2(line / 240));
+  return rule === 'exact' && line > 0 ? `${snapPt(twipToPt(line))}pt` : null;
+}
+
 // What a style declares itself: its resolved props minus the parent's.
 function ownProps<T extends object>(resolved: T, parent: T): T {
   const out = {} as T;
@@ -1015,9 +1023,8 @@ function stylePara(ctx: Ctx, id: string | null): ParaProps {
   // Not suppressed against single spacing — the document default may be something else
   // (Word writes 1.08), and a style declaring 1 would then inherit that instead. What
   // the parent style already supplies is dropped by the caller's ownProps.
-  if (sp.line != null && (!sp.lineRule || sp.lineRule === 'auto')) {
-    out.lineHeight = String(round2(sp.line / 240));
-  }
+  const spacing = lineSpacing(sp.line ?? null, sp.lineRule ?? null);
+  if (spacing) out.lineHeight = spacing;
   const jc = ctx.styles.paragraphAlign(id);
   if (jc === 'center') out.textAlign = 'center';
   else if (jc === 'both' || jc === 'distribute') out.textAlign = 'justify';
@@ -1425,7 +1432,8 @@ function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number |
   if (after != null) attrs.spaceAfter = snapPt(twipToPt(after));
   // Single spacing is written out too: the block's own style may set another one, and
   // then an unset attr is not the same thing.
-  if (line != null && (!rule || rule === 'auto')) attrs.lineHeight = String(round2(line / 240));
+  const spacing = lineSpacing(line, rule);
+  if (spacing) attrs.lineHeight = spacing;
 
   if (!ppr) return attrs;
 

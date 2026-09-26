@@ -3041,3 +3041,25 @@ describe('Leg 38: a language per paragraph and per run (ODT + DOCX)', () => {
     check('no w:lang in document.xml', !xml.includes('<w:lang'), xml.match(/<w:lang[^>]*>/g));
   });
 });
+
+describe('a fixed line spacing', () => {
+  const sheet = builtinStyleSheet();
+  sheet.paragraph['Fixed'] = { name: 'Fixed', parent: 'Standard', next: 'Standard', para: { lineHeight: '20pt' }, text: {} };
+  const doc: N = { type: 'doc', content: [
+    { type: 'paragraph', attrs: { lineHeight: '28pt' }, content: [{ type: 'text', text: 'exact' }] },
+    { type: 'paragraph', attrs: { styleName: 'Fixed' }, content: [{ type: 'text', text: 'styled' }] },
+  ] };
+
+  it('round-trips as a pt height through ODF and DOCX, on a paragraph and on a style', async () => {
+    const odt = importOdt(await buildOdt(doc, margins, 'portrait', undefined, null, 'A4', sheet));
+    const docxBytes = await buildDocx(doc, margins, 'portrait', undefined, null, 'A4', sheet);
+    check('DOCX writes the paragraph as exact', /<w:spacing[^>]*w:line="560"[^>]*w:lineRule="exact"/.test(strFromU8(unzipSync(docxBytes)['word/document.xml'])));
+    const docx = importDocx(docxBytes);
+    for (const [name, res] of [['ODF', odt], ['DOCX', docx]] as const) {
+      const blocks = res.content.content ?? [];
+      check(`${name}: the paragraph keeps 28pt`, blocks[0]?.attrs?.lineHeight === '28pt', blocks[0]?.attrs);
+      check(`${name}: the styled one carries nothing itself`, blocks[1]?.attrs?.lineHeight == null, blocks[1]?.attrs);
+      check(`${name}: the style keeps 20pt`, res.styles.paragraph['Fixed']?.para.lineHeight === '20pt', res.styles.paragraph['Fixed']?.para);
+    }
+  });
+});
