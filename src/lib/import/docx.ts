@@ -163,6 +163,12 @@ const twipToPx = (tw: number) => (tw / 1440) * 96;
 const emuToPx = (emu: number) => emu / 9525;
 const cmToEmu = (cm: number) => cm * 360000;
 const round2 = (v: number) => Math.round(v * 100) / 100;
+// A twip length in cm, to the hundredth where that still names the same twip (a length
+// typed in cm comes back as typed), else to the thousandth — so it saves back unchanged.
+const twipCm = (tw: number) => {
+  const cm = round2(twipToCm(tw));
+  return Math.round((cm / 2.54) * 1440) === tw ? cm : Math.round(twipToCm(tw) * 1000) / 1000;
+};
 
 // A run-level <w:br w:type="page"/> becomes this sentinel inline node in convertInline;
 // splitParaAtPageBreaks consumes it (body only) into breakBefore, and it never survives.
@@ -3160,8 +3166,7 @@ function tableMargins(tbl: Element, weights: number[] | null, ctx: Ctx, leftPadC
 
   if (Math.abs(left) < 0.05 && Math.abs(right) < 0.05) return null;
   if (left + right > content - 1) return null;
-  const round2 = (v: number) => Math.round(v * 100) / 100;
-  const l = round2(left), r = round2(right);
+  const l = twipCm(Math.round((left / 2.54) * 1440)), r = twipCm(Math.round((right / 2.54) * 1440));
   // A zero side is the attr's default (null); rounding may also leave a -0 behind.
   return { ...(Math.abs(l) >= 0.005 ? { marginLeft: l } : {}), ...(Math.abs(r) >= 0.005 ? { marginRight: r } : {}) };
 }
@@ -3663,7 +3668,7 @@ function sectMargins(sect: Element | null): PageMargins | null {
   if (!pgMar) return null;
   const cm = (a: string, fallback: number) => {
     const tw = intAttr(pgMar, W, a);
-    return tw == null ? fallback : Math.max(0, round2(twipToCm(tw)));
+    return tw == null ? fallback : Math.max(0, twipCm(tw));
   };
   const pgSz = sect ? fc(sect, 'pgSz') : null;
   const dim = (a: string, fallback: number) => {

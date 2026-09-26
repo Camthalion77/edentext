@@ -384,6 +384,16 @@ describe('DOCX export → import round trip', () => {
   });
 });
 
+// A margin in twips comes back as the same twip, and one typed in cm as typed.
+it('keeps a page margin to the twip', async () => {
+  const doc = { type: 'doc', content: [{ type: 'paragraph' }] };
+  const out = await buildDocx(doc as never, { top: 2.5, bottom: 2.5, left: 3.175, right: 3.175 });
+  const again = importDocx(out);
+  expect([again.margins.top, again.margins.left]).toEqual([2.5, 3.175]);
+  const xml = strFromU8(unzipSync(await buildDocx(doc as never, again.margins))['word/document.xml']);
+  expect(xml).toMatch(/<w:pgMar [^>]*w:left="1800"/);
+});
+
 describe('DOCX different first page (w:titlePg)', () => {
   const fixture: N = { type: 'doc', content: [para('Body')] };
   // Arial 10pt on the runs and the page-field atoms, so the field digits keep the font.
