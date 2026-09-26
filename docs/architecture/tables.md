@@ -147,6 +147,12 @@ We deliberately keep TipTap's `resizable: false` (so its own columnResizing plug
   per side. `.paper[data-spacing-model='max']` takes that half pixel back off the side paddings,
   which is what fits a cell line that fills its cell to within half a point (measured: 144pt of
   text in a 144.5pt cell, one line in both word processors, two before).
+  **Here the geometry follows Word, not LibreOffice**, even though LibreOffice is the reference
+  elsewhere: its author laid the document out in Word, and LibreOffice reserves the border
+  even when it opens the DOCX. No file setting decides between the two, and switching on the
+  source format would re-lay a document saved as ODT and reopened. The cost is a cell line
+  filled to within the border width: it wraps in LibreOffice and not here (measured: one cell
+  in the corpus, 4 → 12 reports, against 40 → 17 and two pages for a Word-authored form).
 - **`<th>` carries no UA defaults.** A repeating ODF header row (`table:table-header-rows`)
   becomes a `tableHeader`, and the browser centres and bolds it — neither Word nor LibreOffice
   does. `editor.css` resets both, so the cell follows its own style (the "header row" preset's
