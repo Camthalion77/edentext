@@ -2747,6 +2747,17 @@ function tableFloatOptions(box: TiptapNode): ITableFloatOptions {
   };
 }
 
+// Word has no page break on a table: its first cell's paragraph asks for the page, and
+// both word processors move the whole table there.
+function breakInFirstCell(table: TiptapNode): TiptapNode {
+  const [row, ...rows] = table.content ?? [];
+  const [cell, ...cells] = row?.content ?? [];
+  const [para, ...rest] = cell?.content ?? [];
+  if (table.attrs?.breakBefore !== 'page' || (para?.type !== 'paragraph' && para?.type !== 'heading')) return table;
+  const first = { ...para, attrs: { ...para.attrs, breakBefore: 'page' } };
+  return { ...table, content: [{ ...row, content: [{ ...cell, content: [first, ...rest] }, ...cells] }, ...rows] };
+}
+
 // ---- top-level walk --------------------------------------------------------
 function blocksToDocx(content: TiptapNode[], num: Numbering, contentWidthCm: number): (Paragraph | Table | TableOfContents)[] {
   const out: (Paragraph | Table | TableOfContents)[] = [];
@@ -2758,7 +2769,7 @@ function blocksToDocx(content: TiptapNode[], num: Numbering, contentWidthCm: num
     } else if (node.type === 'bulletList' || node.type === 'orderedList') {
       listEntryToDocx(node, num, out);
     } else if (node.type === 'table') {
-      out.push(tableToDocx(node, contentWidthCm, num));
+      out.push(tableToDocx(breakInFirstCell(node), contentWidthCm, num));
     } else if (node.type === 'image') {
       out.push(new Paragraph({ children: inlineToRuns([node]) }));
     } else if (node.type === 'tableOfContents') {

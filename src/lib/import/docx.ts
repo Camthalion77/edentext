@@ -682,12 +682,16 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
       // result is skipped, the paragraphs above and a bibliography's table alike.
       continue;
     } else if (el.localName === 'tbl') {
-      breakPending = false; // a break before a table can't be modeled; drop it
+      // A page break ending the paragraph above, or Word's own spelling of one: the first
+      // cell's paragraph asking for it. A floating table has no place in the flow to move.
+      const pageBreak = breakPending || tableAsksForPage(el);
+      breakPending = false;
       flush();
       if (kind === 'body') {
         const floated = floatingTableBox(el, ctx);
         if (floated) { floatBoxes.push({ box: floated, at: out.length }); continue; }
         const t = convertTable(el, ctx);
+        if (t && pageBreak) applyBreakBefore(t);
         if (t) out.push(t);
       } else {
         ctx.warnings.add('Nested tables were flattened to paragraphs');
@@ -855,6 +859,11 @@ function lvlSuffix(lvlText: string | undefined): string {
   if (!lvlText) return '.';
   const trail = lvlText.replace(/^.*%\d+/, '');
   return trail.charAt(0) === ')' ? ')' : '.';
+}
+
+function tableAsksForPage(tbl: Element): boolean {
+  const pb = fc(fc(fc(fc(fc(tbl, 'tr'), 'tc'), 'p'), 'pPr'), 'pageBreakBefore');
+  return !!pb && onOff(pb);
 }
 
 // Split a converted body paragraph at run-level page breaks (PB_MARKER): each break

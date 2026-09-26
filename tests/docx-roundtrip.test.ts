@@ -1033,6 +1033,26 @@ describe('DOCX import: a mid-body section break starts a new page', () => {
   });
 });
 
+describe('DOCX import: a page break before a table', () => {
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const tbl = (pPr = '') => `<w:tbl><w:tr><w:tc><w:p>${pPr}<w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`;
+  const build = (body: string) => importDocx(zipSync({ 'word/document.xml': strToU8(
+    `<?xml version="1.0"?><w:document ${W}><w:body><w:p><w:r><w:t>cover</w:t></w:r></w:p>${body}<w:sectPr/></w:body></w:document>`) })).content as N;
+  const table = (doc: N) => doc.content!.find((n) => n.type === 'table')!;
+
+  it('moves the table when the paragraph above ends in a break', () => {
+    expect(table(build(`<w:p><w:r><w:br w:type="page"/></w:r></w:p>${tbl()}`)).attrs?.breakBefore).toBe('page');
+  });
+
+  it("reads the first cell's pageBreakBefore as the table's, and writes it back there", async () => {
+    const doc = build(tbl('<w:pPr><w:pageBreakBefore/></w:pPr>'));
+    expect(table(doc).attrs?.breakBefore).toBe('page');
+    const round = importDocx(await buildDocx(doc as never)).content as N;
+    expect(table(round).attrs?.breakBefore).toBe('page');
+    expect(walk(table(round), 'paragraph')[0].attrs?.breakBefore).toBeFalsy();
+  });
+});
+
 describe('DOCX import: a watermark only from a header a page shows', () => {
   const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:v="urn:schemas-microsoft-com:vml"';
   const build = (type: string, titlePg: boolean) => importDocx(zipSync({
