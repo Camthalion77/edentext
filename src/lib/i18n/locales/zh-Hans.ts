@@ -706,6 +706,7 @@ const zhHans: Messages = {
     keepLines: '段中不分页',
     hyphenate: '自动断词',
     pageBreakBefore: '段前分页',
+    chars: '字符',
     flowHint: '这些选项决定段落可以在哪里跨页断开。',
     tabsButton: '制表位…',
   },

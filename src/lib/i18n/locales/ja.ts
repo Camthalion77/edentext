@@ -708,6 +708,7 @@ const ja: Messages = {
     keepLines: '段落を分割しない',
     hyphenate: '自動ハイフネーション',
     pageBreakBefore: '段落前で改ページする',
+    chars: '字',
     flowHint: '段落をページ間で分割できる位置を指定します。',
     tabsButton: 'タブ…',
   },

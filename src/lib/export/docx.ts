@@ -39,6 +39,7 @@ import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
 import { parseBorderAttr, type BorderSide } from '../editor/extensions/tableCellBorders';
 import { parseCellPadding, DEFAULT_CELL_PADDING } from '../editor/extensions/tableCellPadding';
 import { parseTabStops, type TabAlign } from '../editor/extensions/tabStops';
+import { firstLineCm, leftCm } from '../editor/extensions/indent';
 import { charStyleProps, listMarkerFormat } from '../editor/extensions/listMarker';
 import { effectiveOrderedDefAt, formatOrdinal, childCycle, orderedTypeDef, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { effectiveListLevel, listStyleMarginCm, listStyleOverridden, type ListStyle as ListStyleDef } from '../styles/listStyles';
@@ -279,6 +280,9 @@ const TXBX_NUM = '';
 const NOHYP = '';
 // Marks a paragraph off the page's line grid: <w:snapToGrid w:val="0"/>, the same way.
 const NOSNAP = '\uE023';
+// Wraps the w:ind character attributes the docx package lacks (leftChars, hangingChars),
+// which the same pass adds to the paragraph's w:ind.
+const INDC = '\uE025';
 
 const WP_NS = 'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
 const A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -1207,7 +1211,7 @@ function txbxImageXml(node: TiptapNode, parts: TxbxParts): string {
 
 // The box paragraph's own formatting, hand-serialized in CT_PPr child order
 // (pBdr, shd, bidi, spacing, ind, jc) — mirrors what paragraphToDocx hands the package.
-function txbxPPrXml(attrs: TiptapNode['attrs'], indentTwip: number): string {
+function txbxPPrXml(attrs: TiptapNode['attrs'], indentTwip: number, pt: number): string {
   const out: string[] = [];
   const borders = paraBordersOf(attrs);
   if (borders) {
@@ -1225,12 +1229,14 @@ function txbxPPrXml(attrs: TiptapNode['attrs'], indentTwip: number): string {
       + `${s.line != null ? ` w:line="${s.line}" w:lineRule="${s.lineRule === LineRuleType.EXACT ? 'exact' : 'auto'}"` : ''}/>`);
   }
   const ind: string[] = [];
-  if (typeof attrs?.indent === 'number' && attrs.indent > 0) ind.push(` w:left="${cmToTwip(attrs.indent)}"`);
+  const left = leftCm(attrs, pt);
+  if (left > 0) ind.push(` w:left="${cmToTwip(left)}"`);
   else if (indentTwip) ind.push(` w:left="${indentTwip}"`);
   if (typeof attrs?.indentRight === 'number' && attrs.indentRight > 0) ind.push(` w:right="${cmToTwip(attrs.indentRight)}"`);
-  if (typeof attrs?.indentFirst === 'number' && attrs.indentFirst !== 0) {
-    ind.push(attrs.indentFirst < 0 ? ` w:hanging="${cmToTwip(-attrs.indentFirst)}"` : ` w:firstLine="${cmToTwip(attrs.indentFirst)}"`);
-  }
+  const first = firstLineCm(attrs, pt);
+  if (first) ind.push(first < 0 ? ` w:hanging="${cmToTwip(-first)}"` : ` w:firstLine="${cmToTwip(first)}"`);
+  const chars = indentCharsPayload(attrs);
+  if (chars) ind.push(...chars.split(' ').map((kv) => ` w:${kv.replace('=', '="')}"`));
   if (ind.length) out.push(`<w:ind${ind.join('')}/>`);
   const ta = attrs?.textAlign;
   const jc = ta === 'center' ? 'center' : ta === 'right' ? 'right' : ta === 'justify' ? 'both' : '';
@@ -1250,7 +1256,7 @@ function txbxParagraphXml(node: TiptapNode, parts: TxbxParts, indentTwip = 0, nu
     const lvl = Math.min(MAX_HEADING_LEVEL, Math.max(1, Number(attrs.level) || 1));
     pPr.push(`<w:pStyle w:val="Heading${lvl}"/>`);
   }
-  pPr.push(numPr, txbxPPrXml(attrs, indentTwip));
+  pPr.push(numPr, txbxPPrXml(attrs, indentTwip, blockPt(node)));
   const runProps = (marks: TiptapNode['marks']) => txbxRunPropsXml(marks, [attrs.lang, attrs.langAsian]);
   let runs = '';
   // Comment ranges and bookmarks bracket consecutive runs sharing the mark, as
@@ -2313,9 +2319,13 @@ function applyParagraphFlagsDocx(bytes: Uint8Array): Uint8Array {
   if (!docBytes) return bytes;
   let xml = strFromU8(docBytes);
   const flags = PPR_FLAGS.filter((f) => xml.includes(f.mark));
-  if (!flags.length) return bytes;
+  if (!flags.length && !xml.includes(INDC)) return bytes;
   xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (para) => {
     let p = para;
+    const indc = new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${INDC}([^${INDC}]*)${INDC}(?:(?!</w:r>)[\\s\\S])*</w:r>`).exec(p);
+    // The payload is 'name=value' pairs; the run text would escape an XML quote.
+    const indAttrs = indc?.[1].split(' ').map((kv) => ` w:${kv.replace('=', '="')}"`).join('');
+    if (indc) p = p.replace(indc[0], '').replace(/<w:ind\b/, `$&${indAttrs}`);
     for (const f of flags) {
       if (!p.includes(f.mark)) continue;
       p = p.replace(new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${f.mark}(?:(?!</w:r>)[\\s\\S])*</w:r>`, 'g'), '');
@@ -2396,15 +2406,17 @@ function paraBordersOf(attrs: TiptapNode['attrs']) {
 function paragraphToDocx(node: TiptapNode, opts: ParaOpts = {}): Paragraph {
   const attrs = node.attrs ?? {};
   const indent: Writable<IIndentAttributesProperties> = {};
+  const pt = blockPt(node);
+  const indChars = opts.numbering ? '' : indentCharsPayload(attrs);
   if (!opts.numbering) {
-    if (typeof attrs.indent === 'number' && attrs.indent > 0) indent.left = cmToTwip(attrs.indent);
+    const left = leftCm(attrs, pt);
+    if (left > 0) indent.left = cmToTwip(left);
     else if (opts.indentLeftTwip) indent.left = opts.indentLeftTwip;
     if (typeof attrs.indentRight === 'number' && attrs.indentRight > 0) indent.right = cmToTwip(attrs.indentRight);
     // Word splits the first-line indent into two exclusive attributes by sign.
-    if (typeof attrs.indentFirst === 'number' && attrs.indentFirst !== 0) {
-      if (attrs.indentFirst < 0) indent.hanging = cmToTwip(-attrs.indentFirst);
-      else indent.firstLine = cmToTwip(attrs.indentFirst);
-    }
+    const first = firstLineCm(attrs, pt);
+    if (first < 0) indent.hanging = cmToTwip(-first);
+    else if (first > 0) indent.firstLine = cmToTwip(first);
   }
   // The block's named style (a heading style id is what HeadingLevel references anyway).
   const style = docxStyleId(styleOf(node));
@@ -2444,6 +2456,7 @@ function paragraphToDocx(node: TiptapNode, opts: ParaOpts = {}): Paragraph {
     children: [
       ...(attrs.noHyphenation === true ? [new TextRun(NOHYP)] : []),
       ...(attrs.snapToGrid === false ? [new TextRun(NOSNAP)] : []),
+      ...(indChars ? [new TextRun(`${INDC}${indChars}${INDC}`)] : []),
       ...inlineToRuns(node.content, runForce),
     ],
   });
@@ -2875,6 +2888,25 @@ function bodyGroups(content: TiptapNode[], num: Numbering, widthCm: (section: nu
 }
 
 // The style name a block carries: its own, else the node type's default.
+// The w:ind character attributes of a block, as 'name=value' pairs (hundredths of a
+// character). A hanging count adds to the left one on import, so it is taken off here.
+function indentCharsPayload(attrs: TiptapNode['attrs']): string {
+  const n = (v: unknown) => (typeof v === 'number' ? Math.round(v * 100) : 0);
+  const first = n(attrs?.indentFirstChars);
+  const left = n(attrs?.indentChars);
+  // A hanging count alone would read back as a left indent too, so it needs a left count.
+  const hanging = first < 0 && left ? -first : 0;
+  return [left ? `leftChars=${Math.max(0, left - hanging)}` : '', first > 0 ? `firstLineChars=${first}` : '',
+    hanging ? `hangingChars=${hanging}` : ''].filter(Boolean).join(' ');
+}
+
+// The size a block's unmarked text is set in, in points; a character indent counts in it.
+function blockPt(node: TiptapNode): number {
+  const own = node.attrs?.fontSize;
+  if (typeof own === 'string' && own) return parseFloat(own);
+  return resolveStyle(exportSheet, styleOf(node)).text.fontSizePt ?? 12;
+}
+
 function styleOf(node: TiptapNode): string {
   const own = node.attrs?.styleName;
   if (typeof own === 'string' && own) return own;

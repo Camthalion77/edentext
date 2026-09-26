@@ -711,6 +711,7 @@ const fr: Messages = {
     keepLines: 'Conserver les lignes ensemble',
     hyphenate: 'Césure automatique',
     pageBreakBefore: 'Saut de page avant',
+    chars: 'car.',
     flowHint: 'Ces options déterminent où le paragraphe peut être coupé entre les pages.',
     tabsButton: 'Tabulations…',
   },

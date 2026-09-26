@@ -305,6 +305,8 @@ function hasCustomAttrs(attrs: TiptapNode['attrs']): boolean {
   if (typeof attrs.fontFamilyAsian === 'string' && attrs.fontFamilyAsian) return true;
   if (typeof attrs.indent === 'number' && attrs.indent > 0) return true;
   if (typeof attrs.indentFirst === 'number' && attrs.indentFirst !== 0) return true;
+  if (typeof attrs.indentFirstChars === 'number' && attrs.indentFirstChars !== 0) return true;
+  if (typeof attrs.indentChars === 'number' && attrs.indentChars !== 0) return true;
   if (typeof attrs.indentRight === 'number' && attrs.indentRight > 0) return true;
   if (typeof attrs.tabStops === 'string' && attrs.tabStops) return true;
   if (typeof attrs.backgroundColor === 'string' && attrs.backgroundColor) return true;
@@ -1362,6 +1364,10 @@ type ParaStyle = {
   // lives in its list style, and the importer skips paraProps indents there.
   indent: number | null;
   indentFirst: number | null;
+  // Left and first-line indents in characters (loext:margin-left / loext:text-indent in
+  // `ic`); each excludes its cm twin.
+  indentChars: number | null;
+  indentFirstChars: number | null;
   indentRight: number | null;
   // A page break before the item — list paragraphs only; LibreOffice ignores one in a cell.
   breakBefore: boolean;
@@ -1379,7 +1385,7 @@ function paraStyleIsEmpty(s: ParaStyle): boolean {
   return s.align === null && s.spaceBefore === null && s.spaceAfter === null && s.lineHeight === null
     && s.background === null && s.borderTop === null && s.borderRight === null
     && s.borderBottom === null && s.borderLeft === null && s.dir === null
-    && s.indent === null && s.indentFirst === null && s.indentRight === null && !s.breakBefore
+    && s.indent === null && s.indentFirst === null && s.indentFirstChars === null && s.indentChars === null && s.indentRight === null && !s.breakBefore
     && s.lang === null && s.langAsian === null && !s.noSnap;
 }
 
@@ -1429,6 +1435,8 @@ function paraStyleFromAttrs(attrs: TiptapNode['attrs'], withIndents = true): Par
     dir: attrs?.dir === 'rtl' || attrs?.dir === 'ltr' ? attrs.dir : null,
     indent: cm(attrs?.indent),
     indentFirst: cm(attrs?.indentFirst),
+    indentFirstChars: cm(attrs?.indentFirstChars),
+    indentChars: cm(attrs?.indentChars),
     indentRight: cm(attrs?.indentRight),
     breakBefore: false,
     lang: typeof attrs?.lang === 'string' && attrs.lang ? attrs.lang : null,
@@ -1457,6 +1465,8 @@ function paraStyleProps(style: ParaStyle): string[] {
   if (style.lineHeight != null) props.push(`fo:line-height="${normalizeLineHeight(style.lineHeight)}"`);
   if (style.indent != null) props.push(`fo:margin-left="${style.indent}cm"`);
   if (style.indentFirst != null) props.push(`fo:text-indent="${style.indentFirst}cm"`);
+  if (style.indentFirstChars != null) props.push(`loext:text-indent="${style.indentFirstChars}ic"`);
+  if (style.indentChars != null) props.push(`loext:margin-left="${style.indentChars}ic"`);
   if (style.indentRight != null) props.push(`fo:margin-right="${style.indentRight}cm"`);
   if (style.breakBefore) props.push('fo:break-before="page"');
   if (style.background) props.push(`fo:background-color="${style.background}"`);
@@ -2004,7 +2014,8 @@ function applyEmptyLineFontSizes(odtBytes: Uint8Array): Uint8Array {
 // A top-level paragraph's box spec for the PBX sentinel: bg|borderTop|Right|Bottom|Left,
 // each the raw value (canonical border '<W>pt solid #RRGGBB' is a valid fo:border) or '',
 // then a widow flag, the right indent, a keep-with-next flag, the writing mode, a
-// no-hyphenation flag, the paragraph's two language tags and an off-the-grid flag.
+// no-hyphenation flag, the paragraph's two language tags, an off-the-grid flag and the
+// first-line and left indents in characters.
 // '' when it needs none.
 function paraBoxSpec(attrs: TiptapNode['attrs']): string {
   const s = paraStyleFromAttrs(attrs);
@@ -2013,19 +2024,21 @@ function paraBoxSpec(attrs: TiptapNode['attrs']): string {
   const keepLines = attrs?.keepLines === true;
   const noHyphen = attrs?.noHyphenation === true;
   const noSnap = attrs?.snapToGrid === false;
+  const chars = s.indentFirstChars ?? '';
+  const leftChars = s.indentChars ?? '';
   // odf-kit has a paragraph option for the left indent but none for the right one.
   const right = typeof attrs?.indentRight === 'number' && attrs.indentRight > 0 ? attrs.indentRight : 0;
   const wm = writingModeOf(s.dir);
   const lang = s.lang ?? '';
   const langAsian = s.langAsian ?? '';
-  if (!s.background && !s.borderTop && !s.borderRight && !s.borderBottom && !s.borderLeft && !noWidow && !right && !keepNext && !keepLines && !wm && !noHyphen && !lang && !langAsian && !noSnap) return '';
+  if (!s.background && !s.borderTop && !s.borderRight && !s.borderBottom && !s.borderLeft && !noWidow && !right && !keepNext && !keepLines && !wm && !noHyphen && !lang && !langAsian && !noSnap && !chars && !leftChars) return '';
   return [s.background, s.borderTop, s.borderRight, s.borderBottom, s.borderLeft]
     .map((v) => v ?? '')
-    .concat(noWidow ? 'w0' : '', right ? `${right}cm` : '', keepNext ? 'k1' : '', keepLines ? 'g1' : '', wm ?? '', noHyphen ? 'h0' : '', lang, langAsian, noSnap ? 's0' : '').join('|');
+    .concat(noWidow ? 'w0' : '', right ? `${right}cm` : '', keepNext ? 'k1' : '', keepLines ? 'g1' : '', wm ?? '', noHyphen ? 'h0' : '', lang, langAsian, noSnap ? 's0' : '', chars ? `${chars}ic` : '', leftChars ? `${leftChars}ic` : '').join('|');
 }
 
 function boxSpecToProps(spec: string): string {
-  const [bg, bt, br, bb, bl, widow, marginRight, keepNext, keepLines, writingMode, , , , snap] = spec.split('|');
+  const [bg, bt, br, bb, bl, widow, marginRight, keepNext, keepLines, writingMode, , , , snap, firstChars, leftChars] = spec.split('|');
   const props: string[] = [];
   if (bg) props.push(`fo:background-color="${bg}"`);
   if (bt) props.push(`fo:border-top="${bt}"`);
@@ -2039,6 +2052,8 @@ function boxSpecToProps(spec: string): string {
   if (keepLines === 'g1') props.push('fo:keep-together="always"');
   if (writingMode) props.push(`style:writing-mode="${writingMode}"`);
   if (snap === 's0') props.push('style:snap-to-layout-grid="false"');
+  if (firstChars) props.push(`loext:text-indent="${firstChars}"`);
+  if (leftChars) props.push(`loext:margin-left="${leftChars}"`);
   return props.join(' ');
 }
 
@@ -5643,7 +5658,19 @@ export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAU
   const withHfDates = applyHfDateFields(withSections, hfDateFields, language ?? null);
   const withWatermark = applyFoldMarksOdf(applyWatermarkOdf(withHfDates, decor.watermark), foldMarks);
   const withFonts = applyEmbeddedFontsOdf(declareReferencedFonts(withWatermark), fonts);
-  return zipFinal(applyOdfVersion(applyDocProperties(applyPageNumberStart(applySpacingModel(withFonts, spacingModel, spacingAtPageStart, balanceSpaces), pageNumbering.start), props)));
+  return zipFinal(declareLoext(applyOdfVersion(applyDocProperties(applyPageNumberStart(applySpacingModel(withFonts, spacingModel, spacingAtPageStart, balanceSpaces), pageNumbering.start), props))));
+}
+
+// A pass that writes a loext: attribute (a character indent) leaves its declaration here.
+function declareLoext(odtBytes: Uint8Array): Uint8Array {
+  const files = unzipSync(odtBytes);
+  for (const name of ['content.xml', 'styles.xml']) {
+    const xml = files[name] && strFromU8(files[name]);
+    if (!xml || !/\sloext:/.test(xml) || xml.includes('xmlns:loext=')) continue;
+    files[name] = strToU8(xml.replace(/<office:document-(?:content|styles)\b/,
+      '$& xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"'));
+  }
+  return rezipOdt(files);
 }
 
 // The package declares ODF 1.3 in every part — the version LibreOffice writes, and

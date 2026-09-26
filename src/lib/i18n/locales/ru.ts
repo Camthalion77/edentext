@@ -721,6 +721,7 @@ const ru: Messages = {
     keepLines: 'Не разрывать абзац',
     hyphenate: 'Автоматический перенос',
     pageBreakBefore: 'С новой страницы',
+    chars: 'симв.',
     flowHint: 'Здесь задаётся, где абзац можно разорвать между страницами.',
     tabsButton: 'Табуляция…',
   },

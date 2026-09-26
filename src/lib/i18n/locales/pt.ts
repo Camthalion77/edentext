@@ -705,6 +705,7 @@ const pt: Messages = {
     keepLines: 'Manter linhas juntas',
     hyphenate: 'Hifenização automática',
     pageBreakBefore: 'Quebra de página antes',
+    chars: 'car.',
     flowHint: 'Estas opções determinam onde o parágrafo pode ser quebrado entre as páginas.',
     tabsButton: 'Tabulações…',
   },

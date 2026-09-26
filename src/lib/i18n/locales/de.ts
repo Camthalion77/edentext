@@ -712,6 +712,7 @@ const de: Messages = {
     keepLines: 'Zeilen nicht trennen',
     hyphenate: 'Automatische Silbentrennung',
     pageBreakBefore: 'Seitenumbruch oberhalb',
+    chars: 'Zchn',
     flowHint: 'Diese Optionen bestimmen, wo der Absatz über Seiten getrennt werden darf.',
     tabsButton: 'Tabstopps…',
   },

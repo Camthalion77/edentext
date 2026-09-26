@@ -16,6 +16,8 @@
   import { formatOrdinal } from '../../../utils/orderedListTypes';
   import { t } from '../../../i18n/i18n.svelte';
   import { shortcutHint } from '../../../editor/shortcuts';
+  import { leftCm } from '../../../editor/extensions/indent';
+  import { blockFontSize } from '../../../utils/fontSize';
 
   let {
     editor, tick, hfActive = null,
@@ -132,7 +134,13 @@
   }
 
   // --- Paragraph indent and spacing, in the units Word's Layout tab uses ---
-  let indentLeft = $derived(tick >= 0 && editor ? uniformBlockAttr<number>(editor.state, 'indent', 0) : 0);
+  // A left indent counted in characters shows here in cm, at the cursor block's size.
+  let indentLeft = $derived.by(() => {
+    if (tick < 0 || !editor) return 0;
+    if (!uniformBlockAttr<number>(editor.state, 'indentChars', 0)) return uniformBlockAttr<number>(editor.state, 'indent', 0);
+    const block = editor.state.selection.$from.parent;
+    return leftCm(block.attrs, parseFloat(blockFontSize(block)));
+  });
   let indentRight = $derived(tick >= 0 && editor ? uniformBlockAttr<number>(editor.state, 'indentRight', 0) : 0);
   let spaceBefore = $derived(tick >= 0 && editor ? uniformBlockAttr<number>(editor.state, 'spaceBefore', 0) : 0);
   let spaceAfter = $derived(tick >= 0 && editor ? uniformBlockAttr<number>(editor.state, 'spaceAfter', 0) : 0);

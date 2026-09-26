@@ -707,6 +707,7 @@ const es: Messages = {
     keepLines: 'Mantener las líneas juntas',
     hyphenate: 'División de palabras automática',
     pageBreakBefore: 'Salto de página antes',
+    chars: 'car.',
     flowHint: 'Estos controles determinan dónde puede dividirse el párrafo entre páginas.',
     tabsButton: 'Tabuladores…',
   },

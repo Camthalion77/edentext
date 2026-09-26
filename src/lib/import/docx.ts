@@ -1456,15 +1456,22 @@ function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number |
 
   if (kind !== 'list') {
     const ind = fc(ppr, 'ind');
+    // The *Chars attributes (hundredths of a character) win over the twips when nonzero.
+    // A hanging count adds to the left one, where LibreOffice puts the text (probed).
+    const hangingChars = ind ? intAttr(ind, W, 'hangingChars') : null;
+    const leftChars = ind ? intAttr(ind, W, 'leftChars') ?? intAttr(ind, W, 'startChars') : null;
     const left = ind ? intAttr(ind, W, 'left') ?? intAttr(ind, W, 'start') : null;
-    if (left != null) { const cm = round2(twipToCm(left)); if (cm > LIST_INDENT_EPS_CM) attrs.indent = cm; }
+    if (leftChars || hangingChars) attrs.indentChars = ((leftChars ?? 0) + (hangingChars ?? 0)) / 100;
+    else if (left != null) { const cm = round2(twipToCm(left)); if (cm > LIST_INDENT_EPS_CM) attrs.indent = cm; }
     const right = ind ? intAttr(ind, W, 'right') ?? intAttr(ind, W, 'end') : null;
     if (right != null) { const cm = round2(twipToCm(right)); if (cm > LIST_INDENT_EPS_CM) attrs.indentRight = cm; }
     // w:hanging outdents the first line, w:firstLine indents it; they are exclusive.
     const hanging = ind ? intAttr(ind, W, 'hanging') : null;
     const firstLine = ind ? intAttr(ind, W, 'firstLine') : null;
     const first = hanging != null ? -twipToCm(hanging) : firstLine != null ? twipToCm(firstLine) : null;
-    if (first != null && Math.abs(first) > LIST_INDENT_EPS_CM) attrs.indentFirst = round2(first);
+    const firstChars = hangingChars ? -hangingChars : ind ? intAttr(ind, W, 'firstLineChars') : null;
+    if (firstChars) attrs.indentFirstChars = firstChars / 100;
+    else if (first != null && Math.abs(first) > LIST_INDENT_EPS_CM) attrs.indentFirst = round2(first);
   }
 
   if (kind !== 'cell') {

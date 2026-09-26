@@ -707,6 +707,7 @@ const zhHant: Messages = {
     keepLines: '段落中不分頁',
     hyphenate: '自動斷字',
     pageBreakBefore: '段落前分頁',
+    chars: '字元',
     flowHint: '這些選項決定段落可以在哪裡跨頁斷開。',
     tabsButton: '定位點…',
   },

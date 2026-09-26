@@ -2,6 +2,10 @@
   import type { Editor } from '@tiptap/core';
   import { uniformBlockAttr } from '../utils/selectionFormat';
   import { t } from '../i18n/i18n.svelte';
+  import { blockFontSize } from '../utils/fontSize';
+
+  type Unit = 'cm' | 'chars';
+  type Field = 'left' | 'first';
 
   // Word's Paragraph dialog. Indents and spacing duplicate the ribbon's fields on
   // purpose; the second tab is the only place the text-flow attrs can be set.
@@ -14,6 +18,10 @@
 
   let dialogEl = $state<HTMLDialogElement | null>(null);
   let pane = $state<'indents' | 'breaks'>('indents');
+
+  $effect(() => {
+    if (open) unitPicked = {};
+  });
 
   $effect(() => {
     const el = dialogEl;
@@ -32,6 +40,18 @@
   let indent = $derived(read('indent', 0));
   let indentRight = $derived(read('indentRight', 0));
   let indentFirst = $derived(read('indentFirst', 0));
+  let indentFirstChars = $derived(read('indentFirstChars', 0));
+  let indentChars = $derived(read('indentChars', 0));
+  // The left and first-line fields count characters when the block does, or once picked.
+  let unitPicked = $state<{ left?: Unit; first?: Unit }>({});
+  let units = $derived({
+    left: unitPicked.left ?? (indentChars ? 'chars' : 'cm'),
+    first: unitPicked.first ?? (indentFirstChars ? 'chars' : 'cm'),
+  } as Record<Field, Unit>);
+  let values = $derived({
+    left: units.left === 'chars' ? indentChars : indent,
+    first: units.first === 'chars' ? indentFirstChars : indentFirst,
+  } as Record<Field, number | ''>);
   let spaceBefore = $derived(read('spaceBefore', 0));
   let spaceAfter = $derived(read('spaceAfter', 0));
   let lineHeight = $derived(read('lineHeight', '1'));
@@ -66,6 +86,25 @@
     if (!isNaN(v)) setAttr(attr, v);
   }
 
+  // Through the commands, so a field's two units replace each other.
+  function setIndentIn(field: Field, raw: string, unit: Unit) {
+    const v = parseFloat(raw.replace(',', '.'));
+    if (isNaN(v) || !editor) return;
+    const c = editor.chain().focus();
+    if (field === 'left') (unit === 'chars' ? c.setIndentChars(v) : c.setIndent(v)).run();
+    else (unit === 'chars' ? c.setIndentFirstChars(v) : c.setIndentFirst(v)).run();
+  }
+
+  // Switching the unit converts the value at the block's size, as the ruler would show it.
+  function switchUnit(field: Field, unit: Unit) {
+    const current = values[field];
+    unitPicked = { ...unitPicked, [field]: unit };
+    if (!editor || !current) return;
+    const cmPerChar = parseFloat(blockFontSize(editor.state.selection.$from.parent)) / 72 * 2.54;
+    const next = unit === 'chars' ? current / cmPerChar : current * cmPerChar;
+    setIndentIn(field, String(Math.round(next * 100) / 100), unit);
+  }
+
   const num = (v: number | '') => (v === '' ? '' : String(Math.round((v as number) * 100) / 100));
 
   const FLOW: { attr: string; on: () => boolean; label: () => string; set: (v: boolean) => void }[] = [
@@ -76,6 +115,13 @@
     { attr: 'breakBefore', on: () => breakBefore, label: () => t().paragraphDialog.pageBreakBefore, set: (v) => setAttr('breakBefore', v ? 'page' : null) },
   ];
 </script>
+
+{#snippet indentField(field: Field)}
+  <input type="text" inputmode="decimal" value={num(values[field])} onchange={(e) => setIndentIn(field, (e.currentTarget as HTMLInputElement).value, units[field])} />
+  <select class="unit" value={units[field]} onchange={(e) => switchUnit(field, (e.currentTarget as HTMLSelectElement).value as Unit)}>
+    <option value="cm">cm</option><option value="chars">{t().paragraphDialog.chars}</option>
+  </select>
+{/snippet}
 
 <dialog bind:this={dialogEl} onclose={() => (open = false)} onclick={(e) => e.target === dialogEl && (open = false)} aria-label={t().paragraphDialog.title}>
   <div class="body">
@@ -104,9 +150,9 @@
           </select>
         </label>
 
-        <label class="row newline"><span>{t().ribbon.indentLeft}</span><input type="text" inputmode="decimal" value={num(indent)} onchange={(e) => setNumber('indent', (e.currentTarget as HTMLInputElement).value)} /><em>cm</em></label>
+        <label class="row newline"><span>{t().ribbon.indentLeft}</span>{@render indentField('left')}</label>
         <label class="row"><span>{t().ribbon.indentRight}</span><input type="text" inputmode="decimal" value={num(indentRight)} onchange={(e) => setNumber('indentRight', (e.currentTarget as HTMLInputElement).value)} /><em>cm</em></label>
-        <label class="row"><span>{t().ruler.firstLineIndent}</span><input type="text" inputmode="decimal" value={num(indentFirst)} onchange={(e) => setNumber('indentFirst', (e.currentTarget as HTMLInputElement).value)} /><em>cm</em></label>
+        <label class="row"><span>{t().ruler.firstLineIndent}</span>{@render indentField('first')}</label>
 
         <label class="row newline"><span>{t().ribbon.spaceBefore}</span><input type="text" inputmode="decimal" value={num(spaceBefore)} onchange={(e) => setNumber('spaceBefore', (e.currentTarget as HTMLInputElement).value)} /><em>pt</em></label>
         <label class="row"><span>{t().ribbon.spaceAfter}</span><input type="text" inputmode="decimal" value={num(spaceAfter)} onchange={(e) => setNumber('spaceAfter', (e.currentTarget as HTMLInputElement).value)} /><em>pt</em></label>
@@ -210,6 +256,13 @@
 
   /* No unit of its own, so it reaches across the field and unit columns. */
   .row select { width: calc(84px + 1.5em); }
+  /* A switchable unit, drawn as underlined unit text; it overhangs into the column gap
+     so the field keeps the other rows' edge. */
+  .row select.unit {
+    appearance: none; width: 2.6em; height: auto; margin-right: -1.1em; padding: 0;
+    border: none; border-bottom: 1px dashed currentColor; border-radius: 0;
+    background: none; color: var(--color-text-muted); cursor: pointer;
+  }
   .row input { text-align: right; }
 
   .flow { display: flex; flex-direction: column; gap: 8px; }

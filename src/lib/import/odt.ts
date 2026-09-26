@@ -2016,11 +2016,17 @@ function blockAttrs(paraProps: PropMap, textProps: PropMap, defaults: BlockDefau
   // list-style level properties, not paraProps. What the style already indents is not
   // direct formatting.
   if (kind !== 'list') {
+    // LibreOffice's font-relative loext: twins (in `ic`, characters) win over the fo: ones.
+    const ic = (v: string | undefined) => { const m = /^(-?[\d.]+)ic$/.exec(v ?? ''); return m ? parseFloat(m[1]) : 0; };
     const ml = lengthToPt(paraProps['fo:margin-left']) ?? 0;
-    if (Math.abs(ml - defaults.indentPt) > EPS_PT) attrs.indent = Math.round((ml / 72) * 2.54 * 100) / 100;
+    const leftChars = ic(paraProps['loext:margin-left']);
+    if (leftChars > 0) attrs.indentChars = leftChars;
+    else if (Math.abs(ml - defaults.indentPt) > EPS_PT) attrs.indent = Math.round((ml / 72) * 2.54 * 100) / 100;
     // fo:text-indent is the first line only; negative is a hanging indent.
+    const chars = ic(paraProps['loext:text-indent']);
     const ti = lengthToCm(paraProps['fo:text-indent']);
-    if (ti != null && Math.abs(ti) > 0.02) attrs.indentFirst = Math.round(ti * 100) / 100;
+    if (chars) attrs.indentFirstChars = chars;
+    else if (ti != null && Math.abs(ti) > 0.02) attrs.indentFirst = Math.round(ti * 100) / 100;
     const mr = lengthToCm(paraProps['fo:margin-right']);
     if (mr != null && mr > 0.02) attrs.indentRight = Math.round(mr * 100) / 100;
   }

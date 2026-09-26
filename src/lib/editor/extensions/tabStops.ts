@@ -5,6 +5,8 @@ import type { EditorState } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { FORCE_PAGE_RECALC, isSplitPane, pageBreakKey } from './pageBreaks';
 import { PX_PER_CM } from '../../storage/pageMargins';
+import { blockFontSize } from '../../utils/fontSize';
+import { firstLineCm, leftCm } from './indent';
 
 // Per-paragraph tab stops. CSS only has the fixed `tab-size` grid, so a tab that
 // resolves to a stop is measured and given the exact advance as an inline margin.
@@ -69,9 +71,9 @@ export function activeTabStops(state: EditorState): BlockRuler | null {
     const cm = (v: unknown) => (typeof v === 'number' ? v : 0);
     return {
       stops: parseTabStops(node.attrs.tabStops),
-      indent: cm(node.attrs.indent),
+      indent: leftCm(node.attrs, parseFloat(blockFontSize(node))),
       indentRight: cm(node.attrs.indentRight),
-      indentFirst: cm(node.attrs.indentFirst),
+      indentFirst: firstLineCm(node.attrs, parseFloat(blockFontSize(node))),
     };
   }
   return null;
@@ -99,9 +101,8 @@ function clampStops(stops: TabStop[], widthCm: number): TabStop[] {
 // stops of its own; a hanging indent implies one at the text position.
 function stopsOf(node: PmNode): TabStop[] {
   const stops = parseTabStops(node.attrs.tabStops);
-  const first = typeof node.attrs.indentFirst === 'number' ? node.attrs.indentFirst : 0;
-  if (first < 0) {
-    const indent = typeof node.attrs.indent === 'number' ? node.attrs.indent : 0;
+  if (node.attrs.indentFirst < 0 || node.attrs.indentFirstChars < 0) {
+    const indent = leftCm(node.attrs, parseFloat(blockFontSize(node)));
     stops.push({ pos: indent, align: 'left' });
     stops.sort((a, b) => a.pos - b.pos);
   }
