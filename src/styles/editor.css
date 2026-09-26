@@ -678,9 +678,10 @@
 
 /* The line box: the paragraph's spacing factor times its font's natural line height.
    Either half may come from the style rule or, nearer, from the block's own attrs
-   (lineHeight.ts / blockFontSize.ts) — multiplying them here is what keeps both. */
+   (lineHeight.ts / blockFontSize.ts) — multiplying them here is what keeps both.
+   A fixed spacing (--line-fixed) replaces the product outright. */
 .paper .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, li, .toc-entry) {
-  line-height: calc(var(--line-factor) * var(--natural-line));
+  line-height: var(--line-fixed, calc(var(--line-factor) * var(--natural-line)));
 }
 
 /* A spacing above single puts all of its extra leading *below* each line (measured in

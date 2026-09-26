@@ -294,6 +294,13 @@ export function singleLineHeight(fontFamily?: string): number {
   return (fontFamily && SINGLE_LINE_HEIGHT[fontFamily]) || DEFAULT_SINGLE_LINE_HEIGHT;
 }
 
+// A line spacing as editor.css reads it: a factor of the font's natural line, or a fixed
+// height in pt (Word's "exactly", ODF's fo:line-height length). Each clears the other,
+// so a paragraph's own spacing beats its style's of either kind.
+export function lineSpacingDeclarations(value: string): string[] {
+  return /pt$/.test(value) ? [`--line-fixed: ${value}`, '--line-factor: 1'] : [`--line-factor: ${value}`, '--line-fixed: initial'];
+}
+
 // The text half of a rule, shared with the table-style family (tableStyles.ts). A block
 // takes the family's natural line height as the variable editor.css multiplies by the
 // paragraph's spacing factor; a run box sets its line height outright.
@@ -322,7 +329,7 @@ function declarations(r: ResolvedStyle): string[] {
   const { para: p } = r;
   const out = textDeclarations(r.text, true);
   if (p.textAlign) out.push(`text-align: ${p.textAlign}`);
-  if (p.lineHeight) out.push(`--line-factor: ${p.lineHeight}`);
+  if (p.lineHeight) out.push(...lineSpacingDeclarations(p.lineHeight));
   // Padding or margin per the document's spacing model — editor.css resolves it.
   if (p.spaceBefore != null) out.push(`--space-before: ${p.spaceBefore}pt`);
   // The property beside it is what the multi-column rule turns the space below into.
