@@ -1395,7 +1395,7 @@ function paraStyleFromAttrs(attrs: TiptapNode['attrs'], withIndents = true): Par
   const lh = attrs?.lineHeight;
   let lineHeight: number | string | null = null;
   if (lh != null) {
-    const lhNum = parseFloat(String(lh));
+    const lhNum = Number(lh);
     lineHeight = isNaN(lhNum) ? String(lh) : lhNum;
   }
   const border = (v: unknown) => (typeof v === 'string' && v && v !== 'none' ? v : null);
@@ -5443,7 +5443,7 @@ export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAU
       // A block with no line height of its own inherits its style's, so none is written.
       if (node.attrs?.lineHeight != null) {
         const lhRaw = String(node.attrs.lineHeight);
-        const lhNum = parseFloat(lhRaw);
+        const lhNum = Number(lhRaw);
         opts.lineHeight = isNaN(lhNum) ? lhRaw : lhNum;
       }
       const ta = node.attrs?.textAlign;
