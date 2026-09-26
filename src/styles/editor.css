@@ -104,6 +104,9 @@
   --natural-line: 1.15;
   --line-factor: 1;
   line-height: 1.15;
+  /* Both word processors space ideographs from Latin letters and digits by default
+     (Word ¼em, LibreOffice ⅕em, measured); the browser's own step is ⅛em. */
+  text-autospace: normal;
   color: var(--color-page-text);
 
   /* The page borders ride the sheet boxes (PageSheetLayer). */
