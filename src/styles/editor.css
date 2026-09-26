@@ -684,6 +684,14 @@
   line-height: var(--line-fixed, calc(var(--line-factor) * var(--natural-line)));
 }
 
+/* The page's line grid rounds each line up to whole grid lines. A fixed spacing keeps
+   its height, and a block off the grid, a zone and a text box are not on it. Per element,
+   so a larger run in the line rounds up by its own size. */
+.paper[data-line-grid] .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, li, .toc-entry):not([data-snap-to-grid='false']):not(:is(.hf-zone, .textbox-node) *),
+.paper[data-line-grid] .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, .toc-entry):not([data-snap-to-grid='false']):not(:is(.hf-zone, .textbox-node) *) :not(.textbox-node, .textbox-node *) {
+  line-height: var(--line-fixed, round(up, calc(var(--line-factor) * var(--natural-line) * 1em), var(--grid-pitch)));
+}
+
 /* A spacing above single puts all of its extra leading *below* each line (measured in
    LibreOffice); CSS splits it half above. Shifting the block up by that half draws its
    lines where LibreOffice does and leaves the flow — so pagination — untouched. */

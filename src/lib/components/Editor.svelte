@@ -36,6 +36,7 @@ import ChangeBarLayer from './ChangeBarLayer.svelte';
   import { visibleComments, visibleRevisions } from './reviewItems';
   import { changesInMargin, commentsInMargin, markupView } from '../storage/markup.svelte';
 import { DEFAULT_LINE_NUMBERING, type LineNumbering } from '../storage/lineNumbering';
+import { DEFAULT_LINE_GRID, type LineGrid } from '../storage/lineGrid';
 import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   import Ruler from './Ruler.svelte';
   import { saveDocument, loadDocument, markDocumentLoaded } from '../storage/autosave';
@@ -67,7 +68,7 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   let {
     editor = $bindable(), tick = $bindable(0), currentPage = $bindable(1), numPages = $bindable(1),
     zoom = 100, onZoom, showFormattingMarks = false, showFieldShading = true, showRuler = true, splitView = false, pageColumns = 1, pageMargins = DEFAULT_MARGINS, orientation = 'portrait',
-    pageFormat = 'A4', tabIntervalCm = DEFAULT_TAB_INTERVAL_CM, spacingModel = 'add', spacingAtPageStart = true, documentEpoch = 0, pageRtl = false, hyphenate = false, documentLanguage = 'en', pageNumbering = DEFAULT_PAGE_NUMBERING, pageDecor = EMPTY_PAGE_DECOR, lineNumbering = DEFAULT_LINE_NUMBERING, foldMarks = false, commentAuthor = '',
+    pageFormat = 'A4', tabIntervalCm = DEFAULT_TAB_INTERVAL_CM, spacingModel = 'add', spacingAtPageStart = true, documentEpoch = 0, pageRtl = false, hyphenate = false, documentLanguage = 'en', pageNumbering = DEFAULT_PAGE_NUMBERING, pageDecor = EMPTY_PAGE_DECOR, lineNumbering = DEFAULT_LINE_NUMBERING, lineGrid = DEFAULT_LINE_GRID, foldMarks = false, commentAuthor = '',
     headerDoc = $bindable(null), footerDoc = $bindable(null), hfDistances = DEFAULT_HF_DISTANCES,
     headerFirstDoc = $bindable(null), footerFirstDoc = $bindable(null), differentFirstPage = false,
     headerEvenDoc = $bindable(null), footerEvenDoc = $bindable(null), differentOddEven = false,
@@ -95,6 +96,8 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
     pageDecor?: PageDecor;
     /** Numbers in the left margin, one per rendered line. */
     lineNumbering?: LineNumbering;
+    /** Lines rounded up to whole grid lines (editor.css, --grid-pitch). */
+    lineGrid?: LineGrid;
     /** Fold + punch marks in the left margin (DIN 5008 letter sheets). */
     foldMarks?: boolean;
     headerDoc?: HfDoc; footerDoc?: HfDoc; hfDistances?: HfDistances;
@@ -386,6 +389,8 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
     void tabIntervalCm;
     // …and how the space between two blocks is measured.
     void spacingModel;
+    // …and the line grid, which sets every line's height.
+    void (lineGrid.on && lineGrid.pitchPt);
     // …and the header/footer-driven effective margins, so growing a zone re-paginates.
     void (effTopRest + effTopFirst + effBottomRest + effBottomFirst);
     void sectionReach;
@@ -1739,7 +1744,7 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
 {/snippet}
 
 {#snippet paper(i: number, offsetTop: number, offsetLeft: number)}
-    <div bind:this={papers[i]} class="paper" data-hide-deletions={markup.hideDeletions ? '' : null} data-hide-insertions={markup.hideInsertions ? '' : null} data-plain-markup={markup.plainRevisions ? '' : null} data-hide-comments={markup.comments ? null : ''} style:position={offsetTop || offsetLeft ? 'absolute' : null} style:top={offsetTop ? `${offsetTop}px` : null} style:left={offsetLeft ? `${offsetLeft}px` : null} data-spacing-model={spacingModel} class:show-formatting-marks={showFormattingMarks} class:field-shading={showFieldShading} class:hf-editing={hfActive} class:settling style:--font-asian={asianDefaultFont} style="transform: scale({appliedZoom / 100});{pageDecor.background ? ` --color-page-bg: ${pageDecor.background};` : ''}">
+    <div bind:this={papers[i]} class="paper" data-hide-deletions={markup.hideDeletions ? '' : null} data-hide-insertions={markup.hideInsertions ? '' : null} data-plain-markup={markup.plainRevisions ? '' : null} data-hide-comments={markup.comments ? null : ''} style:position={offsetTop || offsetLeft ? 'absolute' : null} style:top={offsetTop ? `${offsetTop}px` : null} style:left={offsetLeft ? `${offsetLeft}px` : null} data-spacing-model={spacingModel} data-line-grid={lineGrid.on ? '' : null} style:--grid-pitch={lineGrid.on ? `${lineGrid.pitchPt}pt` : null} class:show-formatting-marks={showFormattingMarks} class:field-shading={showFieldShading} class:hf-editing={hfActive} class:settling style:--font-asian={asianDefaultFont} style="transform: scale({appliedZoom / 100});{pageDecor.background ? ` --color-page-bg: ${pageDecor.background};` : ''}">
       <!-- Dedicated mount point that TipTap fully owns — keeping it free of Svelte
            content avoids Svelte and ProseMirror fighting over the same parent's DOM. -->
       <div bind:this={hosts[i]} class="tiptap-host" data-split-pane={i > 0 ? '' : null} dir={pageRtl ? 'rtl' : null} lang={documentLanguage === NO_LANGUAGE ? null : documentLanguage} style:hyphens={hyphenate ? 'auto' : null}></div>
