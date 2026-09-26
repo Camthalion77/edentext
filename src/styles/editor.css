@@ -684,12 +684,12 @@
   line-height: var(--line-fixed, calc(var(--line-factor) * var(--natural-line)));
 }
 
-/* The page's line grid rounds each line up to whole grid lines. A fixed spacing keeps
-   its height, and a block off the grid, a zone and a text box are not on it. Per element,
-   so a larger run in the line rounds up by its own size. */
+/* The page's line grid rounds each line up to whole grid lines, one exactly a pitch tall
+   too (Word: 12pt SimSun, 15.6pt, takes two of 15.6pt). A fixed spacing, a block off the
+   grid, a zone and a text box are not on it. Per element, so a larger run rounds by its size. */
 .paper[data-line-grid] .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, li, .toc-entry):not([data-snap-to-grid='false']):not(:is(.hf-zone, .textbox-node) *),
 .paper[data-line-grid] .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, .toc-entry):not([data-snap-to-grid='false']):not(:is(.hf-zone, .textbox-node) *) :not(.textbox-node, .textbox-node *) {
-  line-height: var(--line-fixed, round(up, calc(var(--line-factor) * var(--natural-line) * 1em), var(--grid-pitch)));
+  line-height: var(--line-fixed, round(up, calc(var(--line-factor) * var(--natural-line) * 1em + 0.01pt), var(--grid-pitch)));
 }
 
 /* A document balancing single- and double-byte widths sets every space at half its size
