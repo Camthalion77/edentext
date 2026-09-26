@@ -25,13 +25,13 @@
   import type { Orientation } from '../storage/pageOrientation';
   import { pageDimsCm, PAGE_FORMAT_CM, type PageFormat } from '../storage/pageFormat';
   import { DEFAULT_HF_DISTANCES, clampHfDistance, type HfDistances } from '../storage/headerFooter';
-  import { blockFontSize, coversWholeBlock, DEFAULT_FONT_SIZE, FONT_SIZES, type SizedBlock } from '../utils/fontSize';
+  import { blockFontSize, coversWholeBlock, DEFAULT_FONT_SIZE, parseSize, sizeLabel, sizeMenu, type SizedBlock } from '../utils/fontSize';
   import { listContext } from '../editor/extensions/indent';
   import { stepFontSize } from '../editor/extensions/shortcuts';
   import { findColumns, DEFAULT_COLUMN_GAP_CM } from '../editor/extensions/columns';
   import { DEFAULT_PAGE_NUMBERING, PAGE_NUM_FORMATS, clampPageStart, type PageNumbering } from '../storage/pageNumbering';
   import { formatOrdinal } from '../utils/orderedListTypes';
-  import { t } from '../i18n/i18n.svelte';
+  import { locale, t } from '../i18n/i18n.svelte';
   import { shortcutHint, type ShortcutId } from '../editor/shortcuts';
   import { MAX_PAGE_COLUMNS } from '../storage/theme';
 
@@ -301,12 +301,13 @@
   let paraShadeOpen = $state(false);
   let sizeInputFocused = $state(false);
   let sizeInputValue = $state('');
+  let namedSizes = $derived(locale() === 'zh-Hans');
   let savedFrom: number | null = null;
   let savedTo: number | null = null;
 
   $effect(() => {
     if (!sizeInputFocused) {
-      sizeInputValue = currentFontSize ? currentFontSize.replace('pt', '') : '';
+      sizeInputValue = currentFontSize ? sizeLabel(currentFontSize, namedSizes) : '';
     }
   });
 
@@ -418,10 +419,8 @@
   function onSizeInputKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      // Imported documents carry fractional sizes (producer rounding, relative style
-      // sizes), so keep one decimal instead of snapping the shown value to a whole point.
-      const num = Math.round(parseFloat(sizeInputValue.replace(',', '.')) * 10) / 10;
-      if (!isNaN(num) && num >= 1 && num <= 400) applyFontSize(num);
+      const num = parseSize(sizeInputValue);
+      if (num != null) applyFontSize(num);
       sizeInputFocused = false;
       (e.target as HTMLInputElement).blur();
     } else if (e.key === 'Escape') {
@@ -1137,7 +1136,6 @@
           onfocus={onSizeInputFocus}
           onkeydown={onSizeInputKeydown}
           onblur={onSizeInputBlur}
-          inputmode="numeric"
           title={t().toolbarExpanded.fontSize}
         />
         <button class="size-chevron" onclick={openSizePicker} tabindex="-1" title={t().toolbarExpanded.fontSizeList}>
@@ -1150,12 +1148,12 @@
         <div class="size-dropdown">
           <div class="menu-scroll">
             <div class="lh-section-label">{t().toolbarExpanded.fontSize}</div>
-            {#each FONT_SIZES as size}
+            {#each sizeMenu(namedSizes) as [label, size]}
               <button
                 class="size-option"
-                class:active={currentFontSize === `${size}pt`}
+                class:active={sizeLabel(currentFontSize, namedSizes) === label}
                 onclick={() => pickSize(size)}
-              >{size}</button>
+              >{label}</button>
             {/each}
           </div>
         </div>

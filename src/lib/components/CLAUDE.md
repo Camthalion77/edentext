@@ -11,6 +11,7 @@ Only one view may measure and paginate in split or page-grid layouts. Plugin dec
 shared by multiple views must create their DOM in a widget factory, never reuse one node.
 `chromeMode` selects one of the modern toolbar island or `ribbon/`; both use
 `activeEditor`/`activeTick` and only one mounts at a time.
+Under the zh-Hans UI both size boxes list and accept the named sizes (字号, `utils/fontSize.ts`).
 
 Keep `pageBreaks.ts`, `Editor.svelte`, and `editor.css` layout constants aligned. Zoom is a
 CSS transform on `.paper`, while pagination always measures at 100%; reserve its scaled
