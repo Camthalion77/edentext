@@ -137,7 +137,10 @@ We deliberately keep TipTap's `resizable: false` (so its own columnResizing plug
   The excess comes off the cell's `padding-bottom` (`--border-over`, `tableCellBorders.ts`;
   the bottom side only, since `border-collapse` draws one line per boundary), which is why the
   cell padding rides four custom properties rather than one shorthand. 0.25mm a row, a page
-  over the Math Guide's length.
+  over the Math Guide's length. A default line (0.5pt, painted 1px) has its excess too — the
+  CSS fallback of `--border-over`, so an explicit bottom border always sets the variable — and
+  what the paddings cannot take (Word's cells have none above or below) a negative margin on
+  the cell's `::after` does: measured, a 20pt row is 20.5pt in both word processors, not 20.75.
 - **In a Word document the cell margin is measured from the grid line.** Word's PDF centres a
   line in exactly cell width − left − right margin, the border taking nothing; LibreOffice
   reserves one declared border width per cell, and Chromium's collapsed 1px line half a pixel

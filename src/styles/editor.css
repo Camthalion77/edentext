@@ -900,10 +900,11 @@
   padding: var(--cell-pad-t, 0) var(--cell-pad-r, 0.19cm) var(--cell-pad-b, 0) var(--cell-pad-l, 0.19cm);
   /* A painted border is a whole pixel wide whatever the file declares, so the excess
      comes off the padding — else a long table grows a line every few rows
-     (tableCellBorders.ts). Below first, then what is left of it above. */
-  padding-bottom: max(0px, calc(var(--cell-pad-b, 0px) - var(--border-over, 0px)));
-  padding-top: max(0px, calc(
-    var(--cell-pad-t, 0px) - max(0px, var(--border-over, 0px) - var(--cell-pad-b, 0px))));
+     (tableCellBorders.ts). Below first, then what is left of it above, then ::after. */
+  --border-over-default: calc(1px - 0.5pt);
+  padding-bottom: max(0px, calc(var(--cell-pad-b, 0px) - var(--border-over, var(--border-over-default))));
+  padding-top: max(0px, calc(var(--cell-pad-t, 0px)
+    - max(0px, var(--border-over, var(--border-over-default)) - var(--cell-pad-b, 0px))));
   vertical-align: top;
   /* A repeating header row is a <th>, and no word processor centres or bolds its text
      for that reason — drop the two UA defaults so the cell follows its own style. */
@@ -912,6 +913,15 @@
   /* Positioning context for the column-resize handle widget (a child div the
      resize plugin places at the cell's right edge). */
   position: relative;
+}
+
+/* What of the border's excess no padding could take: a negative margin on an empty last
+   block, which collapses with the cell's last paragraph's own space below. */
+.paper .tiptap :is(td, th)::after {
+  content: '';
+  display: block;
+  margin-top: min(0px, calc(var(--cell-pad-t, 0px) + var(--cell-pad-b, 0px)
+    - var(--border-over, var(--border-over-default))));
 }
 
 /* Word measures a cell's margin from the grid line, and the border takes nothing from the
