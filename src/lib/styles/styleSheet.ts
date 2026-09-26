@@ -253,10 +253,52 @@ export function cssFontFamily(name: string): string {
   return `"${cssString(name)}", var(--font-serif)`;
 }
 
+// What a family's substitute does differently, one row per family. `stack`: the names it
+// renders under; `sans`: Arial's generic tail; `singleLine`: its natural line height (1.15
+// is Liberation Serif's, editor.css), measured against LibreOffice at 12pt.
+// `noBold`: Word has no bold face and strokes the regular outline 0.025em (read from its PDF),
+// heavier than a substitute's own bold. `wideQuotes`: full-width quotation marks, as the
+// Chinese face sets them, from `EdenText Quotes` where the face is missing.
+interface FontProfile {
+  stack?: string;
+  sans?: boolean;
+  singleLine?: number;
+  noBold?: boolean;
+  wideQuotes?: boolean;
+}
+const SANS = { stack: "'Arial', 'Liberation Sans'", sans: true };
+// Measured in Word: 22pt SimSun at 1.15 sets 32.9pt lines. It sets FangSong_GB2312 in
+// SimSun where the font is missing, and LibreOffice's fallback measures 1.34.
+const SONG = { singleLine: 1.3, noBold: true, wideQuotes: true };
+const CJK_NO_BOLD = { noBold: true, wideQuotes: true };
+const FONT_PROFILES: Record<string, FontProfile> = {
+  'Liberation Serif': { stack: "'Liberation Serif', 'Times New Roman'" },
+  'Liberation Sans': SANS,
+  Arial: SANS,
+  Calibri: { singleLine: 1.2208 },
+  'Calibri Light': { singleLine: 1.2208 },
+  Carlito: { singleLine: 1.2208 },
+  'Courier New': { singleLine: 1.1333 },
+  'Liberation Mono': { singleLine: 1.1333 },
+  SimSun: SONG, 宋体: SONG, NSimSun: SONG, 新宋体: SONG, FangSong: SONG, 仿宋: SONG, 仿宋_GB2312: SONG,
+  FangSong_GB2312: CJK_NO_BOLD, SimHei: CJK_NO_BOLD, 黑体: CJK_NO_BOLD, KaiTi: CJK_NO_BOLD,
+  KaiTi_GB2312: CJK_NO_BOLD, 楷体: CJK_NO_BOLD, 楷体_GB2312: CJK_NO_BOLD, MingLiU: CJK_NO_BOLD,
+  PMingLiU: CJK_NO_BOLD, 細明體: CJK_NO_BOLD, 新細明體: CJK_NO_BOLD, 'MS Mincho': CJK_NO_BOLD,
+  'MS PMincho': CJK_NO_BOLD, 'MS Gothic': CJK_NO_BOLD, 'MS PGothic': CJK_NO_BOLD,
+};
+
+// A family named in Han is a Chinese face all the same.
+function fontProfile(name: string): FontProfile {
+  return FONT_PROFILES[name] ?? (/\p{sc=Han}/u.test(name) ? { wideQuotes: true } : {});
+}
+
+export function fauxBold(asian: string): boolean {
+  return !!fontProfile(asian).noBold;
+}
+
 function westNames(name: string): string {
-  if (name === 'Liberation Serif') return "'Liberation Serif', 'Times New Roman'";
-  if (name === 'Liberation Sans' || name === 'Arial') return "'Arial', 'Liberation Sans'";
-  return `"${cssString(name)}"`;
+  const p = fontProfile(name);
+  return (p.stack ?? `"${cssString(name)}"`) + (p.wideQuotes ? ", 'EdenText Quotes'" : '');
 }
 
 // Text takes the western font, then the asian one, then the western family's generic tail
@@ -265,9 +307,12 @@ function westNames(name: string): string {
 export function fontPairDeclarations(west?: string | null, asian?: string | null): string[] {
   if (!west && !asian) return [];
   const out: string[] = [];
-  const tail = `var(${west === 'Liberation Sans' || west === 'Arial' ? '--font-heading' : '--font-serif'})`;
+  const tail = `var(${west && fontProfile(west).sans ? '--font-heading' : '--font-serif'})`;
   if (west) out.push(`--font-west: ${westNames(west)}`, `--font-tail: ${tail}`);
-  if (asian) out.push(`--font-asian: "${cssString(asian)}"`);
+  if (asian) {
+    out.push(`--font-asian: "${cssString(asian)}"`);
+    out.push(...(fauxBold(asian) ? ['--bold-weight: 400', '--bold-stroke: 0.025em'] : ['--bold-weight: 700', '--bold-stroke: 0']));
+  }
   out.push(`font-family: var(--font-space,) ${[
     west ? westNames(west) : 'var(--font-west)',
     asian ? `"${cssString(asian)}"` : 'var(--font-asian, var(--font-tail))',
@@ -276,31 +321,10 @@ export function fontPairDeclarations(west?: string | null, asian?: string | null
   return out;
 }
 
-// Single spacing is the font's *natural* line height, so it differs per family.
-// Liberation Serif's 1.15 is the default (editor.css); only the bundled families that
-// deviate are listed, measured against LibreOffice at 12pt.
-const DEFAULT_SINGLE_LINE_HEIGHT = 1.15;
-const SINGLE_LINE_HEIGHT: Record<string, number> = {
-  Calibri: 1.2208,
-  'Calibri Light': 1.2208,
-  Carlito: 1.2208,
-  'Courier New': 1.1333,
-  'Liberation Mono': 1.1333,
-  // Measured in Word: 22pt at 1.15 sets 32.9pt lines. It sets FangSong_GB2312 in SimSun
-  // where the font is missing, and LibreOffice's fallback measures 1.34.
-  SimSun: 1.3,
-  宋体: 1.3,
-  NSimSun: 1.3,
-  新宋体: 1.3,
-  FangSong: 1.3,
-  仿宋: 1.3,
-  仿宋_GB2312: 1.3,
-};
-
 // A proportional line spacing multiplies the font's natural line height, while CSS
 // multiplies the font size — so the stored factor is scaled by the family's own.
 export function singleLineHeight(fontFamily?: string): number {
-  return (fontFamily && SINGLE_LINE_HEIGHT[fontFamily]) || DEFAULT_SINGLE_LINE_HEIGHT;
+  return (fontFamily && FONT_PROFILES[fontFamily]?.singleLine) || 1.15;
 }
 
 // A line spacing as editor.css reads it: a factor of the font's natural line, or a fixed
@@ -317,13 +341,15 @@ export function textDeclarations(t: TextProps, asBlock = false): string[] {
   const out: string[] = [];
   out.push(...fontPairDeclarations(t.fontFamily, t.fontFamilyAsian));
   if (t.fontFamily) {
-    const lh = SINGLE_LINE_HEIGHT[t.fontFamily];
+    const lh = FONT_PROFILES[t.fontFamily]?.singleLine;
     if (lh) out.push(`${asBlock ? '--natural-line' : 'line-height'}: ${lh}`);
   }
   if (t.fontSizePt != null) out.push(`font-size: ${t.fontSizePt}pt`);
   if (t.letterSpacingPt) out.push(`letter-spacing: ${t.letterSpacingPt}pt`);
   if (t.kerning != null) out.push(`font-kerning: ${t.kerning ? 'normal' : 'none'}`);
-  if (t.bold != null) out.push(`font-weight: ${t.bold ? 700 : 400}`);
+  if (t.bold != null) {
+    out.push(`font-weight: ${t.bold ? 'var(--bold-weight, 700)' : 400}`, `-webkit-text-stroke-width: ${t.bold ? 'var(--bold-stroke, 0)' : 0}`);
+  }
   if (t.italic != null) out.push(`font-style: ${t.italic ? 'italic' : 'normal'}`);
   if (t.underline || t.strike) {
     out.push(`text-decoration: ${[t.underline && 'underline', t.strike && 'line-through'].filter(Boolean).join(' ')}`);

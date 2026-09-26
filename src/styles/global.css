@@ -96,6 +96,17 @@
   unicode-range: U+20;
 }
 
+/* Liberation Serif's quotation marks set full width, as a Chinese face's are: what a run
+   whose western font is one sets them in where that font is missing (westNames). */
+@font-face {
+  font-family: 'EdenText Quotes';
+  font-style: normal;
+  font-weight: 1 1000;
+  font-display: block;
+  src: url('../assets/fonts/EdenQuotes.woff2') format('woff2');
+  unicode-range: U+2018-2019, U+201C-201D;
+}
+
 /* STIX Two Math — a font with an OpenType MATH table is what makes MathML typeset:
    without one Chromium drops ∑ and ϕ entirely and leaves brackets glyph-height next
    to a fraction. Word uses Cambria Math for the same job. (OFL — see

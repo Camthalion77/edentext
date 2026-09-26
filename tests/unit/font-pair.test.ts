@@ -65,6 +65,16 @@ describe('font pair rendering', () => {
     expect(decls).toContain('--font-tail: var(--font-heading)');
     expect(decls).toContain('--font-asian: "SimHei"');
   });
+
+  it('strokes bold in a face without one and sets a Chinese face\'s quotes full width', () => {
+    const song = textDeclarations({ fontFamily: 'FangSong', fontFamilyAsian: '宋体', bold: true });
+    expect(song).toContain('--bold-stroke: 0.025em');
+    expect(song).toContain('font-weight: var(--bold-weight, 700)');
+    expect(song).toContain(`--font-west: "FangSong", 'EdenText Quotes'`);
+    const yahei = textDeclarations({ fontFamily: 'Arial', fontFamilyAsian: 'Microsoft YaHei' });
+    expect(yahei).toContain('--bold-stroke: 0');
+    expect(yahei).toContain("--font-west: 'Arial', 'Liberation Sans'");
+  });
 });
 
 describe('font box', () => {

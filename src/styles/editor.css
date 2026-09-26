@@ -695,6 +695,12 @@
   line-height: var(--line-fixed, round(up, calc(var(--line-factor) * var(--natural-line) * 1em + 0.01pt), var(--grid-pitch)));
 }
 
+/* Bold in a face Word has none for is the regular face stroked (FONT_PROFILES, styleSheet.ts). */
+.paper .tiptap strong {
+  font-weight: var(--bold-weight, bolder);
+  -webkit-text-stroke-width: var(--bold-stroke, 0);
+}
+
 /* A document balancing single- and double-byte widths sets every space at half its size
    (storage/balanceSpaces.ts): the half-width face goes in front of each font stack. */
 .paper[data-balance-spaces] {
