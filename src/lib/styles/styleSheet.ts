@@ -286,12 +286,15 @@ const SINGLE_LINE_HEIGHT: Record<string, number> = {
   Carlito: 1.2208,
   'Courier New': 1.1333,
   'Liberation Mono': 1.1333,
-  // Measured in Word: 22pt at 1.15 sets 32.9pt lines. 12pt × 1.3 is also the 15.6pt
-  // pitch of a Chinese template's line grid.
+  // Measured in Word: 22pt at 1.15 sets 32.9pt lines. It sets FangSong_GB2312 in SimSun
+  // where the font is missing, and LibreOffice's fallback measures 1.34.
   SimSun: 1.3,
   宋体: 1.3,
   NSimSun: 1.3,
   新宋体: 1.3,
+  FangSong: 1.3,
+  仿宋: 1.3,
+  仿宋_GB2312: 1.3,
 };
 
 // A proportional line spacing multiplies the font's natural line height, while CSS
