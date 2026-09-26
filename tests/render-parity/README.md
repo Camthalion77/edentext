@@ -34,6 +34,11 @@ a document pays for it — the whole corpus measured **9:00 cold against 5:41 ca
 and one fixture 15s against 10s. `--no-cache` after installing or removing a font,
 which does change what LibreOffice renders.
 
+**A PDF beside a fixture replaces LibreOffice as its reference**: `name.docx` with a
+`name.pdf` next to it is compared against that PDF, the way the file's own word processor
+laid it out. Use it where that layout is the right one and LibreOffice's is not — the
+console line then reads `PDF 2p` in place of `LO 2p`.
+
 ## How it compares
 
 | | reference | editor |

@@ -52,6 +52,15 @@ function loRender(file, work, cache) {
   return { pages: parseBbox(readFileSync(xml, 'utf8')), pdf, cached: hit };
 }
 
+// A PDF of the same name beside the document is the reference in LibreOffice's place:
+// the word processor that made the file, where it lays the file out better than LO.
+function pdfReference(file) {
+  const pdf = file.slice(0, -extname(file).length) + '.pdf';
+  if (!existsSync(pdf)) return null;
+  const xml = execFileSync('pdftotext', ['-bbox-layout', pdf, '-'], { maxBuffer: 1 << 28 }).toString();
+  return { pages: parseBbox(xml), pdf, cached: false, source: 'PDF' };
+}
+
 // pdftotext -bbox-layout emits <page><flow><block><line><word>, coords in pt,
 // origin top-left of the page.
 function parseBbox(xml) {
@@ -149,7 +158,7 @@ async function worker() {
     const name = basename(file);
     const log = [];
     try {
-      const ref = loRender(file, work, cache);
+      const ref = pdfReference(file) ?? loRender(file, work, cache);
       const ed = await editorRender(browser, file);
       const issues = compare(ref, ed);
       report[at] = {
@@ -161,7 +170,7 @@ async function worker() {
         } : {}),
       };
       const was = baseline?.[name]?.issues;
-      log.push(`\n${issues.length ? '✗' : '✓'} ${name}  (LO ${ref.pages.length}p / editor ${ed.pages.length}p)`
+      log.push(`\n${issues.length ? '✗' : '✓'} ${name}  (${ref.source ?? 'LO'} ${ref.pages.length}p / editor ${ed.pages.length}p)`
         + `  ${issues.length} ${delta(issues.length, was)}${ref.cached ? '  [cached]' : ''}`);
       for (const i of issues.slice(0, 12)) log.push('    ' + fmt(i));
       if (issues.length > 12) log.push(`    … ${issues.length - 12} more`);
