@@ -244,6 +244,7 @@ const pt: Messages = {
     lineSpacing: 'Espaçamento entre linhas',
     lineSingle: 'Simples',
     lineDouble: 'Duplo',
+    lineFixed: 'Fixo',
     spaceBefore: 'Espaço antes do parágrafo (pt)',
     spaceAfter: 'Espaço após parágrafo (pt)',
     spaceBeforePresets: 'Espaçamentos predefinidos antes',

@@ -255,6 +255,7 @@ const ru: Messages = {
     lineSpacing: 'Междустрочный интервал',
     lineSingle: 'Одинарный',
     lineDouble: 'Двойной',
+    lineFixed: 'Фиксированный',
     spaceBefore: 'Интервал перед абзацем (пт)',
     spaceAfter: 'Интервал после абзаца (пт)',
     spaceBeforePresets: 'Предустановки интервала перед абзацем',

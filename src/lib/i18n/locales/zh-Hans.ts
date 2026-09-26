@@ -245,6 +245,7 @@ const zhHans: Messages = {
     lineSpacing: '行距',
     lineSingle: '单倍',
     lineDouble: '双倍',
+    lineFixed: '固定值',
     spaceBefore: '段前距（磅）',
     spaceAfter: '段后距（磅）',
     spaceBeforePresets: '段前距预设',

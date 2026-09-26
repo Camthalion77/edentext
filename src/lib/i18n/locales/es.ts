@@ -245,6 +245,7 @@ const es: Messages = {
     lineSpacing: 'Interlineado',
     lineSingle: 'Sencillo',
     lineDouble: 'Doble',
+    lineFixed: 'Fijo',
     spaceBefore: 'Espacio antes del párrafo (pt)',
     spaceAfter: 'Espacio después del párrafo (pt)',
     spaceBeforePresets: 'Valores de espacio antes',

@@ -250,6 +250,7 @@ const fr: Messages = {
     lineSpacing: 'Interligne',
     lineSingle: 'Simple',
     lineDouble: 'Double',
+    lineFixed: 'Fixe',
     spaceBefore: 'Espace avant le paragraphe (pt)',
     spaceAfter: 'Espace après le paragraphe (pt)',
     spaceBeforePresets: 'Espacements prédéfinis avant',

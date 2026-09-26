@@ -252,6 +252,7 @@ const en = {
     lineSpacing: 'Line spacing',
     lineSingle: 'Single',
     lineDouble: 'Double',
+    lineFixed: 'Fixed',
     spaceBefore: 'Space before paragraph (pt)',
     spaceAfter: 'Space after paragraph (pt)',
     spaceBeforePresets: 'Space before presets',

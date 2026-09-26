@@ -35,6 +35,8 @@
   let spaceBefore = $derived(read('spaceBefore', 0));
   let spaceAfter = $derived(read('spaceAfter', 0));
   let lineHeight = $derived(read('lineHeight', '1'));
+  // A fixed spacing is a height in pt ('28pt'), the presets are factors.
+  let fixedLine = $derived(/pt$/.test(String(lineHeight)));
 
   let breakBefore = $derived(read<string | null>('breakBefore', null) === 'page');
   // widowControl is on unless a paragraph turned it off; the other two are off unless set.
@@ -111,10 +113,14 @@
 
         <label class="row newline">
           <span>{t().toolbarExpanded.lineSpacing}</span>
-          <select value={String(lineHeight)} onchange={(e) => editor?.chain().focus().setLineHeight((e.currentTarget as HTMLSelectElement).value).run()}>
+          <select value={fixedLine ? 'fixed' : String(lineHeight)} onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; editor?.chain().focus().setLineHeight(v === 'fixed' ? '12pt' : v).run(); }}>
             {#each ['1', '1.15', '1.5', '2'] as h}<option value={h}>{h === '1' ? t().toolbarExpanded.lineSingle : h === '2' ? t().toolbarExpanded.lineDouble : h}</option>{/each}
+            <option value="fixed">{t().toolbarExpanded.lineFixed}</option>
           </select>
         </label>
+        {#if fixedLine}
+          <label class="row"><span></span><input type="text" inputmode="decimal" value={num(parseFloat(String(lineHeight)))} onchange={(e) => { const v = parseFloat((e.currentTarget as HTMLInputElement).value.replace(',', '.')); if (v > 0) editor?.chain().focus().setLineHeight(`${v}pt`).run(); }} /><em>pt</em></label>
+        {/if}
       </div>
     {:else}
       <div class="flow">

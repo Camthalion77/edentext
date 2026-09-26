@@ -246,6 +246,7 @@ const zhHant: Messages = {
     lineSpacing: '行距',
     lineSingle: '單行間距',
     lineDouble: '兩倍行高',
+    lineFixed: '固定行高',
     spaceBefore: '與前段距離（點）',
     spaceAfter: '與後段距離（點）',
     spaceBeforePresets: '與前段距離的預設值',

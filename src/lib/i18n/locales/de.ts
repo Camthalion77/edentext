@@ -246,6 +246,7 @@ const de: Messages = {
     lineSpacing: 'Zeilenabstand',
     lineSingle: 'Einfach',
     lineDouble: 'Doppelt',
+    lineFixed: 'Fest',
     spaceBefore: 'Abstand vor Absatz (pt)',
     spaceAfter: 'Abstand nach Absatz (pt)',
     spaceBeforePresets: 'Voreinstellungen Abstand davor',

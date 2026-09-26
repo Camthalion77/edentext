@@ -247,6 +247,7 @@ const ja: Messages = {
     lineSpacing: '行間',
     lineSingle: '1 行',
     lineDouble: '2 行',
+    lineFixed: '固定値',
     spaceBefore: '段落前の間隔 (pt)',
     spaceAfter: '段落後の間隔 (pt)',
     spaceBeforePresets: '段落前の間隔のプリセット',
