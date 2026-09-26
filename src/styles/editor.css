@@ -914,6 +914,14 @@
   position: relative;
 }
 
+/* Word measures a cell's margin from the grid line, and the border takes nothing from the
+   text (its PDF centres a line in exactly width − margins); the collapsed border puts half
+   a painted pixel inside each side. ponytail: assumes 1px lines, a thick one still costs. */
+.paper[data-spacing-model='max'] .tiptap :is(td, th) {
+  padding-left: calc(var(--cell-pad-l, 0.19cm) - 0.5px);
+  padding-right: calc(var(--cell-pad-r, 0.19cm) - 0.5px);
+}
+
 /* No space below a cell paragraph that names no style: LibreOffice's Table Contents and
    Word's table styles both zero it, and the space would fill the cell, leaving vertical
    alignment no slack. An inline value (direct formatting) still wins. */

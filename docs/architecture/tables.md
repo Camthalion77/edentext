@@ -138,6 +138,12 @@ We deliberately keep TipTap's `resizable: false` (so its own columnResizing plug
   the bottom side only, since `border-collapse` draws one line per boundary), which is why the
   cell padding rides four custom properties rather than one shorthand. 0.25mm a row, a page
   over the Math Guide's length.
+- **In a Word document the cell margin is measured from the grid line.** Word's PDF centres a
+  line in exactly cell width − left − right margin, the border taking nothing; LibreOffice
+  reserves one declared border width per cell, and Chromium's collapsed 1px line half a pixel
+  per side. `.paper[data-spacing-model='max']` takes that half pixel back off the side paddings,
+  which is what fits a cell line that fills its cell to within half a point (measured: 144pt of
+  text in a 144.5pt cell, one line in both word processors, two before).
 - **`<th>` carries no UA defaults.** A repeating ODF header row (`table:table-header-rows`)
   becomes a `tableHeader`, and the browser centres and bolds it — neither Word nor LibreOffice
   does. `editor.css` resets both, so the cell follows its own style (the "header row" preset's
