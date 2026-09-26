@@ -5,7 +5,7 @@ import {
   Table, TableRow, TableCell, Header, Footer, PageNumber, SimpleField, ImportedXmlComponent,
   CommentRangeStart, CommentRangeEnd, CommentReference, InsertedTextRun, DeletedTextRun,
   AlignmentType, LevelFormat, LevelSuffix, UnderlineType, BorderStyle, ShadingType,
-  WidthType, HeightRule, PageOrientation, LineRuleType, LineNumberRestartFormat, TableLayoutType, SectionType, NumberFormat,
+  WidthType, HeightRule, PageOrientation, LineRuleType, LineNumberRestartFormat, DocumentGridType, TableLayoutType, SectionType, NumberFormat,
   HorizontalPositionAlign, VerticalPositionRelativeFrom, HorizontalPositionRelativeFrom,
   TableAnchorType, RelativeHorizontalPosition,
   TextWrappingType, TextWrappingSide, TabStopType, LeaderType,
@@ -51,6 +51,7 @@ import { DEFAULT_PAGE_NUMBERING, type PageNumbering } from '../storage/pageNumbe
 import { EMPTY_PAGE_DECOR, isEmptyPageDecor, type PageDecor, type Watermark } from '../storage/pageDecor';
 import { FOLD_MARK_MM, PUNCH_MARK_MM, MARK_START_MM, FOLD_MARK_LEN_MM, PUNCH_MARK_LEN_MM, FOLD_MARK_NAME } from '../storage/foldMarks';
 import { DEFAULT_LINE_NUMBERING, type LineNumbering } from '../storage/lineNumbering';
+import { DEFAULT_LINE_GRID, type LineGrid } from '../storage/lineGrid';
 
 // The five page-number formats both word processors offer → Word's own names.
 const DOCX_PAGE_NUM_FORMAT = {
@@ -276,6 +277,8 @@ const TXBX_NUM = '';
 // Marks a paragraph whose w:pPr must gain <w:suppressAutoHyphens/> — the docx package
 // has no option for it, so a post-pack pass writes it and drops this run.
 const NOHYP = '';
+// Marks a paragraph off the page's line grid: <w:snapToGrid w:val="0"/>, the same way.
+const NOSNAP = '\uE023';
 
 const WP_NS = 'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
 const A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -2292,28 +2295,37 @@ function applyBidiDocx(bytes: Uint8Array): Uint8Array {
   return zipSync(out);
 }
 
-// The w:pPr children that follow w:suppressAutoHyphens in CT_PPrBase — Word's schema is
-// a sequence, so the flag goes in before the first of them.
-const AFTER_SUPPRESS_HYPHENS = /<w:(kinsoku|wordWrap|overflowPunct|topLinePunct|autoSpace|bidi|adjustRightInd|snapToGrid|spacing|ind|contextualSpacing|mirrorIndents|suppressOverlap|jc|textDirection|textAlignment|textboxTightWrap|outlineLvl|divId|cnfStyle|rPr|sectPr)\b/;
+// Paragraph flags the docx package does not expose, each with the w:pPr children that
+// follow it in CT_PPrBase — Word's schema is a sequence, so it goes in before the first.
+const PPR_TAIL = 'spacing|ind|contextualSpacing|mirrorIndents|suppressOverlap|jc|textDirection|textAlignment|textboxTightWrap|outlineLvl|divId|cnfStyle|rPr|sectPr';
+const PPR_FLAGS = [
+  { mark: NOHYP, xml: '<w:suppressAutoHyphens/>',
+    before: new RegExp(`<w:(kinsoku|wordWrap|overflowPunct|topLinePunct|autoSpace|bidi|adjustRightInd|snapToGrid|${PPR_TAIL})\\b`) },
+  { mark: NOSNAP, xml: '<w:snapToGrid w:val="0"/>', before: new RegExp(`<w:(${PPR_TAIL})\\b`) },
+];
 
-// Post-pack pass: "don't hyphenate this paragraph" is <w:suppressAutoHyphens/> in w:pPr,
-// which the docx package does not expose. The paragraph carries the NOHYP run instead;
-// this drops that run and writes the flag.
-function applyNoHyphensDocx(bytes: Uint8Array): Uint8Array {
+// Post-pack pass: the paragraph carries a marker run per flag instead; this drops the
+// run and writes the flag into w:pPr.
+function applyParagraphFlagsDocx(bytes: Uint8Array): Uint8Array {
   const files = unzipSync(bytes);
   const docBytes = files['word/document.xml'];
   if (!docBytes) return bytes;
   let xml = strFromU8(docBytes);
-  if (!xml.includes(NOHYP)) return bytes;
+  const flags = PPR_FLAGS.filter((f) => xml.includes(f.mark));
+  if (!flags.length) return bytes;
   xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (para) => {
-    if (!para.includes(NOHYP)) return para;
-    const p = para.replace(new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${NOHYP}(?:(?!</w:r>)[\\s\\S])*</w:r>`, 'g'), '');
-    const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(p);
-    if (!pPr) return p.replace(/^(<w:p\b[^>]*>)/, '$1<w:pPr><w:suppressAutoHyphens/></w:pPr>');
-    const patched = AFTER_SUPPRESS_HYPHENS.test(pPr[0])
-      ? pPr[0].replace(AFTER_SUPPRESS_HYPHENS, '<w:suppressAutoHyphens/>$&')
-      : pPr[0].replace('</w:pPr>', '<w:suppressAutoHyphens/></w:pPr>');
-    return p.replace(pPr[0], patched);
+    let p = para;
+    for (const f of flags) {
+      if (!p.includes(f.mark)) continue;
+      p = p.replace(new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${f.mark}(?:(?!</w:r>)[\\s\\S])*</w:r>`, 'g'), '');
+      const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(p);
+      if (!pPr) { p = p.replace(/^(<w:p\b[^>]*>)/, `$1<w:pPr>${f.xml}</w:pPr>`); continue; }
+      const patched = f.before.test(pPr[0])
+        ? pPr[0].replace(f.before, `${f.xml}$&`)
+        : pPr[0].replace('</w:pPr>', `${f.xml}</w:pPr>`);
+      p = p.replace(pPr[0], patched);
+    }
+    return p;
   });
   files['word/document.xml'] = strToU8(xml);
   const out: Record<string, [Uint8Array, { level: 6 }]> = {};
@@ -2428,9 +2440,11 @@ function paragraphToDocx(node: TiptapNode, opts: ParaOpts = {}): Paragraph {
     border: paraBordersOf(attrs),
     // The paragraph mark's own run properties; the language there formats the mark alone.
     run: markSize || markFont || blockLang ? { size: markSize, font: markFont, language: blockLang } : undefined,
-    children: attrs.noHyphenation === true
-      ? [new TextRun(NOHYP), ...inlineToRuns(node.content, runForce)]
-      : inlineToRuns(node.content, runForce),
+    children: [
+      ...(attrs.noHyphenation === true ? [new TextRun(NOHYP)] : []),
+      ...(attrs.snapToGrid === false ? [new TextRun(NOSNAP)] : []),
+      ...inlineToRuns(node.content, runForce),
+    ],
   });
 }
 
@@ -3092,6 +3106,7 @@ export async function buildDocx(
   foldMarks = false,
   spacingAtPageStart = true,
   fonts: EmbeddedFont[] = [],
+  lineGrid: LineGrid = DEFAULT_LINE_GRID,
 ): Promise<Uint8Array> {
   docLangTag = localeTag(language ? language.language : 'en');
   // Before the walk: every picture the file can hold has to be a raster by then, and
@@ -3289,6 +3304,8 @@ export async function buildDocx(
     sections: groups.map((g, i) => ({
       properties: {
         page: pagePropsFor(g.section),
+        // Word's Document Grid, lines only; ODF keeps it on the page layout.
+        ...(lineGrid.on ? { grid: { type: DocumentGridType.LINES, linePitch: Math.round(lineGrid.pitchPt * 20) } } : {}),
         // Word's Layout ▸ Line Numbers; ODF keeps the same five values document-wide.
         ...(lineNumbering.on
           ? { lineNumbers: {
@@ -3338,7 +3355,7 @@ export async function buildDocx(
   const withNotes = docNoteIds.size ? applyEndnoteImagesDocx(applyNoteMarksDocx(applyNoteBookmarksDocx(withNotePr))) : withNotePr;
   const threaded = applyCommentsExtendedDocx(withNotes);
   const mirrored = margins.mirrored ? applyMirrorMarginsDocx(threaded) : threaded;
-  const bidi = applyNoHyphensDocx(rtl ? applyBidiDocx(mirrored) : mirrored);
+  const bidi = applyParagraphFlagsDocx(rtl ? applyBidiDocx(mirrored) : mirrored);
   const dims = pageDimsCm(pageFormat, orientation);
   const foldMarked = applyFoldMarksDocx(bidi, foldMarks, dims.w * 10);
   const spaced = spacingAtPageStart ? foldMarked : applySpacingAtStartDocx(foldMarked);

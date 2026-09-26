@@ -3063,3 +3063,30 @@ describe('a fixed line spacing', () => {
     }
   });
 });
+
+describe('the line grid', () => {
+  const grid = { on: true, pitchPt: 15.6 };
+  const off = { type: 'paragraph', attrs: { snapToGrid: false }, content: [{ type: 'text', text: 'off' }] };
+  const doc: N = { type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'on' }] },
+    off,
+    { type: 'table', content: [{ type: 'tableRow', content: [{ type: 'tableCell', content: [off] }] }] },
+  ] };
+  const u = undefined;
+
+  it('round-trips with the blocks off it through ODF and DOCX', async () => {
+    const odtBytes = await buildOdt(doc, margins, 'portrait', u, null, 'A4', u, u, u, u, u, u, u, u, u, u, u, u, u, u, grid);
+    const docxBytes = await buildDocx(doc, margins, 'portrait', u, null, 'A4', u, u, u, u, u, u, u, u, u, u, u, u, u, u, grid);
+    check('DOCX writes a lines grid', /<w:docGrid w:type="lines" w:linePitch="312"/.test(strFromU8(unzipSync(docxBytes)['word/document.xml'])));
+    for (const [name, res] of [['ODF', importOdt(odtBytes)], ['DOCX', importDocx(docxBytes)]] as const) {
+      check(`${name}: the grid comes back`, res.lineGrid.on && Math.abs(res.lineGrid.pitchPt - 15.6) < 0.05, res.lineGrid);
+      const paras = (res.content.content ?? []).filter((n) => n.type === 'paragraph');
+      check(`${name}: a block on the grid carries nothing`, paras[0]?.attrs?.snapToGrid == null, paras[0]?.attrs);
+      check(`${name}: a block off it says so`, paras[1]?.attrs?.snapToGrid === false, paras[1]?.attrs);
+      const cell = JSON.stringify((res.content.content ?? []).find((n) => n.type === 'table'));
+      check(`${name}: so does one in a cell`, cell.includes('"snapToGrid":false'), cell.slice(0, 300));
+    }
+    const plain = importDocx(await buildDocx({ type: 'doc', content: [off] } as N));
+    check('no grid unless asked', plain.lineGrid.on === false, plain.lineGrid);
+  });
+});

@@ -12,6 +12,7 @@ import { DEFAULT_PAGE_NUMBERING, type PageNumbering } from '../storage/pageNumbe
 import { EMPTY_PAGE_DECOR, type PageDecor, type Watermark } from '../storage/pageDecor';
 import { FOLD_MARK_MM, PUNCH_MARK_MM, MARK_START_MM, FOLD_MARK_LEN_MM, PUNCH_MARK_LEN_MM, FOLD_MARK_NAME } from '../storage/foldMarks';
 import { DEFAULT_LINE_NUMBERING, type LineNumbering } from '../storage/lineNumbering';
+import { DEFAULT_LINE_GRID, type LineGrid } from '../storage/lineGrid';
 import { asianLang, cjkDocFont, isAsianTag, odfFromTag, tagFromOdf, westLang, type ExportLanguage } from '../storage/documentLanguage';
 import { builtinStyleSheet, DEFAULT_STYLE, resolveStyle, type StyleSheet, type TextProps, type ParaProps } from '../styles/styleSheet';
 import type { EmbeddedFont } from '../fonts/embeddedFonts';
@@ -307,6 +308,7 @@ function hasCustomAttrs(attrs: TiptapNode['attrs']): boolean {
   if (attrs.keepNext === true) return true;
   if (attrs.keepLines === true) return true;
   if (attrs.noHyphenation === true) return true;
+  if (attrs.snapToGrid === false) return true;
   if (attrs.dir === 'rtl' || attrs.dir === 'ltr') return true;
   if (typeof attrs.lang === 'string' && attrs.lang) return true;
   if (typeof attrs.langAsian === 'string' && attrs.langAsian) return true;
@@ -1353,6 +1355,8 @@ type ParaStyle = {
   // The block's language tags; ODF keeps them in the text properties, not the paragraph ones.
   lang: string | null;
   langAsian: string | null;
+  // Off the page's line grid (style:snap-to-layout-grid="false").
+  noSnap: boolean;
 };
 
 // A list item's blocks past its first: each one's own style, and its heading level.
@@ -1363,7 +1367,7 @@ function paraStyleIsEmpty(s: ParaStyle): boolean {
     && s.background === null && s.borderTop === null && s.borderRight === null
     && s.borderBottom === null && s.borderLeft === null && s.dir === null
     && s.indent === null && s.indentFirst === null && s.indentRight === null && !s.breakBefore
-    && s.lang === null && s.langAsian === null;
+    && s.lang === null && s.langAsian === null && !s.noSnap;
 }
 
 // What a minted style is deduped on — every emitted property, the language included.
@@ -1416,6 +1420,7 @@ function paraStyleFromAttrs(attrs: TiptapNode['attrs'], withIndents = true): Par
     breakBefore: false,
     lang: typeof attrs?.lang === 'string' && attrs.lang ? attrs.lang : null,
     langAsian: typeof attrs?.langAsian === 'string' && attrs.langAsian ? attrs.langAsian : null,
+    noSnap: attrs?.snapToGrid === false,
   };
 }
 
@@ -1453,6 +1458,7 @@ function paraStyleProps(style: ParaStyle): string[] {
   if (wm) props.push(`style:writing-mode="${wm}"`);
   // The pair LibreOffice writes: the mode alone leaves the block left-aligned (probed).
   if (style.dir === 'rtl' && !style.align) props.push('fo:text-align="end"');
+  if (style.noSnap) props.push('style:snap-to-layout-grid="false"');
   return props;
 }
 
@@ -1985,26 +1991,28 @@ function applyEmptyLineFontSizes(odtBytes: Uint8Array): Uint8Array {
 // A top-level paragraph's box spec for the PBX sentinel: bg|borderTop|Right|Bottom|Left,
 // each the raw value (canonical border '<W>pt solid #RRGGBB' is a valid fo:border) or '',
 // then a widow flag, the right indent, a keep-with-next flag, the writing mode, a
-// no-hyphenation flag and the paragraph's two language tags. '' when it needs none.
+// no-hyphenation flag, the paragraph's two language tags and an off-the-grid flag.
+// '' when it needs none.
 function paraBoxSpec(attrs: TiptapNode['attrs']): string {
   const s = paraStyleFromAttrs(attrs);
   const noWidow = attrs?.widowControl === false;
   const keepNext = attrs?.keepNext === true;
   const keepLines = attrs?.keepLines === true;
   const noHyphen = attrs?.noHyphenation === true;
+  const noSnap = attrs?.snapToGrid === false;
   // odf-kit has a paragraph option for the left indent but none for the right one.
   const right = typeof attrs?.indentRight === 'number' && attrs.indentRight > 0 ? attrs.indentRight : 0;
   const wm = writingModeOf(s.dir);
   const lang = s.lang ?? '';
   const langAsian = s.langAsian ?? '';
-  if (!s.background && !s.borderTop && !s.borderRight && !s.borderBottom && !s.borderLeft && !noWidow && !right && !keepNext && !keepLines && !wm && !noHyphen && !lang && !langAsian) return '';
+  if (!s.background && !s.borderTop && !s.borderRight && !s.borderBottom && !s.borderLeft && !noWidow && !right && !keepNext && !keepLines && !wm && !noHyphen && !lang && !langAsian && !noSnap) return '';
   return [s.background, s.borderTop, s.borderRight, s.borderBottom, s.borderLeft]
     .map((v) => v ?? '')
-    .concat(noWidow ? 'w0' : '', right ? `${right}cm` : '', keepNext ? 'k1' : '', keepLines ? 'g1' : '', wm ?? '', noHyphen ? 'h0' : '', lang, langAsian).join('|');
+    .concat(noWidow ? 'w0' : '', right ? `${right}cm` : '', keepNext ? 'k1' : '', keepLines ? 'g1' : '', wm ?? '', noHyphen ? 'h0' : '', lang, langAsian, noSnap ? 's0' : '').join('|');
 }
 
 function boxSpecToProps(spec: string): string {
-  const [bg, bt, br, bb, bl, widow, marginRight, keepNext, keepLines, writingMode] = spec.split('|');
+  const [bg, bt, br, bb, bl, widow, marginRight, keepNext, keepLines, writingMode, , , , snap] = spec.split('|');
   const props: string[] = [];
   if (bg) props.push(`fo:background-color="${bg}"`);
   if (bt) props.push(`fo:border-top="${bt}"`);
@@ -2017,6 +2025,7 @@ function boxSpecToProps(spec: string): string {
   if (keepNext === 'k1') props.push('fo:keep-with-next="always"');
   if (keepLines === 'g1') props.push('fo:keep-together="always"');
   if (writingMode) props.push(`style:writing-mode="${writingMode}"`);
+  if (snap === 's0') props.push('style:snap-to-layout-grid="false"');
   return props.join(' ');
 }
 
@@ -3336,7 +3345,7 @@ function applyBibliographyConfig(odtBytes: Uint8Array, numbered: boolean): Uint8
   return rezipOdt(files);
 }
 
-function rewriteStylesXml(odtBytes: Uint8Array, lang: ExportLanguage | null, pageFormat: PageFormat, orientation: Orientation, sheet: StyleSheet, used: Set<string>, usedTables: Set<string> = new Set(), usedLists: Set<string> = new Set(), tabIntervalCm: number = DEFAULT_TAB_INTERVAL_CM, mirrored = false, rtl = false, notes: NoteSettings = DEFAULT_NOTE_SETTINGS, hyphenate = false, pageNumbering: PageNumbering = DEFAULT_PAGE_NUMBERING, decor: PageDecor = EMPTY_PAGE_DECOR, lineNumbering: LineNumbering = DEFAULT_LINE_NUMBERING): Uint8Array {
+function rewriteStylesXml(odtBytes: Uint8Array, lang: ExportLanguage | null, pageFormat: PageFormat, orientation: Orientation, sheet: StyleSheet, used: Set<string>, usedTables: Set<string> = new Set(), usedLists: Set<string> = new Set(), tabIntervalCm: number = DEFAULT_TAB_INTERVAL_CM, mirrored = false, rtl = false, notes: NoteSettings = DEFAULT_NOTE_SETTINGS, hyphenate = false, pageNumbering: PageNumbering = DEFAULT_PAGE_NUMBERING, decor: PageDecor = EMPTY_PAGE_DECOR, lineNumbering: LineNumbering = DEFAULT_LINE_NUMBERING, lineGrid: LineGrid = DEFAULT_LINE_GRID): Uint8Array {
   const files = unzipSync(odtBytes);
   const stylesBytes = files['styles.xml'];
   if (!stylesBytes) return odtBytes;
@@ -3404,6 +3413,25 @@ function rewriteStylesXml(odtBytes: Uint8Array, lang: ExportLanguage | null, pag
     styles = styles.includes('</office:styles>')
       ? styles.replace('</office:styles>', `${cfg}</office:styles>`)
       : styles.replace(/<office:automatic-styles\b/, `<office:styles>${cfg}</office:styles><office:automatic-styles`);
+  }
+
+  // The line grid rides the page layout, lines only, as LibreOffice writes Word's
+  // docGrid (probed); its line count is what fits the text area. Standard mode is the
+  // one that lays lines out as Word does, and it lives on the default page layout.
+  if (lineGrid.on) {
+    const pitchCm = lineGrid.pitchPt / 72 * 2.54;
+    styles = styles.replace(/<style:page-layout-properties [^>]*?(?=\/?>)/, (m) => {
+      const cm = (a: string) => Number(new RegExp(`fo:${a}="([\\d.]+)cm"`).exec(m)?.[1] ?? 0);
+      const lines = Math.max(1, Math.floor((cm('page-height') - cm('margin-top') - cm('margin-bottom')) / pitchCm));
+      return `${m} style:layout-grid-mode="line" style:layout-grid-base-height="${round3(pitchCm)}cm"`
+        + ` style:layout-grid-ruby-height="0cm" style:layout-grid-lines="${lines}"`
+        + ' style:layout-grid-ruby-below="false" style:layout-grid-print="false" style:layout-grid-display="false"';
+    });
+    const standard = '<style:default-page-layout><style:page-layout-properties style:layout-grid-standard-mode="true"/></style:default-page-layout>';
+    styles = styles.replace(/<style:default-page-layout\b[^>]*?(?:\/>|>[\s\S]*?<\/style:default-page-layout>)/, '');
+    styles = styles.includes('</office:styles>')
+      ? styles.replace('</office:styles>', `${standard}</office:styles>`)
+      : styles.replace(/<office:automatic-styles\b/, `<office:styles>${standard}</office:styles><office:automatic-styles`);
   }
 
   // How the page-number field counts. ODF keeps the format on the page layout; the start
@@ -5313,7 +5341,7 @@ export type HfExport = {
 };
 
 // The full document → .odt pipeline, DOM-free; returns the .odt bytes.
-export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAULT_MARGINS, orientation: Orientation = 'portrait', hf?: HfExport, language?: ExportLanguage | null, pageFormat: PageFormat = 'A4', styles: StyleSheet = builtinStyleSheet(), tabIntervalCm: number = DEFAULT_TAB_INTERVAL_CM, spacingModel: SpacingModel = 'add', rtl = false, notesSettings: NoteSettings = DEFAULT_NOTE_SETTINGS, props: DocProperties = EMPTY_DOC_PROPERTIES, hyphenate = false, pageNumbering: PageNumbering = DEFAULT_PAGE_NUMBERING, decor: PageDecor = EMPTY_PAGE_DECOR, lineNumbering: LineNumbering = DEFAULT_LINE_NUMBERING, recordChanges = false, foldMarks = false, spacingAtPageStart = true, fonts: EmbeddedFont[] = []): Promise<Uint8Array> {
+export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAULT_MARGINS, orientation: Orientation = 'portrait', hf?: HfExport, language?: ExportLanguage | null, pageFormat: PageFormat = 'A4', styles: StyleSheet = builtinStyleSheet(), tabIntervalCm: number = DEFAULT_TAB_INTERVAL_CM, spacingModel: SpacingModel = 'add', rtl = false, notesSettings: NoteSettings = DEFAULT_NOTE_SETTINGS, props: DocProperties = EMPTY_DOC_PROPERTIES, hyphenate = false, pageNumbering: PageNumbering = DEFAULT_PAGE_NUMBERING, decor: PageDecor = EMPTY_PAGE_DECOR, lineNumbering: LineNumbering = DEFAULT_LINE_NUMBERING, recordChanges = false, foldMarks = false, spacingAtPageStart = true, fonts: EmbeddedFont[] = [], lineGrid: LineGrid = DEFAULT_LINE_GRID): Promise<Uint8Array> {
   // Images become IMG sentinels before serialization; applyImages resolves them and writes
   // the Pictures/ + manifest entries. Text boxes and columns hoist after replacePageBreaks
   // (so PGB misses their blocks) and before the inline passes (which then cover them).
@@ -5590,7 +5618,7 @@ export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAU
   // Effects first: applyCharacterStyles then clones the style that already carries them.
   const withNamedStyles = applyCharacterStyles(applyTextEffects(applyParagraphStyles(withParaBoxes)));
   const usedTables = new Set(tableStyleNames.filter((t): t is TableStyleRef => !!t).map(t => t.name));
-  const withStyles = rewriteStylesXml(withNamedStyles, language ?? null, pageFormat, orientation, styles, usedStyleNames(docJson, styles), usedTables, new Set(listStyleRepoints.filter((n): n is string => !!n)), tabIntervalCm, margins.mirrored === true, rtl, notesSettings, hyphenate, pageNumbering, decor, lineNumbering);
+  const withStyles = rewriteStylesXml(withNamedStyles, language ?? null, pageFormat, orientation, styles, usedStyleNames(docJson, styles), usedTables, new Set(listStyleRepoints.filter((n): n is string => !!n)), tabIntervalCm, margins.mirrored === true, rtl, notesSettings, hyphenate, pageNumbering, decor, lineNumbering, lineGrid);
   const withBib = applyBibliographyConfig(withStyles, tocs.some((t) => t.kind === 'bibliography' && t.citationStyle === 'numbered'));
   const withHf = applyHfPostProcess(withBib, margins, headerPara, footerPara, headerDist, footerDist, firstHeaderPara, firstFooterPara, hf?.pageCount ?? 1, hfImages, evenHeaderPara, evenFooterPara);
   // Sections past the first get their own master page, which is where ODF keeps a
