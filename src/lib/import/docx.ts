@@ -44,6 +44,7 @@ import type { IndexKind } from '../editor/extensions/tableOfContents';
 import { bibTypeFromDocx, DOCX_BIB_FIELD, type BibSource } from '../editor/extensions/bibliographyEntry';
 import { normalizePageDecor, type PageDecor } from '../storage/pageDecor';
 import { DEFAULT_LINE_NUMBERING, normalizeLineNumbering, type LineNumbering } from '../storage/lineNumbering';
+import { DEFAULT_LINE_GRID, normalizeLineGrid, type LineGrid } from '../storage/lineGrid';
 import { clampColumnGap } from '../editor/extensions/columns';
 import { astToLatex } from '../math/latex';
 import { parseOmml, OMML_NS } from '../math/omml';
@@ -335,6 +336,8 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
     decor: docxPageDecor(docDoc, finalSectPr, files,
       shownHeaderParts([...groups.map((g) => g.sectPr), finalSectPr], ctx, oddEven)),
     lineNumbering: docxLineNumbering(finalSectPr),
+    // The first section's, as the margins and the paper are.
+    lineGrid: docxLineGrid(groups[0]?.sectPr ?? finalSectPr),
     foldMarks: docxFoldMarks(files),
     hyphenate: docAutoHyphenation(files),
     recordChanges: docRecordsChanges(files),
@@ -1436,6 +1439,9 @@ function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number |
   if (spacing) attrs.lineHeight = spacing;
 
   if (!ppr) return attrs;
+
+  const snap = fc(ppr, 'snapToGrid');
+  if (snap && !onOff(snap)) attrs.snapToGrid = false;
 
   if (kind !== 'list') {
     const ind = fc(ppr, 'ind');
@@ -3285,6 +3291,16 @@ function docxWatermark(files: Record<string, Uint8Array>, headers: Set<string>):
 
 const decodeXml = (s: string) =>
   s.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+// <w:docGrid> in the section: every type but "default" lays lines on the grid, at
+// w:linePitch twips. The character half of linesAndChars is not modelled.
+function docxLineGrid(sectPr: Element | null): LineGrid {
+  const grid = fc(sectPr, 'docGrid');
+  const type = grid?.getAttributeNS(W, 'type');
+  const pitch = grid ? intAttr(grid, W, 'linePitch') : null;
+  if (!type || type === 'default' || !pitch) return DEFAULT_LINE_GRID;
+  return normalizeLineGrid({ on: true, pitchPt: twipToPt(pitch) });
+}
 
 // <w:lnNumType> in the section: Word's line numbers. Absent = not numbered, which is
 // also ODF's meaning for a missing configuration element.

@@ -6,6 +6,7 @@ import { normalizeLeader, type TabAlign, type TabStop } from '../editor/extensio
 import { DEFAULT_NOTE_SETTINGS, type NoteKind, type NoteNumFormat, type NoteSettings } from '../storage/noteSettings';
 import { DEFAULT_WATERMARK, normalizePageDecor, type PageDecor, type Watermark } from '../storage/pageDecor';
 import { DEFAULT_LINE_NUMBERING, normalizeLineNumbering, type LineNumbering } from '../storage/lineNumbering';
+import { DEFAULT_LINE_GRID, normalizeLineGrid, type LineGrid } from '../storage/lineGrid';
 import { mainOfPair, tagFromOdf } from '../storage/documentLanguage';
 import { mostlyAsian } from '../utils/script';
 
@@ -403,6 +404,17 @@ export class StyleResolver {
   // what "the document hyphenates" means.
   documentHyphenation(): boolean {
     return this.merged('paragraph', 'Standard').text['fo:hyphenate'] === 'true';
+  }
+
+  // The text grid of the first page's layout: "line" or "both" lays lines on it, one
+  // grid line being the base height plus the ruby line above it.
+  lineGrid(): LineGrid {
+    const props = this.pageLayoutEl()?.getElementsByTagNameNS(NS.style, 'page-layout-properties')[0] ?? null;
+    const mode = props?.getAttributeNS(NS.style, 'layout-grid-mode');
+    const base = lengthToPt(props?.getAttributeNS(NS.style, 'layout-grid-base-height'));
+    if ((mode !== 'line' && mode !== 'both') || !base) return DEFAULT_LINE_GRID;
+    const ruby = lengthToPt(props?.getAttributeNS(NS.style, 'layout-grid-ruby-height')) ?? 0;
+    return normalizeLineGrid({ on: true, pitchPt: base + ruby });
   }
 
   // The page-number format, from the page layout of the governing master page.

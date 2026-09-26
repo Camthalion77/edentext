@@ -45,6 +45,7 @@ import { citationStyleFromTemplate } from '../utils/citationStyle';
 import type { PageDecor } from '../storage/pageDecor';
 import { FOLD_MARK_NAME } from '../storage/foldMarks';
 import type { LineNumbering } from '../storage/lineNumbering';
+import type { LineGrid } from '../storage/lineGrid';
 import type { EmbeddedFont } from '../fonts/embeddedFonts';
 import { cellPaddingAttr, DEFAULT_CELL_PADDING, type CellPadding } from '../editor/extensions/tableCellPadding';
 import { fromWriterFormula } from '../utils/tableFormula';
@@ -78,6 +79,7 @@ export interface OdtImportResult {
   // Page background, page border and watermark (storage/pageDecor.ts).
   decor: PageDecor;
   lineNumbering: LineNumbering;
+  lineGrid: LineGrid;
   // Fold + punch marks in the left margin (the export's named header lines).
   foldMarks: boolean;
   // Automatic hyphenation (ODF fo:hyphenate on the base style, Word w:autoHyphenation).
@@ -907,6 +909,7 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
     rtl: geometry?.rtl ?? false,
     decor: resolver.pageDecor(first),
     lineNumbering: resolver.lineNumbering(),
+    lineGrid: resolver.lineGrid(),
     foldMarks: ctx.foldMarks,
     hyphenate: resolver.documentHyphenation(),
     recordChanges: odfRecordChanges(body),
@@ -1993,6 +1996,7 @@ function blockAttrs(paraProps: PropMap, textProps: PropMap, defaults: BlockDefau
 
   const lh = lineSpacing(paraProps['fo:line-height']);
   if (lh != null && lh !== defaults.lineHeight) attrs.lineHeight = lh;
+  if (paraProps['style:snap-to-layout-grid'] === 'false') attrs.snapToGrid = false;
 
   const defTop = defaults.marginTopPt;
   const defBottom = defaults.marginBottomPt;

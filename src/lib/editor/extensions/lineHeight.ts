@@ -43,6 +43,15 @@ export const LineHeight = Extension.create({
               };
             },
           },
+          // Off the page's line grid (Word's w:snapToGrid="0", ODF's
+          // style:snap-to-layout-grid="false"); null follows the grid.
+          snapToGrid: {
+            default: null,
+            parseHTML: (element: HTMLElement) =>
+              element.getAttribute('data-snap-to-grid') === 'false' ? false : null,
+            renderHTML: (attributes: Record<string, unknown>) =>
+              attributes.snapToGrid === false ? { 'data-snap-to-grid': 'false' } : {},
+          },
         },
       },
     ];
