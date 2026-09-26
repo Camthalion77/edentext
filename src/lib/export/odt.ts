@@ -93,6 +93,10 @@ const LBR = '';
 // rewrites it to <text:page-count> in styles.xml. U+E002 (SEG/LBR are E000/E001).
 const PGC = '';
 
+// Sentinel for a space ODF would collapse — one opening a paragraph or following another
+// (LibreOffice reads "a  b" as "a b"); replaceTabs → applyInlineSentinels → <text:s/>. U+E024.
+const SPC = '\uE024';
+
 // Sentinel for tab chars: \t collapses to a space in ODF, so replaceTabs swaps
 // each tab for this before odf-kit serializes; applyInlineSentinels → <text:tab/>. U+E003.
 const TAB = '';
@@ -377,12 +381,21 @@ function replaceHardBreaks(node: TiptapNode): TiptapNode {
 // Swap each tab character in run text for the TAB sentinel so it survives odf-kit
 // serialization (a literal \t would collapse to a space); applyInlineSentinels
 // rewrites it to <text:tab/> in content.xml afterwards.
+// The spaces ODF collapses become SPC in the same walk: a textblock's runs are read as one
+// string, so a space after a space in the previous run counts too.
 function replaceTabs(node: TiptapNode): TiptapNode {
-  if (node.type === 'text' && node.text?.includes('\t')) {
-    return { ...node, text: node.text.split('\t').join(TAB) };
-  }
   if (!node.content?.length) return node;
-  return { ...node, content: node.content.map(replaceTabs) };
+  if (!node.content.some((c) => c.type === 'text')) return { ...node, content: node.content.map(replaceTabs) };
+  let afterSpace = true;
+  return { ...node, content: node.content.map((c) => {
+    if (c.type !== 'text' || !c.text) { afterSpace = false; return replaceTabs(c); }
+    let text = '';
+    for (const ch of c.text) {
+      text += ch === ' ' && afterSpace ? SPC : ch === '\t' ? TAB : ch;
+      afterSpace = ch === ' ';
+    }
+    return { ...c, text };
+  }) };
 }
 
 // Prepend a PGB sentinel run to each top-level paragraph/heading with breakBefore so it
@@ -4291,9 +4304,10 @@ function applyInlineSentinels(odtBytes: Uint8Array): Uint8Array {
   if (!contentBytes) return odtBytes;
 
   let content = strFromU8(contentBytes);
-  if (!content.includes(LBR) && !content.includes(TAB) && !content.includes(CHAR_TAB_STOP)) return odtBytes;
+  if (!content.includes(LBR) && !content.includes(TAB) && !content.includes(CHAR_TAB_STOP) && !content.includes(SPC)) return odtBytes;
 
-  content = content.split(LBR).join('<text:line-break/>').split(TAB).join('<text:tab/>');
+  content = content.split(LBR).join('<text:line-break/>').split(TAB).join('<text:tab/>')
+    .replace(new RegExp(`${SPC}+`, 'g'), (m) => (m.length > 1 ? `<text:s text:c="${m.length}"/>` : '<text:s/>'));
   content = content.split(CHAR_TAB_STOP).join(`${CHAR_TAB_STOP} style:char="."`);
   files['content.xml'] = strToU8(content);
   return rezipOdt(files);

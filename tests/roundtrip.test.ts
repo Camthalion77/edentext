@@ -3090,3 +3090,16 @@ describe('the line grid', () => {
     check('no grid unless asked', plain.lineGrid.on === false, plain.lineGrid);
   });
 });
+
+// ODF collapses a space that opens a paragraph or follows another, across runs too.
+describe('ODT spaces', () => {
+  it('writes every collapsible space as text:s', async () => {
+    const doc = { type: 'doc', content: [
+      { type: 'paragraph', content: [{ type: 'text', text: ' x    y' }] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'a ' }, { type: 'text', text: ' b', marks: [{ type: 'bold' }] }] },
+    ] };
+    const xml = strFromU8(unzipSync(await buildOdt(doc as N))['content.xml']);
+    expect(xml).toContain('<text:s/>x <text:s text:c="3"/>y');
+    expect(xml).toMatch(/a <text:span [^>]*><text:s\/>b/);
+  });
+});

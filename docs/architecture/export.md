@@ -35,7 +35,8 @@ again. The final ODT writes `mimetype` first and stored, preserves already-compr
 and deflates remaining entries once.
 
 Sentinels carry editor features that `odf-kit` cannot express through every serializer path.
-Replacement passes restore inline breaks and tabs, images, custom paragraph attributes, named
+Replacement passes restore inline breaks, tabs and collapsible spaces (every space opening a
+paragraph or following another, counted across runs — LibreOffice reads raw `a  b` as `a b`), images, custom paragraph attributes, named
 styles, page and section breaks, text boxes, fields, revisions, notes, and other format-specific
 nodes. Keep the source definitions and replacement order in `odt.ts` authoritative; do not add
 a second serialized representation of the same feature.
