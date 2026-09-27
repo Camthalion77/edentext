@@ -1,10 +1,10 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Editor, generateHTML, type Content } from '@tiptap/core';
+  import { Editor, type Content } from '@tiptap/core';
   import { layOutZoneTabs, zoneDefaultStops } from '../editor/extensions/tabStops';
   import { FORCE_PAGE_RECALC } from '../editor/extensions/pageBreaks';
   import { zoneExtensions } from '../editor/extensions';
-  import { flattenToInline, plainPastedSpaces } from '../editor/paste';
+  import { plainPastedSpaces } from '../editor/paste';
   import { hfIsEmpty, DEFAULT_HF_DISTANCES, HF_ZONE_KEYS, type HfDoc, type HfZone, type HfVariant, type HfDistances, type HfSet, type HfZoneKey } from '../storage/headerFooter';
   import { cmToPx, PX_PER_CM, type PageMargins } from '../storage/pageMargins';
   import { type Orientation } from '../storage/pageOrientation';
@@ -76,7 +76,7 @@
   // Minimum zone height (~one 12pt line), so a thin margin band (footer distance ≥
   // bottom margin, as some Word docs have) still renders instead of collapsing to 0.
   const MIN_ZONE_PX = 20;
-  // Schema for static (read-only) rendering of the inactive zones.
+  // Schema for the read-only editors the inactive zones are cloned from.
   const renderExts = zoneExtensions();
 
   // All geometry is in unscaled document px — the layer lives inside the scaled
@@ -169,18 +169,6 @@
   const boxStyle = (b: { top: number; left: number; width: number; height: number }) =>
     `top: ${b.top}px; left: ${b.left}px; width: ${b.width}px; height: ${b.height}px;`;
 
-  function staticHtml(doc: HfDoc): string {
-    if (hfIsEmpty(doc)) return '';
-    try {
-      const html = generateHTML(doc as Parameters<typeof generateHTML>[0], renderExts);
-      // A paragraph ending in a hardBreak loses its last blank line: a bare trailing <br>
-      // collapses, so the live editor adds a ProseMirror trailing break but generateHTML
-      // doesn't. Append one (past any mark close-tags) so static matches editing.
-      return html.replace(/(<br\s*\/?>)((?:<\/[a-zA-Z]+>)*<\/p>)/g, '$1<br>$2');
-    } catch {
-      return '';
-    }
-  }
   // A positioned frame in a zone is out of flow: the page-anchored letterhead or
   // watermark a title page is made of. It paints once per page from the page corner,
   // behind the body, and the zone's own box never sees it (editor.css hides it there).
@@ -209,13 +197,43 @@
     },
     ...extraHfSections,
   ]);
-  // Rendered once per set, not per page: a 48-page document would otherwise run
-  // generateHTML for every page of every zone.
-  let setHtml = $derived(sets.map((s) => ({
-    header: staticHtml(s.header), footer: staticHtml(s.footer),
-    headerFirst: staticHtml(s.headerFirst), footerFirst: staticHtml(s.footerFirst),
-    headerEven: staticHtml(s.headerEven), footerEven: staticHtml(s.footerEven),
+  // Each zone as a string: '' for an empty one, and what the pages test for fields in.
+  const signature = (doc: HfDoc) => (hfIsEmpty(doc) ? '' : JSON.stringify(doc));
+  let setSig = $derived(sets.map((s) => ({
+    header: signature(s.header), footer: signature(s.footer),
+    headerFirst: signature(s.headerFirst), footerFirst: signature(s.footerFirst),
+    headerEven: signature(s.headerEven), footerEven: signature(s.footerEven),
   })));
+
+  // Rendered once per set, not per page: a read-only editor per zone, in the off-screen
+  // measuring box at its section's text width. A page shows a clone of its DOM, so list
+  // markers, table columns and frames render as they do in the live zone.
+  let sources = $state<Record<string, HTMLElement>>({});
+  let sourceVersion = $state(0);
+  function staticZone(node: HTMLElement, [id, doc]: [string, HfDoc]) {
+    const ed = new Editor({ element: node, editable: false, extensions: renderExts, content: doc as Content });
+    let raf = 0;
+    const bump = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => sourceVersion++);
+    };
+    // NodeViews settle after the first render (an image's size, a box's layout).
+    const mo = new MutationObserver(bump);
+    mo.observe(ed.view.dom, { subtree: true, childList: true, attributes: true, characterData: true });
+    sources[id] = ed.view.dom as HTMLElement;
+    bump();
+    return {
+      update([, next]: [string, HfDoc]) {
+        if (next !== doc) ed.commands.setContent((doc = next) as Content, { emitUpdate: false });
+      },
+      destroy() {
+        cancelAnimationFrame(raf);
+        mo.disconnect();
+        delete sources[id];
+        ed.destroy();
+      },
+    };
+  }
   let setBg = $derived(sets.map((s) => ({
     header: backgrounds(s.header), footer: backgrounds(s.footer),
     headerFirst: backgrounds(s.headerFirst), footerFirst: backgrounds(s.footerFirst),
@@ -232,7 +250,7 @@
     const boxes = Array.from(root.querySelectorAll<HTMLElement>('.hf-measure-box'));
     const n = HF_ZONE_KEYS.length;
     const read = () => {
-      const next = setHtml.map((_, i) => HF_ZONE_KEYS.map((_, k) => boxes[i * n + k]?.offsetHeight ?? 0));
+      const next = setSig.map((_, i) => HF_ZONE_KEYS.map((_, k) => boxes[i * n + k]?.offsetHeight ?? 0));
       if (String(next) !== String(untrack(() => zoneHeights))) zoneHeights = next;
     };
     // A web font arriving late (an embedded one lands after the import) reflows the zone,
@@ -266,12 +284,11 @@
     if (s.differentOddEven && isLeftPage(pageNumberAt(page))) return 'even';
     return 'default';
   }
-  function zoneHtml(zone: HfZone, page: number): string {
-    const index = sectionOf(page);
-    const v = variantFor(page, index);
-    const h = setHtml[index] ?? setHtml[0];
-    if (zone === 'header') return v === 'first' ? h.headerFirst : v === 'even' ? h.headerEven : h.header;
-    return v === 'first' ? h.footerFirst : v === 'even' ? h.footerEven : h.footer;
+  // The zone a page shows: its set and key, and that zone's signature.
+  function zoneOf(zone: HfZone, page: number): { id: string; sig: string } {
+    const index = Math.min(sectionOf(page), setSig.length - 1);
+    const key = zoneKey(zone, variantFor(page, index));
+    return { id: `${index}:${key}`, sig: setSig[index][key] };
   }
   function zoneBackgrounds(zone: HfZone, page: number): PageBg[] {
     const index = sectionOf(page);
@@ -281,28 +298,25 @@
     return v === 'first' ? b.footerFirst : v === 'even' ? b.footerEven : b.footer;
   }
 
-  // Page, the page count and chapter map (only where the zone shows them), its HTML, the
-  // zone and the number the page shows: everything the two actions below re-run on. The
-  // label is a parameter of its own because numbering can change without the page doing so.
-  type ZoneParams = [number, number, string, unknown, HfZone, string];
+  // Page, the page count and chapter map (only where the zone shows them), its source
+  // editor's DOM and version, the zone and the number the page shows: everything the
+  // action below re-runs on. The label is a parameter of its own because numbering can
+  // change without the page doing so.
+  type ZoneParams = [number, number, HTMLElement | undefined, unknown, HfZone, string, number];
 
   // The zone's tabs: static HTML no ProseMirror plugin reaches. The advances are layout
   // px, so only a content change invalidates them — not the zoom transform. The zones of
   // one flush lay out together, after their fields are patched: one layout, not one each.
   const tabQueue = new Set<HTMLElement>();
-  function layOutTabs(node: HTMLElement, _params: ZoneParams) {
-    const apply = () => {
-      if (!tabQueue.size) {
-        queueMicrotask(() => {
-          const zones = [...tabQueue].filter((z) => z.isConnected);
-          tabQueue.clear();
-          layOutZoneTabs(zones);
-        });
-      }
-      tabQueue.add(node);
-    };
-    apply();
-    return { update: apply };
+  function layOutTabs(node: HTMLElement) {
+    if (!tabQueue.size) {
+      queueMicrotask(() => {
+        const zones = [...tabQueue].filter((z) => z.isConnected);
+        tabQueue.clear();
+        layOutZoneTabs(zones);
+      });
+    }
+    tabQueue.add(node);
   }
 
   // The number a page shows, and the label of it in its section's format (a roman
@@ -315,16 +329,18 @@
     return formatOrdinal(pageNumberAt(page), sets[sectionOf(page)]?.pageNumberFormat ?? pageNumbering.format);
   }
 
-  // Replace the placeholder text in every page-field span with the real value:
-  // current page number, or the total page count. Re-runs when its param changes.
-  function patchFields(node: HTMLElement, params: ZoneParams) {
-    const apply = ([page, total, , , zone]: ZoneParams) => {
+  // Clone the zone's source, replace the placeholder text in every page-field span with
+  // the real value (current page number, or the total page count), then lay out its tabs.
+  function fillZone(node: HTMLElement, params: ZoneParams) {
+    const apply = ([page, total, src, , zone]: ZoneParams) => {
+      node.replaceChildren(...(src ? [src.cloneNode(true)] : []));
       for (const el of Array.from(node.querySelectorAll('[data-page-field]'))) {
         const kind = el.getAttribute('data-page-field');
         if (kind === 'chapter') el.textContent = chapterOn(chapterStarts, page, Number(el.getAttribute('data-level')) || 1, zone);
         // The count stays decimal, as the field LibreOffice and Word write does.
         else el.textContent = kind === 'count' ? String(total) : pageLabel(page);
       }
+      layOutTabs(node);
     };
     apply(params);
     return { update: apply };
@@ -432,9 +448,7 @@
         writeZone(editingIndex, zone, editingVariant, editor.getJSON() as HfDoc);
       },
       editorProps: {
-        // The zone is one paragraph: pasted blocks arrive as its own text, a line break
-        // apart, which is what both importers write for a zone's paragraphs.
-        transformPasted: (slice, view) => flattenToInline(plainPastedSpaces(slice), view.state.schema),
+        transformPasted: (slice) => plainPastedSpaces(slice),
         handleKeyDown: (_view, event) => {
           if (event.key === 'Escape') {
             hfActive = null;
@@ -475,7 +489,8 @@
     activeContentPx = tt ? tt.offsetHeight : 0;
     // A rendered trailing break adds one caret line past the real content; measure that
     // line height (the CSS var below shifts the editor down so it overflows the anchor).
-    const p = tt?.querySelector('p') as HTMLElement | null;
+    const last = tt?.lastElementChild;
+    const p = last instanceof HTMLParagraphElement ? last : null;
     // Only past real content: in an empty zone that break is the caret line itself, and
     // discounting it would drop the placeholder a line below the anchored edge.
     const tb = p && p.childNodes.length > 1 ? (p.querySelector(':scope > br.ProseMirror-trailingBreak') as HTMLElement | null) : null;
@@ -490,15 +505,17 @@
 
 <!-- Only the measuring pane runs it: every pane renders the same zones, and a second
      writer would just re-report the same heights. -->
-{#if interactive}
 <div class="hf-measure" aria-hidden="true" bind:this={measureRoot}>
-  {#each setHtml as html, i}
+  {#each sets as set, i}
     {#each HF_ZONE_KEYS as key}
-      <div class="hf-zone hf-measure-box" style="width: {contentWidthOf(sectionFirstPage(i))}px">{@html html[key]}</div>
+      <div class="hf-zone hf-measure-box" style="width: {contentWidthOf(sectionFirstPage(i))}px">
+        {#if setSig[i]?.[key]}
+          <div use:staticZone={[`${i}:${key}`, set[key]]}></div>
+        {/if}
+      </div>
     {/each}
   {/each}
 </div>
-{/if}
 
 <!-- Own layer below the body (z-index -1 against .paper's zoom stacking context), so a
      full-page background sits under the text the way LibreOffice paints it. -->
@@ -521,23 +538,21 @@
   {#each pages as p}
     {#each ['header', 'footer'] as const as zone}
       {#if !(interactive && hfActive === zone && editingPage === p)}
-        {@const html = zoneHtml(zone, p)}
-        {@const total = html.includes('data-page-field="count"') ? numPages : 0}
-        {@const chapters = html.includes('data-page-field="chapter"') ? chapterStarts : null}
+        {@const { id, sig } = zoneOf(zone, p)}
+        {@const total = sig.includes('"pageCount"') ? numPages : 0}
+        {@const chapters = sig.includes('"chapterField"') ? chapterStarts : null}
+        {@const src = sig ? sources[id] : undefined}
         {@const zb = zoneBox(zone, p)}
         <div
           class="hf-zone hf-{zone}"
-          class:hf-empty={!html}
+          class:hf-empty={!sig}
           data-hf-label={zone === 'header' ? t().hf.addHeaderHint : t().hf.addFooterHint}
           style={boxStyle(zb) + (interactive ? hitVars(zone, p, zb) : '')}
           ondblclick={() => interactive && startEdit(zone, p)}
           role="button"
           tabindex="-1"
-          use:patchFields={[p, total, html, chapters, zone, pageLabel(p)]}
-          use:layOutTabs={[p, total, html, chapters, zone, pageLabel(p)]}
-        >
-          {@html html}
-        </div>
+          use:fillZone={[p, total, src, chapters, zone, pageLabel(p), sourceVersion]}
+        ></div>
       {/if}
     {/each}
   {/each}
@@ -602,13 +617,11 @@
     position: static;
     height: auto;
   }
-  /* The paragraph's space above is band height as well — and in a header it is drawn
-     too, which is what puts a rule line at the foot of the band it belongs to. A
-     footer's carries the zone's own gap to the body (import/odt.ts), so it stays a
-     measurement there: drawn, it would push the text off the page. */
-  .hf-measure .hf-zone :global(p),
-  .hf-header :global(p) {
-    margin-top: var(--space-before, 0);
+  /* The space above a footer's first block carries the zone's own gap to the body
+     (import/odt.ts), so it is measured (.hf-measure) but not drawn: drawn, it would
+     push the text off the page. */
+  .hf-footer :global(.tiptap > :first-child) {
+    --space-before: 0 !important;
   }
 
   .hf-zone {
@@ -695,22 +708,15 @@
     user-select: none;
   }
 
-  /* Strip the page margins from the rendered header/footer paragraph. pre-wrap keeps
-     runs of spaces (used to push a right-side field over) that HTML would collapse —
-     matching the live editor's ProseMirror rendering. */
-  .hf-zone :global(p) {
-    margin: 0;
-    line-height: 1.15;
-    white-space: pre-wrap;
-  }
-  /* The live editor's editable root is also a `.tiptap`, so the global `.paper .tiptap`
-     rules (96px padding, 1123px min-height, page gradient) leak in and push the text out
-     of the clipped zone. Reset them — higher specificity, plus !important for the gradient. */
-  .hf-layer .hf-zone :global(.tiptap) {
+  /* A zone's editor (live, source or clone) is a `.tiptap`, so it takes the body's block
+     rules; the root's own page rules (96px padding, 1123px min-height, page gradient)
+     are reset here — higher specificity, plus !important for the gradient. */
+  .hf-zone :global(.tiptap) {
     padding: 0;
     min-height: 0;
     width: 100%;
     background: none !important;
+    box-shadow: none;
     /* The zone's own size, which follows the document's default style — not the 12pt
        `.paper .tiptap` puts on the body. */
     font-size: inherit;
@@ -723,16 +729,10 @@
        anchored edge while the real content stays put (set per active zone). */
     margin-bottom: var(--hf-tb-offset, 0px);
   }
-  /* The live editor's paragraph also matches `.paper .tiptap p` (margin-bottom 0.212cm),
-     which the static `<p>` doesn't — with flex-end alignment that gap shifts the text up
-     on activation. Match the static zero margin (higher specificity). */
-  .hf-layer .hf-zone :global(.tiptap p) {
-    margin: 0;
-  }
   /* A paragraph ending in an inline atom (a page field) gets a phantom trailing <br> the
      static <p> lacks; ProseMirror marks that case with a separator <img>, so hide the
      break only then. A real Enter-made line has no separator and keeps its caret. */
-  .hf-layer .hf-zone :global(.tiptap p:has(img.ProseMirror-separator) > br.ProseMirror-trailingBreak) {
+  .hf-zone :global(.tiptap p:has(img.ProseMirror-separator) > br.ProseMirror-trailingBreak) {
     display: none;
   }
   .hf-zone :global([data-page-field]) {
