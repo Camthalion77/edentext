@@ -1329,6 +1329,13 @@ function txbxParagraphXml(node: TiptapNode, parts: TxbxParts, indentTwip = 0, nu
         ? `<w:r>${runProps(child.marks)}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`
         : `<w:fldSimple w:instr="${escapeXml(instr)}"><w:r>` +
           `<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:fldSimple>`;
+    } else if (child.type === 'pageNumber' || child.type === 'pageCount' || child.type === 'chapterField') {
+      // A header's page fields, the same fields the zone's own runs carry.
+      const instr = child.type === 'pageNumber' ? 'PAGE' : child.type === 'pageCount' ? 'NUMPAGES'
+        : `STYLEREF ${Number(child.attrs?.level) || 1} \\* MERGEFORMAT`;
+      const shown = child.type === 'chapterField' ? String(child.attrs?.text ?? '') : '1';
+      runs += `<w:fldSimple w:instr="${escapeXml(instr)}"><w:r>` +
+        `${runProps(child.marks)}<w:t xml:space="preserve">${escapeXml(shown)}</w:t></w:r></w:fldSimple>`;
     } else if (child.type === 'formula') {
       // A sentinel run, resolved by applyFormulasDocx — it runs after the boxes are packed.
       const latex = typeof child.attrs?.latex === 'string' ? child.attrs.latex : '';
@@ -1525,62 +1532,77 @@ function maxIdIn(xml: string, attr: RegExp): number {
   return max;
 }
 
-// Post-pack pass: swap each marker paragraph in word/document.xml for its drawing.
+// The parts a run can land in: a note's text and a header or footer are parts of their
+// own, so a sentinel pass that only rewrote document.xml would leave it standing there.
+const textParts = (files: Record<string, Uint8Array>): string[] =>
+  Object.keys(files).filter((p) => /^word\/(document|footnotes|endnotes|header\d*|footer\d*)\.xml$/.test(p));
+const relsOf = (part: string) => part.replace(/^word\/(.*)$/, 'word/_rels/$1.rels');
+const EMPTY_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+
+// Post-pack pass: swap each marker paragraph in a text part for its drawing.
 // The tempered pattern keeps the match inside one paragraph. A box's pictures and
 // lists need parts of their own — the pass holds the whole zip, so it appends the
 // media entries, their relationships and the numbering definitions here.
 function applyTextBoxesDocx(bytes: Uint8Array, boxes: TextBoxDocx[]): Uint8Array {
   if (!boxes.length) return bytes;
   const files = unzipSync(bytes);
-  const docBytes = files['word/document.xml'];
-  if (!docBytes) return bytes;
-  let xml = strFromU8(docBytes);
-
-  const relsPath = 'word/_rels/document.xml.rels';
-  const rels = files[relsPath] ? strFromU8(files[relsPath]) : '';
-  let nextRid = maxIdIn(rels, /Id="rId(\d+)"/g);
   let nextBm = 8000;
-  const parts: TxbxParts = { media: [], nums: [], links: [], nextRid: () => `rId${++nextRid}`, nextBookmarkId: () => ++nextBm };
+  // Media and numbering are named package-wide; relationships are each part's own.
+  const media: TxbxParts['media'] = [];
+  const nums: TxbxParts['nums'] = [];
 
-  // Only the marker run is rebuilt — the paragraph around it keeps its own properties
-  // and whatever text stands beside the box. Tempered so a match can't span two runs.
-  xml = xml.replace(
-    new RegExp(`<w:r\\b[^>]*?>(?:(?!</w:r>)[\\s\\S])*?${TBX}(\\d+)${TBX}(?:(?!</w:r>)[\\s\\S])*?</w:r>`, 'g'),
-    (_m, idx: string) => {
-      const box = boxes[Number(idx)];
-      return box ? `<w:r>${textBoxDrawingXml(box, Number(idx), parts)}</w:r>` : '';
-    },
-  );
+  for (const part of textParts(files)) {
+    let xml = strFromU8(files[part]);
+    if (!xml.includes(TBX)) continue;
+    const relsPath = relsOf(part);
+    const rels = files[relsPath] ? strFromU8(files[relsPath]) : EMPTY_RELS;
+    let nextRid = maxIdIn(rels, /Id="rId(\d+)"/g);
+    const from = media.length;
+    const parts: TxbxParts = { media, nums, links: [], nextRid: () => `rId${++nextRid}`, nextBookmarkId: () => ++nextBm };
+
+    // Only the marker run is rebuilt — the paragraph around it keeps its own properties
+    // and whatever text stands beside the box. Tempered so a match can't span two runs.
+    xml = xml.replace(
+      new RegExp(`<w:r\\b[^>]*?>(?:(?!</w:r>)[\\s\\S])*?${TBX}(\\d+)${TBX}(?:(?!</w:r>)[\\s\\S])*?</w:r>`, 'g'),
+      (_m, idx: string) => {
+        const box = boxes[Number(idx)];
+        return box ? `<w:r>${textBoxDrawingXml(box, Number(idx), parts)}</w:r>` : '';
+      },
+    );
+    files[part] = strToU8(xml);
+
+    const added = media.slice(from);
+    if (added.length || parts.links.length) {
+      files[relsPath] = strToU8(rels.replace('</Relationships>', added.map((m) =>
+        `<Relationship Id="${m.rid}" Type="${R_NS}/image" Target="media/${m.path.split('/').pop()}"/>`).join('') +
+        parts.links.map((l) =>
+          `<Relationship Id="${l.rid}" Type="${R_NS}/hyperlink" Target="${escapeXml(l.href)}" TargetMode="External"/>`).join('') +
+        '</Relationships>'));
+    }
+  }
+  for (const m of media) files[m.path] = m.bytes as Uint8Array<ArrayBuffer>;
 
   const numPath = 'word/numbering.xml';
   const numXml = files[numPath] ? strFromU8(files[numPath]) : '';
-  if (parts.nums.length && numXml) {
+  if (nums.length && numXml) {
     // Both id spaces are the package's, so one free number above its highest serves
     // as the abstract id and the concrete one alike.
     const base = Math.max(maxIdIn(numXml, /w:abstractNumId="(\d+)"/g), maxIdIn(numXml, /w:numId="(\d+)"/g)) + 1;
-    const abstracts = parts.nums.map((n, i) =>
+    const abstracts = nums.map((n, i) =>
       `<w:abstractNum w:abstractNumId="${base + i}"><w:multiLevelType w:val="hybridMultilevel"/>` +
       `${n.levels.filter(Boolean).join('')}</w:abstractNum>`).join('');
-    const concretes = parts.nums.map((_n, i) =>
+    const concretes = nums.map((_n, i) =>
       `<w:num w:numId="${base + i}"><w:abstractNumId w:val="${base + i}"/></w:num>`).join('');
     // w:abstractNum must precede every w:num, so both go where the first w:num is.
     const at = numXml.indexOf('<w:num ');
     files[numPath] = strToU8(at < 0
       ? numXml.replace('</w:numbering>', `${abstracts}${concretes}</w:numbering>`)
       : numXml.slice(0, at) + abstracts + concretes + numXml.slice(at));
-    xml = xml.replace(new RegExp(`${TXBX_NUM}(\\d+)${TXBX_NUM}`, 'g'), (_m, i: string) => String(base + Number(i)));
+    for (const part of textParts(files)) {
+      files[part] = strToU8(strFromU8(files[part]).replace(new RegExp(`${TXBX_NUM}(\\d+)${TXBX_NUM}`, 'g'), (_m, i: string) => String(base + Number(i))));
+    }
   }
 
-  if ((parts.media.length || parts.links.length) && rels) {
-    for (const m of parts.media) files[m.path] = m.bytes as Uint8Array<ArrayBuffer>;
-    files[relsPath] = strToU8(rels.replace('</Relationships>', parts.media.map((m) =>
-      `<Relationship Id="${m.rid}" Type="${R_NS}/image" Target="media/${m.path.split('/').pop()}"/>`).join('') +
-      parts.links.map((l) =>
-        `<Relationship Id="${l.rid}" Type="${R_NS}/hyperlink" Target="${escapeXml(l.href)}" TargetMode="External"/>`).join('') +
-      '</Relationships>'));
-  }
-
-  files['word/document.xml'] = strToU8(xml);
   const out: Record<string, [Uint8Array, { level: 6 }]> = {};
   for (const [path, data] of Object.entries(files)) out[path] = [data, { level: 6 }];
   return zipSync(out);
@@ -1741,9 +1763,6 @@ function applyBibliographyDocx(bytes: Uint8Array, sources: BibSource[], cite: Ci
   return zipSync(out);
 }
 
-// The parts a body run can land in: a note's text is its own part, so a sentinel pass
-// that only rewrote document.xml would leave the sentinel standing in a note.
-const NOTE_BEARING_PARTS = ['word/document.xml', 'word/footnotes.xml', 'word/endnotes.xml'];
 
 // Post-pack pass: swap each sentinel run for its <m:oMath>. A display formula
 // additionally wraps its paragraph's content in <m:oMathPara>, which is how Word
@@ -1755,7 +1774,7 @@ function applyFormulasDocx(bytes: Uint8Array, formulas: FormulaDocx[]): Uint8Arr
   // may cross neither </w:r> nor a nested <w:r> (a box's drawing run wraps whole
   // paragraphs, so matching from it would swallow the box preamble).
   const pattern = new RegExp(`<w:r\\b[^>]*?>(?:(?!</?w:r[\\s>])[\\s\\S])*?${MTH}(\\d+)${MTH}(?:(?!</?w:r[\\s>])[\\s\\S])*?</w:r>`, 'g');
-  for (const part of NOTE_BEARING_PARTS) {
+  for (const part of textParts(files)) {
     const partBytes = files[part];
     if (!partBytes) continue;
     files[part] = strToU8(strFromU8(partBytes).replace(pattern, (_m, idx: string) => {
@@ -1791,8 +1810,8 @@ function applyRubyDocx(bytes: Uint8Array, rubies: RubyDocx[]): Uint8Array {
         + `<w:rt>${run(r.text, 12)}</w:rt><w:rubyBase>${run(r.base)}</w:rubyBase></w:ruby></w:r>`;
     },
   );
-  for (const part of NOTE_BEARING_PARTS) {
-    if (files[part]) files[part] = strToU8(rewrite(strFromU8(files[part])));
+  for (const part of textParts(files)) {
+    files[part] = strToU8(rewrite(strFromU8(files[part])));
   }
   const out: Record<string, [Uint8Array, { level: 6 }]> = {};
   for (const [path, data] of Object.entries(files)) out[path] = [data, { level: 6 }];
@@ -1805,10 +1824,7 @@ function applyRubyDocx(bytes: Uint8Array, rubies: RubyDocx[]): Uint8Array {
 function applyPlaceholdersDocx(bytes: Uint8Array, placeholders: string[]): Uint8Array {
   if (!placeholders.length) return bytes;
   const files = unzipSync(bytes);
-  const docBytes = files['word/document.xml'];
-  if (!docBytes) return bytes;
-  let xml = strFromU8(docBytes);
-  xml = xml.replace(
+  for (const part of textParts(files)) files[part] = strToU8(strFromU8(files[part]).replace(
     new RegExp(`<w:r\\b[^>]*?>(?:(?!</?w:r[\\s>])[\\s\\S])*?${PLH}(\\d+)${PLH}(?:(?!</?w:r[\\s>])[\\s\\S])*?</w:r>`, 'g'),
     (m, idx: string) => {
       const label = placeholders[Number(idx)];
@@ -1819,8 +1835,7 @@ function applyPlaceholdersDocx(bytes: Uint8Array, placeholders: string[]): Uint8
         + '<w:temporary/><w:text/></w:sdtPr><w:sdtContent>'
         + `<w:r>${rpr}<w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r></w:sdtContent></w:sdt>`;
     },
-  );
-  files['word/document.xml'] = strToU8(xml);
+  ));
   const out: Record<string, [Uint8Array, { level: 6 }]> = {};
   for (const [path, data] of Object.entries(files)) out[path] = [data, { level: 6 }];
   return zipSync(out);
@@ -2320,30 +2335,33 @@ const PPR_FLAGS = [
 // run and writes the flag into w:pPr.
 function applyParagraphFlagsDocx(bytes: Uint8Array): Uint8Array {
   const files = unzipSync(bytes);
-  const docBytes = files['word/document.xml'];
-  if (!docBytes) return bytes;
-  let xml = strFromU8(docBytes);
-  const flags = PPR_FLAGS.filter((f) => xml.includes(f.mark));
-  if (!flags.length && !xml.includes(INDC)) return bytes;
-  xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (para) => {
-    let p = para;
-    const indc = new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${INDC}([^${INDC}]*)${INDC}(?:(?!</w:r>)[\\s\\S])*</w:r>`).exec(p);
-    // The payload is 'name=value' pairs; the run text would escape an XML quote.
-    const indAttrs = indc?.[1].split(' ').map((kv) => ` w:${kv.replace('=', '="')}"`).join('');
-    if (indc) p = p.replace(indc[0], '').replace(/<w:ind\b/, `$&${indAttrs}`);
-    for (const f of flags) {
-      if (!p.includes(f.mark)) continue;
-      p = p.replace(new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${f.mark}(?:(?!</w:r>)[\\s\\S])*</w:r>`, 'g'), '');
-      const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(p);
-      if (!pPr) { p = p.replace(/^(<w:p\b[^>]*>)/, `$1<w:pPr>${f.xml}</w:pPr>`); continue; }
-      const patched = f.before.test(pPr[0])
-        ? pPr[0].replace(f.before, `${f.xml}$&`)
-        : pPr[0].replace('</w:pPr>', `${f.xml}</w:pPr>`);
-      p = p.replace(pPr[0], patched);
-    }
-    return p;
-  });
-  files['word/document.xml'] = strToU8(xml);
+  let changed = false;
+  for (const part of textParts(files)) {
+    let xml = strFromU8(files[part]);
+    const flags = PPR_FLAGS.filter((f) => xml.includes(f.mark));
+    if (!flags.length && !xml.includes(INDC)) continue;
+    changed = true;
+    xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (para) => {
+      let p = para;
+      const indc = new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${INDC}([^${INDC}]*)${INDC}(?:(?!</w:r>)[\\s\\S])*</w:r>`).exec(p);
+      // The payload is 'name=value' pairs; the run text would escape an XML quote.
+      const indAttrs = indc?.[1].split(' ').map((kv) => ` w:${kv.replace('=', '="')}"`).join('');
+      if (indc) p = p.replace(indc[0], '').replace(/<w:ind\b/, `$&${indAttrs}`);
+      for (const f of flags) {
+        if (!p.includes(f.mark)) continue;
+        p = p.replace(new RegExp(`<w:r>(?:(?!</w:r>)[\\s\\S])*${f.mark}(?:(?!</w:r>)[\\s\\S])*</w:r>`, 'g'), '');
+        const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(p);
+        if (!pPr) { p = p.replace(/^(<w:p\b[^>]*>)/, `$1<w:pPr>${f.xml}</w:pPr>`); continue; }
+        const patched = f.before.test(pPr[0])
+          ? pPr[0].replace(f.before, `${f.xml}$&`)
+          : pPr[0].replace('</w:pPr>', `${f.xml}</w:pPr>`);
+        p = p.replace(pPr[0], patched);
+      }
+      return p;
+    });
+    files[part] = strToU8(xml);
+  }
+  if (!changed) return bytes;
   const out: Record<string, [Uint8Array, { level: 6 }]> = {};
   for (const [path, data] of Object.entries(files)) out[path] = [data, { level: 6 }];
   return zipSync(out);
@@ -3221,7 +3239,7 @@ export async function buildDocx(
     differentOddEven: !!hf?.differentOddEven,
   }];
   const setAt = (i: number) => hfSets[Math.min(i, hfSets.length - 1)];
-  const para = (d: HfDoc) => (hfIsEmpty(d) ? null : (d!.content![0] as TiptapNode));
+  const zone = (d: HfDoc) => (hfIsEmpty(d) ? null : (d!.content as TiptapNode[]));
   // Different odd & even pages is a document setting (w:evenAndOddHeaders), not a
   // section one, so any section asking for it turns it on.
   const differentOddEven = hfSets.some((s) => s.differentOddEven);
@@ -3266,14 +3284,17 @@ export async function buildDocx(
           : {})),
     };
   };
+  // A zone's blocks at its section's text width; a header has no index to hold.
+  const blocks = (content: TiptapNode[], i: number) =>
+    blocksToDocx(content, num, sectionWidthCm(i)) as (Paragraph | Table)[];
   // Fresh instances per section (Word's per-sectPr references, i.e. no "Link to
   // Previous"). A first-page variant rides `first:` and is activated by titlePage below.
   const mkHeaders = (i: number) => {
     const s = setAt(i);
     // Odd/even is the document's setting: a section not asking for it repeats its
     // running zone on even pages, so that is what its even part holds.
-    const d = para(s.header), f = s.differentFirstPage ? para(s.headerFirst) : null,
-      e = s.differentOddEven ? para(s.headerEven) : differentOddEven ? d : null;
+    const d = zone(s.header), f = s.differentFirstPage ? zone(s.headerFirst) : null,
+      e = s.differentOddEven ? zone(s.headerEven) : differentOddEven ? d : null;
     // A watermark (and the fold marks) lives in a header part, so every page variant
     // needs one — empty where the zone has no text — for the post-passes to inject
     // into; a variant without its own part would blank the decor on those pages.
@@ -3283,26 +3304,26 @@ export async function buildDocx(
     // put a chapter's running head on the pages a blank one was meant for.
     const spellOut = decorated || i > 0;
     const h: { default?: Header; first?: Header; even?: Header } = {};
-    if (d) h.default = new Header({ children: [paragraphToDocx(d)] });
+    if (d) h.default = new Header({ children: blocks(d, i) });
     else if (spellOut) h.default = new Header({ children: [new Paragraph({})] });
-    if (f) h.first = new Header({ children: [paragraphToDocx(f)] });
+    if (f) h.first = new Header({ children: blocks(f, i) });
     else if (s.differentFirstPage && spellOut) h.first = new Header({ children: [new Paragraph({})] });
-    if (e) h.even = new Header({ children: [paragraphToDocx(e)] });
+    if (e) h.even = new Header({ children: blocks(e, i) });
     else if (differentOddEven && spellOut) h.even = new Header({ children: [new Paragraph({})] });
     return Object.keys(h).length ? h : undefined;
   };
   const mkFooters = (i: number) => {
     const s = setAt(i);
-    const d = para(s.footer), f = s.differentFirstPage ? para(s.footerFirst) : null,
-      e = s.differentOddEven ? para(s.footerEven) : differentOddEven ? d : null;
+    const d = zone(s.footer), f = s.differentFirstPage ? zone(s.footerFirst) : null,
+      e = s.differentOddEven ? zone(s.footerEven) : differentOddEven ? d : null;
     if (!d && !f && !e && i === 0) return undefined;
     const fo: { default?: Footer; first?: Footer; even?: Footer } = {};
     // Spelled out past the first section, for the reason the headers are.
-    if (d) fo.default = new Footer({ children: [paragraphToDocx(d)] });
+    if (d) fo.default = new Footer({ children: blocks(d, i) });
     else if (i > 0) fo.default = new Footer({ children: [new Paragraph({})] });
-    if (f) fo.first = new Footer({ children: [paragraphToDocx(f)] });
+    if (f) fo.first = new Footer({ children: blocks(f, i) });
     else if (s.differentFirstPage && i > 0) fo.first = new Footer({ children: [new Paragraph({})] });
-    if (e) fo.even = new Footer({ children: [paragraphToDocx(e)] });
+    if (e) fo.even = new Footer({ children: blocks(e, i) });
     else if (differentOddEven && i > 0) fo.even = new Footer({ children: [new Paragraph({})] });
     return fo;
   };
