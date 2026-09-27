@@ -11,7 +11,7 @@ import { DEFAULT_SHORTCUTS } from '../shortcuts';
 // direct formatting.
 const DIRECT_ATTRS = [
   'textAlign', 'lineHeight', 'spaceBefore', 'spaceAfter', 'fontSize',
-  'indent', 'indentChars', 'indentRight', 'indentFirst', 'indentFirstChars',
+  'indent', 'indentChars', 'indentRight', 'indentRightChars', 'indentFirst', 'indentFirstChars',
   'backgroundColor', 'borderTop', 'borderRight', 'borderBottom', 'borderLeft',
 ];
 

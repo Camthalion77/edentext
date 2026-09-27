@@ -719,7 +719,7 @@ const en = {
     hyphenate: 'Automatic hyphenation',
     pageBreakBefore: 'Page break before',
     // Unit of a first-line indent counted in characters, beside 'cm'.
-    chars: 'ch',
+    chars: 'chars',
     flowHint: 'These control where the paragraph may be split across pages.',
     tabsButton: 'Tabs…',
   },

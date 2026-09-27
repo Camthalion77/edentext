@@ -92,14 +92,18 @@ describe('first-line indent in characters', () => {
   const lefts: N = { type: 'doc', content: [
     P('左缩进', { indentChars: 2, indentFirstChars: -1 }),
     P('只有左', { indentChars: 3 }),
+    P('右', { indentRightChars: 1.5 }),
   ] };
+  const rightCharsOf = (d: N, i: number) => d.content[i].attrs?.indentRightChars ?? null;
   const leftOf = (d: N, i: number) => d.content[i].attrs?.indentChars ?? null;
 
-  it('carries a left indent in characters', async () => {
+  it('carries left and right indents in characters', async () => {
     const odt = await buildOdt(lefts, margins, 'portrait');
     expect(strFromU8(unzipSync(odt)['content.xml'])).toMatch(/loext:margin-left="2ic"/);
     const fromOdt = importOdt(odt).content as N;
     expect([leftOf(fromOdt, 0), charsOf(fromOdt, 0), leftOf(fromOdt, 1)]).toEqual([2, -1, 3]);
+    expect(strFromU8(unzipSync(odt)['content.xml'])).toMatch(/loext:margin-right="1\.5ic"/);
+    expect(rightCharsOf(fromOdt, 2)).toBe(1.5);
 
     // Word counts the left indent without the hanging part (LibreOffice adds them).
     const docx = await buildDocx(lefts, margins, 'portrait');
@@ -108,6 +112,8 @@ describe('first-line indent in characters', () => {
     expect(xml).not.toMatch(/\uE025/);
     const fromDocx = importDocx(docx).content as N;
     expect([leftOf(fromDocx, 0), charsOf(fromDocx, 0), leftOf(fromDocx, 1)]).toEqual([2, -1, 3]);
+    expect(xml).toMatch(/<w:ind w:rightChars="150" w:right="\d+"\/>/);
+    expect([rightCharsOf(fromDocx, 2), fromDocx.content[2].attrs.indentRight ?? null]).toEqual([1.5, null]);
     expect(fromDocx.content[0].attrs.indent ?? null).toBe(null);
   });
 

@@ -5,7 +5,7 @@
   import { blockFontSize } from '../utils/fontSize';
 
   type Unit = 'cm' | 'chars';
-  type Field = 'left' | 'first';
+  type Field = 'left' | 'right' | 'first';
 
   // Word's Paragraph dialog. Indents and spacing duplicate the ribbon's fields on
   // purpose; the second tab is the only place the text-flow attrs can be set.
@@ -42,14 +42,17 @@
   let indentFirst = $derived(read('indentFirst', 0));
   let indentFirstChars = $derived(read('indentFirstChars', 0));
   let indentChars = $derived(read('indentChars', 0));
-  // The left and first-line fields count characters when the block does, or once picked.
-  let unitPicked = $state<{ left?: Unit; first?: Unit }>({});
+  let indentRightChars = $derived(read('indentRightChars', 0));
+  // The indent fields count characters when the block does, or once picked.
+  let unitPicked = $state<Partial<Record<Field, Unit>>>({});
   let units = $derived({
     left: unitPicked.left ?? (indentChars ? 'chars' : 'cm'),
+    right: unitPicked.right ?? (indentRightChars ? 'chars' : 'cm'),
     first: unitPicked.first ?? (indentFirstChars ? 'chars' : 'cm'),
   } as Record<Field, Unit>);
   let values = $derived({
     left: units.left === 'chars' ? indentChars : indent,
+    right: units.right === 'chars' ? indentRightChars : indentRight,
     first: units.first === 'chars' ? indentFirstChars : indentFirst,
   } as Record<Field, number | ''>);
   let spaceBefore = $derived(read('spaceBefore', 0));
@@ -92,6 +95,7 @@
     if (isNaN(v) || !editor) return;
     const c = editor.chain().focus();
     if (field === 'left') (unit === 'chars' ? c.setIndentChars(v) : c.setIndent(v)).run();
+    else if (field === 'right') (unit === 'chars' ? c.setIndentRightChars(v) : c.setIndentRight(v)).run();
     else (unit === 'chars' ? c.setIndentFirstChars(v) : c.setIndentFirst(v)).run();
   }
 
@@ -151,7 +155,7 @@
         </label>
 
         <label class="row newline"><span>{t().ribbon.indentLeft}</span>{@render indentField('left')}</label>
-        <label class="row"><span>{t().ribbon.indentRight}</span><input type="text" inputmode="decimal" value={num(indentRight)} onchange={(e) => setNumber('indentRight', (e.currentTarget as HTMLInputElement).value)} /><em>cm</em></label>
+        <label class="row"><span>{t().ribbon.indentRight}</span>{@render indentField('right')}</label>
         <label class="row"><span>{t().ruler.firstLineIndent}</span>{@render indentField('first')}</label>
 
         <label class="row newline"><span>{t().ribbon.spaceBefore}</span><input type="text" inputmode="decimal" value={num(spaceBefore)} onchange={(e) => setNumber('spaceBefore', (e.currentTarget as HTMLInputElement).value)} /><em>pt</em></label>
@@ -207,7 +211,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    width: 500px;
+    width: 560px;
     padding: 18px 20px 16px;
     font-family: var(--font-sans);
     font-size: 0.85rem;
@@ -241,10 +245,10 @@
 
   .row { display: flex; align-items: center; gap: 8px; }
   .row > span { flex: 1; white-space: nowrap; color: var(--color-text-muted); }
-  .row em { width: 1.5em; font-style: normal; color: var(--color-text-muted); }
+  .row em { width: 4.8em; font-style: normal; color: var(--color-text-muted); }
 
   .row input, .row select {
-    width: 76px;
+    width: 64px;
     height: 26px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
@@ -255,14 +259,9 @@
   }
 
   /* No unit of its own, so it reaches across the field and unit columns. */
-  .row select { width: calc(84px + 1.5em); }
-  /* A switchable unit, drawn as underlined unit text; it overhangs into the column gap
-     so the field keeps the other rows' edge. */
-  .row select.unit {
-    appearance: none; width: 2.6em; height: auto; margin-right: -1.1em; padding: 0;
-    border: none; border-bottom: 1px dashed currentColor; border-radius: 0;
-    background: none; color: var(--color-text-muted); cursor: pointer;
-  }
+  .row select { width: calc(72px + 4.8em); }
+  /* The unit column is as wide as the switchable unit, so every field keeps one edge. */
+  .row select.unit { width: 4.8em; padding: 0 2px; }
   .row input { text-align: right; }
 
   .flow { display: flex; flex-direction: column; gap: 8px; }

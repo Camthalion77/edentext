@@ -93,6 +93,7 @@ declare module '@tiptap/core' {
       setIndent: (cm: number) => ReturnType;
       setIndentChars: (n: number) => ReturnType;
       setIndentRight: (cm: number) => ReturnType;
+      setIndentRightChars: (n: number) => ReturnType;
       setIndentFirst: (cm: number) => ReturnType;
       setIndentFirstChars: (n: number) => ReturnType;
       indentListMore: () => ReturnType;
@@ -113,13 +114,13 @@ function clampFirst(cm: number): number {
   return Math.round(Math.max(-INDENT_MAX_CM, Math.min(INDENT_MAX_CM, cm)) * 100) / 100;
 }
 
-// Character indents, left and first-line.
+// Character indents: left, right and first-line.
 const FIRST_CHARS_MAX = 20;
 function clampFirstChars(n: number): number {
   return Math.round(Math.max(-FIRST_CHARS_MAX, Math.min(FIRST_CHARS_MAX, n)) * 100) / 100;
 }
 
-// A block's left or first-line indent in cm: its own, or its character count at the
+// A block's left, right or first-line indent in cm: its own, or its character count at the
 // block's size.
 function cmOrChars(cm: unknown, chars: unknown, fontPt: number): number {
   if (typeof chars === 'number') return (chars * fontPt / 72) * 2.54;
@@ -127,6 +128,8 @@ function cmOrChars(cm: unknown, chars: unknown, fontPt: number): number {
 }
 export const leftCm = (attrs: Record<string, unknown> | undefined, fontPt: number) =>
   cmOrChars(attrs?.indent, attrs?.indentChars, fontPt);
+export const rightCm = (attrs: Record<string, unknown> | undefined, fontPt: number) =>
+  cmOrChars(attrs?.indentRight, attrs?.indentRightChars, fontPt);
 export const firstLineCm = (attrs: Record<string, unknown> | undefined, fontPt: number) =>
   cmOrChars(attrs?.indentFirst, attrs?.indentFirstChars, fontPt);
 
@@ -182,6 +185,16 @@ export const Indent = Extension.create({
               return { 'data-indent-chars': String(n), style: `margin-left: calc(var(--sec-inset-left, 0px) + ${n}em)` };
             },
           },
+          // Right indent in characters, the mirror of `indentChars`.
+          indentRightChars: {
+            default: null,
+            parseHTML: (element: HTMLElement) => parseIndent(element.getAttribute('data-indent-right-chars')),
+            renderHTML: (attributes: Record<string, unknown>) => {
+              if (attributes.indentRightChars == null) return {};
+              const n = Number(attributes.indentRightChars);
+              return { 'data-indent-right-chars': String(n), style: `margin-right: calc(var(--sec-inset-right, 0px) + ${n}em)` };
+            },
+          },
           // Right indent in cm (fo:margin-right / w:ind w:right), the mirror of `indent`.
           indentRight: {
             default: null,
@@ -234,8 +247,8 @@ export const Indent = Extension.create({
     // a mixed selection. List-item paragraphs are skipped (lists indent by nesting).
     // `clear` names an attr the written one excludes, dropped from every block written;
     // a step from a character indent starts from its size in cm.
-    const write = (attr: 'indent' | 'indentChars' | 'indentRight' | 'indentFirst' | 'indentFirstChars',
-      next: (current: number) => number, clear?: 'indentChars' | 'indent' | 'indentFirst' | 'indentFirstChars') =>
+    type IndentAttr = 'indent' | 'indentChars' | 'indentRight' | 'indentRightChars' | 'indentFirst' | 'indentFirstChars';
+    const write = (attr: IndentAttr, next: (current: number) => number, clear?: IndentAttr) =>
       ({ state, tr, dispatch }: CommandProps) => {
         const { from, to } = state.selection;
         let changed = false;
@@ -280,7 +293,8 @@ export const Indent = Extension.create({
       // Absolute, as the ruler drags them; the buttons above step relatively.
       setIndent: (cm: number) => write('indent', () => clampIndent(cm), 'indentChars'),
       setIndentChars: (n: number) => write('indentChars', () => clampFirstChars(Math.max(0, n)), 'indent'),
-      setIndentRight: (cm: number) => write('indentRight', () => clampIndent(cm)),
+      setIndentRight: (cm: number) => write('indentRight', () => clampIndent(cm), 'indentRightChars'),
+      setIndentRightChars: (n: number) => write('indentRightChars', () => clampFirstChars(Math.max(0, n)), 'indentRight'),
       setIndentFirst: (cm: number) => write('indentFirst', () => clampFirst(cm), 'indentFirstChars'),
       setIndentFirstChars: (n: number) => write('indentFirstChars', () => clampFirstChars(n), 'indentFirst'),
       indentListMore: () => stepList(INDENT_STEP_CM),
@@ -338,7 +352,7 @@ export const Indent = Extension.create({
   // the commands above refuse to set one, and neither file can express it. Wrapping an
   // indented paragraph into a list (or pasting one in) is the door this closes.
   addProseMirrorPlugins() {
-    const attrs = ['indent', 'indentChars', 'indentRight', 'indentFirst', 'indentFirstChars'] as const;
+    const attrs = ['indent', 'indentChars', 'indentRight', 'indentRightChars', 'indentFirst', 'indentFirstChars'] as const;
     return [new Plugin({
       appendTransaction: (trs, _old, state) => {
         if (!trs.some((t) => t.docChanged)) return null;
@@ -348,7 +362,7 @@ export const Indent = Extension.create({
           // frame — a list inside a text box is a list all the same.
           if (node.isInline && node.isAtom) return false;
           if (parent?.type.name !== 'listItem' || attrs.every((a) => node.attrs[a] == null)) return;
-          tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: null, indentChars: null, indentRight: null, indentFirst: null, indentFirstChars: null });
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: null, indentChars: null, indentRight: null, indentRightChars: null, indentFirst: null, indentFirstChars: null });
         });
         return tr.steps.length ? tr : null;
       },

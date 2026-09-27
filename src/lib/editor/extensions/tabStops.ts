@@ -6,7 +6,7 @@ import type { Node as PmNode } from '@tiptap/pm/model';
 import { FORCE_PAGE_RECALC, isSplitPane, pageBreakKey } from './pageBreaks';
 import { PX_PER_CM } from '../../storage/pageMargins';
 import { blockFontSize } from '../../utils/fontSize';
-import { firstLineCm, leftCm } from './indent';
+import { firstLineCm, leftCm, rightCm } from './indent';
 
 // Per-paragraph tab stops. CSS only has the fixed `tab-size` grid, so a tab that
 // resolves to a stop is measured and given the exact advance as an inline margin.
@@ -68,12 +68,12 @@ export function activeTabStops(state: EditorState): BlockRuler | null {
   for (let d = $from.depth; d >= 0; d--) {
     const node = $from.node(d);
     if (!node.isTextblock) continue;
-    const cm = (v: unknown) => (typeof v === 'number' ? v : 0);
+    const pt = parseFloat(blockFontSize(node));
     return {
       stops: parseTabStops(node.attrs.tabStops),
-      indent: leftCm(node.attrs, parseFloat(blockFontSize(node))),
-      indentRight: cm(node.attrs.indentRight),
-      indentFirst: firstLineCm(node.attrs, parseFloat(blockFontSize(node))),
+      indent: leftCm(node.attrs, pt),
+      indentRight: rightCm(node.attrs, pt),
+      indentFirst: firstLineCm(node.attrs, pt),
     };
   }
   return null;

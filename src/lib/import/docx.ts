@@ -1464,7 +1464,9 @@ function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number |
     if (leftChars || hangingChars) attrs.indentChars = ((leftChars ?? 0) + (hangingChars ?? 0)) / 100;
     else if (left != null) { const cm = round2(twipToCm(left)); if (cm > LIST_INDENT_EPS_CM) attrs.indent = cm; }
     const right = ind ? intAttr(ind, W, 'right') ?? intAttr(ind, W, 'end') : null;
-    if (right != null) { const cm = round2(twipToCm(right)); if (cm > LIST_INDENT_EPS_CM) attrs.indentRight = cm; }
+    const rightChars = ind ? intAttr(ind, W, 'rightChars') ?? intAttr(ind, W, 'endChars') : null;
+    if (rightChars) attrs.indentRightChars = rightChars / 100;
+    else if (right != null) { const cm = round2(twipToCm(right)); if (cm > LIST_INDENT_EPS_CM) attrs.indentRight = cm; }
     // w:hanging outdents the first line, w:firstLine indents it; they are exclusive.
     const hanging = ind ? intAttr(ind, W, 'hanging') : null;
     const firstLine = ind ? intAttr(ind, W, 'firstLine') : null;

@@ -39,7 +39,7 @@ import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
 import { parseBorderAttr, type BorderSide } from '../editor/extensions/tableCellBorders';
 import { parseCellPadding, DEFAULT_CELL_PADDING } from '../editor/extensions/tableCellPadding';
 import { parseTabStops, type TabAlign } from '../editor/extensions/tabStops';
-import { firstLineCm, leftCm } from '../editor/extensions/indent';
+import { firstLineCm, leftCm, rightCm } from '../editor/extensions/indent';
 import { charStyleProps, listMarkerFormat } from '../editor/extensions/listMarker';
 import { effectiveOrderedDefAt, formatOrdinal, childCycle, orderedTypeDef, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { effectiveListLevel, listStyleMarginCm, listStyleOverridden, type ListStyle as ListStyleDef } from '../styles/listStyles';
@@ -280,7 +280,7 @@ const TXBX_NUM = '';
 const NOHYP = '';
 // Marks a paragraph off the page's line grid: <w:snapToGrid w:val="0"/>, the same way.
 const NOSNAP = '\uE023';
-// Wraps the w:ind character attributes the docx package lacks (leftChars, hangingChars),
+// Wraps the w:ind character attributes the docx package lacks (leftChars, rightChars, …),
 // which the same pass adds to the paragraph's w:ind.
 const INDC = '\uE025';
 
@@ -1232,7 +1232,8 @@ function txbxPPrXml(attrs: TiptapNode['attrs'], indentTwip: number, pt: number):
   const left = leftCm(attrs, pt);
   if (left > 0) ind.push(` w:left="${cmToTwip(left)}"`);
   else if (indentTwip) ind.push(` w:left="${indentTwip}"`);
-  if (typeof attrs?.indentRight === 'number' && attrs.indentRight > 0) ind.push(` w:right="${cmToTwip(attrs.indentRight)}"`);
+  const right = rightCm(attrs, pt);
+  if (right > 0) ind.push(` w:right="${cmToTwip(right)}"`);
   const first = firstLineCm(attrs, pt);
   if (first) ind.push(first < 0 ? ` w:hanging="${cmToTwip(-first)}"` : ` w:firstLine="${cmToTwip(first)}"`);
   const chars = indentCharsPayload(attrs);
@@ -2412,7 +2413,8 @@ function paragraphToDocx(node: TiptapNode, opts: ParaOpts = {}): Paragraph {
     const left = leftCm(attrs, pt);
     if (left > 0) indent.left = cmToTwip(left);
     else if (opts.indentLeftTwip) indent.left = opts.indentLeftTwip;
-    if (typeof attrs.indentRight === 'number' && attrs.indentRight > 0) indent.right = cmToTwip(attrs.indentRight);
+    const right = rightCm(attrs, pt);
+    if (right > 0) indent.right = cmToTwip(right);
     // Word splits the first-line indent into two exclusive attributes by sign.
     const first = firstLineCm(attrs, pt);
     if (first < 0) indent.hanging = cmToTwip(-first);
@@ -2894,10 +2896,11 @@ function indentCharsPayload(attrs: TiptapNode['attrs']): string {
   const n = (v: unknown) => (typeof v === 'number' ? Math.round(v * 100) : 0);
   const first = n(attrs?.indentFirstChars);
   const left = n(attrs?.indentChars);
+  const right = n(attrs?.indentRightChars);
   // A hanging count alone would read back as a left indent too, so it needs a left count.
   const hanging = first < 0 && left ? -first : 0;
   return [left ? `leftChars=${Math.max(0, left - hanging)}` : '', first > 0 ? `firstLineChars=${first}` : '',
-    hanging ? `hangingChars=${hanging}` : ''].filter(Boolean).join(' ');
+    hanging ? `hangingChars=${hanging}` : '', right ? `rightChars=${right}` : ''].filter(Boolean).join(' ');
 }
 
 // The size a block's unmarked text is set in, in points; a character indent counts in it.
