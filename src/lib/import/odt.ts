@@ -527,7 +527,8 @@ export function unnestBoxes(blocks: Node[], ctx: { warnings: Set<string> }): Nod
 // box), else the frame's computed svg:height (LibreOffice re-saves).
 function convertTextBoxFrame(frame: Element, textBoxEl: Element, ctx: Ctx): Node {
   const attrs: Record<string, unknown> = {};
-  const wCm = lengthToCm(frame.getAttributeNS(NS.svg, 'width'));
+  // A frame that grows with its text states its least width instead (fo:min-width).
+  const wCm = lengthToCm(frame.getAttributeNS(NS.svg, 'width')) ?? lengthToCm(textBoxEl.getAttributeNS(NS.fo, 'min-width'));
   if (wCm != null) attrs.width = framePx(cmToPx(wCm));
   const hCm = lengthToCm(textBoxEl.getAttributeNS(NS.fo, 'min-height'))
     ?? lengthToCm(frame.getAttributeNS(NS.svg, 'height'));
@@ -1794,7 +1795,9 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
   // box — the formatting has to become direct, so it is measured against the default
   // style instead: the one `p:not([data-style])` re-applies (styleSheet.ts). A heading
   // keeps its level's yardstick, which is what `hN:not([data-style])` re-applies.
-  const yardstick = kind === 'body' ? named : isHeading ? null : DEFAULT_STYLE;
+  // A header/footer zone renders its paragraphs at the editor's own defaults with only the
+  // default style's font on top, so that is what its formatting is measured against.
+  const yardstick = kind === 'body' ? named : isHeading || kind === 'zone' ? null : DEFAULT_STYLE;
   const defaults = blockDefaults(resolver, yardstick, isHeading ? level : null, boldByDefault);
   // A cell paragraph's spacing is the exception: editor.css zeroes it whatever the default
   // style declares (only that rule outranks the style's — not the `li p` one, and not for a
@@ -1899,8 +1902,11 @@ function blockAttrs(paraProps: PropMap, textProps: PropMap, defaults: BlockDefau
   const base = paraProps['style:writing-mode'] === 'rl-tb' ? 'right' : defaults.textAlign ?? 'left';
   if (ta !== null && ta !== base) attrs.textAlign = ta;
 
+  // A header/footer's proportional spacing is left out: LibreOffice lays the band out at
+  // single height (measured: a 10pt header in a 115% style reserves one plain line).
   const lh = lineSpacing(paraProps['fo:line-height']);
-  if (lh != null && lh !== defaults.lineHeight) attrs.lineHeight = lh;
+  const widened = kind === 'zone' && lh != null && !lh.endsWith('pt') && Number(lh) > 1;
+  if (lh != null && lh !== defaults.lineHeight && !widened) attrs.lineHeight = lh;
   if (paraProps['style:snap-to-layout-grid'] === 'false') attrs.snapToGrid = false;
 
   const defTop = defaults.marginTopPt;
