@@ -2,9 +2,9 @@
 
 The TipTap extension registry (`extensions.ts`), the shortcut table, the context-menu
 builder, and `paste.ts` — how foreign HTML is fitted into this schema, which ProseMirror's
-own fitting gets wrong (`unwrapPastedBoxes`, `flattenToInline`; both called from a
-`transformPasted`, the body editor's in `Editor.svelte`, the zone's in
-`HeaderFooterLayer.svelte`). Both also run `plainPastedSpaces`: a block pasted with
+own fitting gets wrong (`unwrapPastedBoxes`, `flattenToInline`; called from the body
+editor's `transformPasted` in `Editor.svelte`). It and the zone's in
+`HeaderFooterLayer.svelte` also run `plainPastedSpaces`: a block pasted with
 no-break spaces and no ordinary one (a web editor's copy) gets plain spaces back. Per-extension notes live in `extensions/CLAUDE.md`.
 
 ## Keyboard shortcuts (`shortcuts.ts`, `extensions/shortcuts.ts`)
@@ -51,8 +51,8 @@ it stays constant-size. `Editor.svelte`'s `openContextMenu` (one `oncontextmenu`
 `.editor`) picks the caret (keeping a selection the click lands in, as Word does), reads
 `spellErrorAt`, and builds the list. It bails on **Shift+right-click** (the browser menu,
 whose Paste needs no clipboard permission — Firefox does this for page handlers anyway),
-on images/text boxes (their floating toolbars), and in the header/footer (the HF schema
-has none of the entries). Cut/copy go through `document.execCommand` so ProseMirror's own
+and on images/text boxes (their floating toolbars). In an open header/footer it serves that
+zone's editor, without the comment entry (the zone schema has no comment mark). Cut/copy go through `document.execCommand` so ProseMirror's own
 copy handler builds the clipboard payload; paste reads `navigator.clipboard` and falls
 back to an alert where the browser blocks it. The menu clamps itself into the viewport
 via transforms, measured from layout offsets so the correction can't feed back into the
