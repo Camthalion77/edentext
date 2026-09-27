@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { autoCorrectFix } from '../../src/lib/editor/extensions/autoCorrect';
+import { autoCorrectFix, quoteLang } from '../../src/lib/editor/extensions/autoCorrect';
 import { DEFAULT_AUTOCORRECT, type AutoCorrectOptions } from '../../src/lib/storage/autoCorrect';
 
 // `before` is the block text up to and including the character just typed; the fix is
@@ -98,5 +98,20 @@ describe('Chinese quotes', () => {
   it('leaves the western rule alone', () => {
     expect(typed('he said "')).toBe('he said “');
     expect(typed('he said “word"')).toBe('he said “word”');
+  });
+});
+
+// A quote takes the language at the caret, not the document's.
+describe('quote language', () => {
+  const de = { main: 'de-DE', west: 'de-DE', asian: null };
+  const block = { langAsian: 'zh-TW' };
+  it('follows the script before it, then the block, then the document', () => {
+    expect(quoteLang('他說："', '', undefined, block, de)).toBe('zh-TW');
+    expect(quoteLang('Er sagt "', '', undefined, block, de)).toBe('de-DE');
+    expect(quoteLang('"', '', undefined, block, de)).toBe('zh-TW');
+    expect(quoteLang('"', '中文', undefined, { lang: 'de-DE', langAsian: 'zh-TW' }, de)).toBe('zh-TW');
+    expect(quoteLang('"', '', undefined, undefined, de)).toBe('de-DE');
+    expect(quoteLang('中"', '', { langAsian: 'ja-JP' }, block, de)).toBe('ja-JP');
+    expect(quoteLang('中"', '', undefined, undefined, de)).toBe('en');
   });
 });
