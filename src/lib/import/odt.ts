@@ -53,7 +53,7 @@ import { cellFormatFromSpec, type CellFormat, type FormatKind } from '../utils/c
 import { TEXTBOX_PADDING_CM } from '../editor/extensions/textBox';
 import { getSchema } from '@tiptap/core';
 import type { Schema } from '@tiptap/pm/model';
-import { hfExtensions } from '../editor/extensions/headerFooter';
+import { zoneExtensions } from '../editor/extensions';
 
 // .odt → TipTap JSON, inverting export/odt.ts. Editor-expressible content becomes its
 // native node/mark/attr; values matching the editor's defaults are suppressed so round
@@ -1110,7 +1110,7 @@ function convertHfZone(zoneEl: Element, ctx: Ctx, bandCm = 0, footer = false): H
 // and come out blank. Drop what it can't hold, keeping the text.
 let zoneSchema: Schema | null = null;
 function fitZoneSchema(nodes: Node[]): Node[] {
-  zoneSchema ??= getSchema(hfExtensions());
+  zoneSchema ??= getSchema(zoneExtensions());
   const out: Node[] = [];
   for (const n of nodes) {
     if (!zoneSchema.nodes[n.type]) {

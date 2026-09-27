@@ -3,7 +3,7 @@
   import { Editor, generateHTML, type Content } from '@tiptap/core';
   import { layOutZoneTabs, zoneDefaultStops } from '../editor/extensions/tabStops';
   import { FORCE_PAGE_RECALC } from '../editor/extensions/pageBreaks';
-  import { hfExtensions } from '../editor/extensions/headerFooter';
+  import { zoneExtensions } from '../editor/extensions';
   import { flattenToInline, plainPastedSpaces } from '../editor/paste';
   import { hfIsEmpty, DEFAULT_HF_DISTANCES, HF_ZONE_KEYS, type HfDoc, type HfZone, type HfVariant, type HfDistances, type HfSet, type HfZoneKey } from '../storage/headerFooter';
   import { cmToPx, PX_PER_CM, type PageMargins } from '../storage/pageMargins';
@@ -77,7 +77,7 @@
   // bottom margin, as some Word docs have) still renders instead of collapsing to 0.
   const MIN_ZONE_PX = 20;
   // Schema for static (read-only) rendering of the inactive zones.
-  const renderExts = hfExtensions();
+  const renderExts = zoneExtensions();
 
   // All geometry is in unscaled document px — the layer lives inside the scaled
   // .paper, so the zoom transform applies to it identically to the page background.
@@ -419,7 +419,7 @@
     liveKey = `${editingIndex}:${editingVariant}`;
     const ed = new Editor({
       element: mount,
-      extensions: hfExtensions(zone === 'header' ? t().hf.headerPlaceholder : t().hf.footerPlaceholder),
+      extensions: zoneExtensions(zone === 'header' ? t().hf.headerPlaceholder : t().hf.footerPlaceholder),
       content: startingDoc(editingIndex, zone, editingVariant, editingPage) as Content,
       // No autofocus: its scrollIntoView nudges the page so the just-clicked zone
       // appears to jump. Focus the zone explicitly without scrolling instead.

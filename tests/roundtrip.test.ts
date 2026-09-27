@@ -9,7 +9,7 @@ import { buildOdt } from '../src/lib/export/odt';
 import { MAX_HEADING_LEVEL } from '../src/lib/styles/headings';
 import { importOdt } from '../src/lib/import/odt';
 import { normalize, firstDiff } from './normalize';
-import { hfExtensions } from '../src/lib/editor/extensions/headerFooter';
+import { zoneExtensions } from '../src/lib/editor/extensions';
 import { HEADER_SHADE } from '../src/lib/editor/extensions/tableHeaderRow';
 import { builtinStyleSheet } from '../src/lib/styles/styleSheet';
 import { buildDocx } from '../src/lib/export/docx';
@@ -1012,7 +1012,7 @@ describe('Leg 3: header/footer → buildOdt → importOdt', () => {
       firstDiff(normalize(fixture), normalize(hfRes.content)));
 
     // Imported header/footer must be valid in the header/footer editor schema.
-    const hfSchema = getSchema(hfExtensions());
+    const hfSchema = getSchema(zoneExtensions());
     let hfSchemaOk = true;
     for (const z of [hfRes.header, hfRes.footer]) {
       if (!z) continue;
@@ -1060,7 +1060,7 @@ describe('Leg 3a: different first page header/footer → buildOdt → importOdt'
     check('dfp: first-page footer keeps trailing blank lines', ffBreaks === 2 && ffInline[ffInline.length - 1]?.type === 'hardBreak', ffInline);
 
     // Every variant must be valid in the header/footer editor schema.
-    const hfSchema = getSchema(hfExtensions());
+    const hfSchema = getSchema(zoneExtensions());
     let ok = true;
     for (const z of [res.header, res.footer, res.headerFirst, res.footerFirst]) {
       if (!z) continue;
@@ -1105,7 +1105,7 @@ describe('Leg 3b: inline images in header/footer → buildOdt → importOdt', ()
     check('hf image: first-page header keeps its image', imgs(res.headerFirst).length === 1, res.headerFirst);
 
     // Both zones must remain valid in the header/footer editor schema.
-    const hfSchema = getSchema(hfExtensions());
+    const hfSchema = getSchema(zoneExtensions());
     let ok = true;
     for (const z of [res.footer, res.headerFirst]) { if (!z) continue; try { PMNode.fromJSON(hfSchema, z).check(); } catch { ok = false; } }
     check('hf image: zones valid in hf schema', ok);
@@ -1131,7 +1131,7 @@ describe('Leg 3c: odd/even page header/footer → buildOdt → importOdt', () =>
     check('odd/even: default + first still round-trip',
       firstDiff(normalize(header), normalize(res.header)) === null && firstDiff(normalize(headerFirst), normalize(res.headerFirst)) === null, res.header);
 
-    const hfSchema = getSchema(hfExtensions());
+    const hfSchema = getSchema(zoneExtensions());
     let ok = true;
     for (const z of [res.headerEven, res.footerEven]) { if (!z) continue; try { PMNode.fromJSON(hfSchema, z).check(); } catch { ok = false; } }
     check('odd/even: even zones valid in hf schema', ok);
