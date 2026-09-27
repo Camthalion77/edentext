@@ -2,6 +2,8 @@
 // box holding a page number come back from both formats as the blocks they went out as.
 import { describe, it, expect } from 'vitest';
 import { buildDocx } from '../../src/lib/export/docx';
+import { buildOdt } from '../../src/lib/export/odt';
+import { importOdt } from '../../src/lib/import/odt';
 import { importDocx } from '../../src/lib/import/docx';
 
 type N = any;
@@ -29,6 +31,12 @@ const shape = (n: N): N => n.type === 'text' ? n.text
 const zoneShape = (d: N) => (d?.content ?? []).map(shape);
 
 describe('header/footer zones hold blocks', () => {
+  it('round-trips through ODT', async () => {
+    const back = importOdt(await buildOdt(body, undefined, 'portrait', hf));
+    expect(zoneShape(back.header)).toEqual(zoneShape(header));
+    expect(zoneShape(back.footer)).toEqual(zoneShape(footer));
+  });
+
   it('round-trips through DOCX', async () => {
     const back = importDocx(await buildDocx(body, undefined, 'portrait', hf));
     expect(zoneShape(back.header)).toEqual(zoneShape(header));
