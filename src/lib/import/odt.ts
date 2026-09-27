@@ -32,7 +32,7 @@ import type { Orientation } from '../storage/pageOrientation';
 import type { SpacingModel } from '../storage/spacingModel';
 import { pageDimsCm, type PageFormat } from '../storage/pageFormat';
 import { languageFromOdf, NO_LANGUAGE, type DocumentLanguage } from '../storage/documentLanguage';
-import type { HfDistances, HfDoc, HfSet } from '../storage/headerFooter';
+import { hfIsEmpty, type HfDistances, type HfDoc, type HfSet } from '../storage/headerFooter';
 import { NOTE_FONT_SIZE_PT, NOTE_INDENT_CM, type NoteKind, type NoteNumFormat, type NoteSettings } from '../storage/noteSettings';
 import { EMPTY_DOC_PROPERTIES, type DocProperties } from '../storage/docProperties';
 import { clampPageStart, type PageNumbering } from '../storage/pageNumbering';
@@ -51,9 +51,6 @@ import { cellPaddingAttr, DEFAULT_CELL_PADDING, type CellPadding } from '../edit
 import { fromWriterFormula } from '../utils/tableFormula';
 import { cellFormatFromSpec, type CellFormat, type FormatKind } from '../utils/cellFormat';
 import { TEXTBOX_PADDING_CM } from '../editor/extensions/textBox';
-import { getSchema } from '@tiptap/core';
-import type { Schema } from '@tiptap/pm/model';
-import { zoneExtensions } from '../editor/extensions';
 
 // .odt → TipTap JSON, inverting export/odt.ts. Editor-expressible content becomes its
 // native node/mark/attr; values matching the editor's defaults are suppressed so round
@@ -136,7 +133,7 @@ export interface OdtImportResult {
 
 // Where a block sits: only 'body' takes page breaks/columns/TOCs, and a 'list'
 // paragraph's indent lives in the list style rather than its own margin.
-type BlockKind = 'body' | 'list' | 'cell';
+type BlockKind = 'body' | 'list' | 'cell' | 'zone';
 
 // `files` is the full unzipped archive so image converters can read Pictures/ binaries;
 // imageCache dedupes repeated hrefs into one data-URI.
@@ -193,6 +190,8 @@ type Ctx = {
   notes: { id: string; kind: NoteKind; label: string | null; text: string; content: Node[]; styleName: string | null }[];
   // Set when a header carries the export's named fold-mark lines (storage/foldMarks.ts).
   foldMarks: boolean;
+  // Converting a header/footer zone: page fields, no notes, comments or revisions.
+  zone?: boolean;
 };
 
 // Read a Pictures/ entry into a base64 data-URI; null when it's missing or in a format
@@ -888,18 +887,20 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
   }
 
   const docNumFormat = resolver.pageNumberFormat(first);
-  const headerFirst = hf.headerFirst ? convertHfZone(hf.headerFirst, ctx, hf.headerBandCm) : null;
-  const footerFirst = hf.footerFirst ? convertHfZone(hf.footerFirst, ctx, hf.footerBandCm, true) : null;
+  const zoneOf = (el: Element | null, footer = false) =>
+    (el ? convertHfZone(el, ctx, ctx.docContentWidthCm, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
+  const headerFirst = zoneOf(hf.headerFirst);
+  const footerFirst = zoneOf(hf.footerFirst, true);
   // The presence of a first-page element is the flag, even when it's empty (an empty
   // first-page zone deliberately blanks page 1 while the default fills later pages).
   const differentFirstPage = !!(hf.headerFirst || hf.footerFirst || hf.firstPageOnly);
   const differentOddEven = !!(hf.headerLeft || hf.footerLeft);
-  const header = hf.header ? convertHfZone(hf.header, ctx, hf.headerBandCm) : null;
-  const footer = hf.footer ? convertHfZone(hf.footer, ctx, hf.footerBandCm, true) : null;
+  const header = zoneOf(hf.header);
+  const footer = zoneOf(hf.footer, true);
   // Odd/even is per zone in ODF: a master that gives only the footer a left variant
   // repeats its header on left pages. An element that is *there* but empty blanks it.
-  const headerEven = hf.headerLeft ? convertHfZone(hf.headerLeft, ctx, hf.headerBandCm) : differentOddEven ? header : null;
-  const footerEven = hf.footerLeft ? convertHfZone(hf.footerLeft, ctx, hf.footerBandCm, true) : differentOddEven ? footer : null;
+  const headerEven = hf.headerLeft ? zoneOf(hf.headerLeft) : differentOddEven ? header : null;
+  const footerEven = hf.footerLeft ? zoneOf(hf.footerLeft, true) : differentOddEven ? footer : null;
   // A first-page/even zone reserves the band even if its default counterpart is empty.
   const hasHeader = hf.header || headerFirst || headerEven;
   const hasFooter = hf.footer || footerFirst || footerEven;
@@ -953,8 +954,9 @@ function hfSetOfMasterPage(
   docEdge: { top: number; bottom: number } | null,
 ): HfSet {
   const hf = ctx.resolver.masterPageHF(name);
+  const zoneGeo = ctx.resolver.pageGeometry(name);
   const zone = (el: Element | null, footer = false) =>
-    (el ? convertHfZone(el, ctx, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
+    (el ? convertHfZone(el, ctx, zoneGeo ? contentWidthOf(zoneGeo) : ctx.docContentWidthCm, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
   // Odd/even is per zone: an absent left variant repeats the default one on left pages.
   const oddEven = !!(hf.headerLeft || hf.footerLeft);
   // Its page layout is the section's own geometry; where the master hands over, that
@@ -1003,144 +1005,36 @@ function hfSetOfMasterPage(
   };
 }
 
-// A header/footer zone → one single-paragraph doc (hfExtensions schema). Multiple
-// paragraphs collapse to hard line breaks; block structures flatten to their text.
-// `bandCm` is the zone's own gap to the body plus its padding: space inside the band,
-// so it rides the collapsed paragraph's spacing on the side facing the body.
-function convertHfZone(zoneEl: Element, ctx: Ctx, bandCm = 0, footer = false): HfDoc {
-  const inline: Node[] = [];
-  let textAlign: string | null = null;
-  let stops: string | null = null;
-  const boxMaps: Record<string, string>[] = [];
-
-  // The zone's paragraphs collapse into one, so their spacing becomes its own: what the
-  // band has to be tall enough to hold (Editor.svelte's hfReachPx). The **last**
-  // paragraph's own margin-bottom is not part of it — probed: a header of one 10pt line
-  // with a 12mm bottom margin puts the body at min-height, and a footer's is dropped the
-  // same way, while every margin *between* two of its paragraphs counts in full.
-  let spaceBefore: number | null = null;
-  let between = 0;
-  let prevBottomPt = 0;
-  // A zone paragraph's own padding is band height too, and the collapsed paragraph has
-  // no padding of its own to carry it — so it joins the spacing on its own side.
-  let padTopPt = 0;
-  let padBottomPt = 0;
-
-  // Counted, not measured by what came out: a zone of nothing but empty paragraphs is
-  // still that many lines tall in both products, and its breaks are what reserves them.
-  let paras = 0;
-  let styleFontPt: number | null = null;
-  const addPara = (p: Element) => {
-    if (paras++) inline.push({ type: 'hardBreak' });
-    const styleName = p.getAttributeNS(NS.text, 'style-name');
-    styleFontPt ??= lengthToPt(ctx.resolver.paraTextProps(styleName)['fo:font-size']) ?? null;
-    const outer = ctx.resolver.paraProps(styleName);
-    const topPt = snapPt(lengthToPt(outer['fo:margin-top']) ?? 0);
-    if (spaceBefore == null) spaceBefore = topPt; else between += prevBottomPt + topPt;
-    prevBottomPt = snapPt(lengthToPt(outer['fo:margin-bottom']) ?? 0);
-    const pad = lengthToPt(outer['fo:padding']);
-    padTopPt += lengthToPt(outer['fo:padding-top']) ?? pad ?? 0;
-    padBottomPt += lengthToPt(outer['fo:padding-bottom']) ?? pad ?? 0;
-    // The zone is one paragraph, so the first line's stops are the zone's.
-    stops ??= formatTabStops(ctx.resolver.tabStops(styleName));
-    if (textAlign === null) {
-      const ta = ctx.resolver.paraProps(styleName)['fo:text-align'] ?? '';
-      textAlign = ta === 'center' || ta === 'justify' ? ta : ta === 'right' || ta === 'end' ? 'right' : null;
-      if (textAlign === null) textAlign = ''; // only the first paragraph decides
-    }
-    boxMaps.push(paraBoxAttrs(ctx.resolver.paraProps(styleName)));
-    inline.push(...convertInline(p, ctx, ctx.resolver.paraTextProps(styleName), blockDefaults(ctx.resolver, null, null, false), true));
+// A header/footer zone → a zone doc, through the body's block converter at the section's
+// text width. `bandCm` is the zone's own gap to the body plus its padding: space inside
+// the band, so it rides the spacing of the block facing the body. The **last**
+// paragraph's own margin-bottom is not part of the band — probed: a header of one 10pt
+// line with a 12mm bottom margin puts the body at min-height, and a footer's is dropped
+// the same way, while every margin *between* two of its paragraphs counts in full.
+function convertHfZone(zoneEl: Element, ctx: Ctx, widthCm: number, bandCm = 0, footer = false): HfDoc {
+  const zoneCtx: Ctx = {
+    ...ctx, zone: true, contentWidthCm: widthCm, foldMarks: false,
+    openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), openInsertions: new Map(),
   };
-
-  // A text box in a zone has no block node to live in, so its paragraphs become lines of
-  // the zone ahead of the one anchoring it — which is what Word's own converter makes of
-  // the same document, and what keeps the band as tall as LibreOffice lays it out.
-  const boxLines = (p: Element) => {
-    for (const frame of Array.from(p.getElementsByTagNameNS(NS.draw, 'frame'))) {
-      const box = frame.getElementsByTagNameNS(NS.draw, 'text-box')[0];
-      if (!box) continue;
-      ctx.warnings.add('Text boxes in headers or footers were flattened to text');
-      for (const inner of Array.from(box.children)) {
-        if (inner.namespaceURI === NS.text && (inner.localName === 'p' || inner.localName === 'h')) addPara(inner);
-      }
-    }
-  };
-
-  for (const child of Array.from(zoneEl.children)) {
-    if (child.namespaceURI === NS.text && (child.localName === 'p' || child.localName === 'h')) {
-      boxLines(child);
-      addPara(child);
-    } else if (child.namespaceURI === NS.text || child.namespaceURI === NS.table) {
-      // Lists/tables in headers are beyond the one-paragraph model — keep their text.
-      ctx.warnings.add('Lists/tables in headers or footers were flattened to text');
-      for (const p of Array.from(child.getElementsByTagNameNS(NS.text, 'p'))) addPara(p);
-    }
+  const blocks = convertBlocks(Array.from(zoneEl.children), zoneCtx, 'zone');
+  if (zoneCtx.foldMarks) ctx.foldMarks = true;
+  const zone: HfDoc = { type: 'doc', content: blocks };
+  if (hfIsEmpty(zone)) return null;
+  const paras = Array.from(zoneEl.children).filter((c) => c.namespaceURI === NS.text && (c.localName === 'p' || c.localName === 'h'));
+  const margin = (p: Element | undefined, side: string) =>
+    snapPt(lengthToPt(ctx.resolver.paraProps(p?.getAttributeNS(NS.text, 'style-name') ?? null)[`fo:margin-${side}`]) ?? 0);
+  const bandPt = snapPt((bandCm / 2.54) * 72);
+  const first = blocks[0];
+  const last = blocks[blocks.length - 1];
+  const isText = (b: Node | undefined) => b?.type === 'paragraph' || b?.type === 'heading';
+  if (footer && isText(first) && bandPt) {
+    first.attrs = { ...first.attrs, spaceBefore: snapPt(margin(paras[0], 'top') + bandPt) };
   }
-  // Empty source paragraphs become blank lines (hardBreaks); an all-empty zone has no
-  // runs and no inter-paragraph break, so inline stays empty. Keep such a zone only when
-  // it carries a background/rule line (a footer that is just a colored line has no text).
-  const box = mergeHfBox(boxMaps);
-  const content = fitZoneSchema(inline);
-  if (content.length === 0 && Object.keys(box).length === 0) return null;
-
-  const para: Node = { type: 'paragraph', content };
-  const attrs: Record<string, string | number> = {};
-  // The zone is one paragraph here, so its strut is the whole band's line height —
-  // runs that agree on a size must set it, or a 10pt footer reserves 12pt lines.
-  applyUniformRunFont(attrs, content);
-  // No run to take the strut from — a zone of blank lines is its style's size all the
-  // same, and nothing else in the band can say how tall those lines are.
-  if (attrs.fontSize == null && styleFontPt != null && !content.some((n) => n.type === 'text')) {
-    attrs.fontSize = `${styleFontPt}pt`;
+  if (isText(last)) {
+    const after = footer ? 0 : bandPt;
+    if (after || margin(paras[paras.length - 1], 'bottom')) last.attrs = { ...last.attrs, spaceAfter: after };
   }
-  if (textAlign) attrs.textAlign = textAlign;
-  if (stops) attrs.tabStops = stops;
-  const bandPt = (bandCm / 2.54) * 72;
-  const before = snapPt((spaceBefore ?? 0) + padTopPt + (footer ? bandPt : 0));
-  const after = snapPt(between + padBottomPt + (footer ? 0 : bandPt));
-  if (before) attrs.spaceBefore = before;
-  if (after) attrs.spaceAfter = after;
-  Object.assign(attrs, box);
-  if (Object.keys(attrs).length) para.attrs = attrs;
-  return { type: 'doc', content: [para] };
-}
-
-// The header/footer schema is a subset of the body's, and it is not forgiving: one node
-// or mark it doesn't know (a hyperlink, a date field) makes the whole zone fail to render
-// and come out blank. Drop what it can't hold, keeping the text.
-let zoneSchema: Schema | null = null;
-function fitZoneSchema(nodes: Node[]): Node[] {
-  zoneSchema ??= getSchema(zoneExtensions());
-  const out: Node[] = [];
-  for (const n of nodes) {
-    if (!zoneSchema.nodes[n.type]) {
-      const text = typeof n.attrs?.text === 'string' ? n.attrs.text : '';
-      if (text) out.push({ type: 'text', text });
-      continue;
-    }
-    const marks = n.marks?.filter((m) => zoneSchema!.marks[m.type]);
-    out.push(marks && marks.length !== n.marks?.length ? { ...n, marks } : n);
-  }
-  return out;
-}
-
-// The zone collapses several source paragraphs into one, so pick the box props that
-// reproduce the visible band+rule: background/side rules from the first that declares
-// them, but the bottom rule from the LAST paragraph (it sits under the whole band).
-function mergeHfBox(maps: Record<string, string>[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  const first = (key: string) => maps.find((m) => m[key] !== undefined)?.[key];
-  const last = (key: string) => [...maps].reverse().find((m) => m[key] !== undefined)?.[key];
-  for (const [key, val] of [
-    ['backgroundColor', first('backgroundColor')],
-    ['borderTop', first('borderTop')],
-    ['borderLeft', first('borderLeft')],
-    ['borderRight', first('borderRight')],
-    ['borderBottom', last('borderBottom')],
-  ] as const) {
-    if (val !== undefined) out[key] = val;
-  }
-  return out;
+  return zone;
 }
 
 // The text width of a page setup; the ODF default page where the file declares none.
@@ -1287,7 +1181,7 @@ function convertBlocks(elements: Element[], ctx: Ctx, kind: BlockKind, boldByDef
       }
       // tracked-changes registry, decls, soft-page-break, … → no visual content
     } else if (el.namespaceURI === NS.table && el.localName === 'table') {
-      if (kind === 'body') {
+      if (kind === 'body' || kind === 'zone') {
         // Before the conversion: a section the table opens may have a text width of its
         // own, which is what its columns are measured against.
         const flow = tableSectionFlow(el, ctx);
@@ -1943,7 +1837,7 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
     lang: blockLang,
     langAsian: blockLangAsian,
   };
-  const content = convertInline(el, ctx, baseTextProps, runDefaults, false);
+  const content = convertInline(el, ctx, baseTextProps, runDefaults);
 
   // The paragraph style's own font size is the block's line-height floor on every
   // line, not only on an empty one; carry it as a block attr (mirrors the docx
@@ -2282,7 +2176,7 @@ function noteBodyStyle(e: Element, ctx: Ctx, kind: NoteKind): string | null {
 
 // <text:note> → the anchor node, with the note's own text collected into ctx for the
 // section the document end gets. A body of several paragraphs is flattened to hard
-// breaks — the editor's note holds one paragraph, as convertHfZone does for a zone.
+// breaks — the editor's note holds one paragraph.
 function convertNote(e: Element, ctx: Ctx, defaults: BlockDefaults): Node | null {
   const kind: NoteKind = e.getAttributeNS(NS.text, 'note-class') === 'endnote' ? 'endnote' : 'footnote';
   const citation = e.getElementsByTagNameNS(NS.text, 'note-citation')[0] ?? null;
@@ -2314,7 +2208,7 @@ function numberStyleKind(tokens: Token[]): 'date' | 'time' | null {
 
 // ---- inline conversion --------------------------------------------------------
 
-function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: BlockDefaults, hfFields = false): Node[] {
+function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: BlockDefaults): Node[] {
   const out: Node[] = [];
   // Point comments, with the run index they were seen at — resolved after the walk.
   const points: { at: number; attrs: Record<string, unknown> }[] = [];
@@ -2342,17 +2236,15 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
     }
     if (linkHref) marks.push({ type: 'link', attrs: { href: linkHref } });
     // Ranges overlap, so the run carries every bookmark it is in — plus any point
-    // bookmark waiting for it. The one-paragraph header/footer schema has no mark.
-    if (!hfFields) {
-      for (const name of ctx.openBookmarks.keys()) ctx.openBookmarks.set(name, true);
-      for (const name of new Set([...ctx.openBookmarks.keys(), ...ctx.pointBookmarks])) {
-        marks.push({ type: 'bookmark', attrs: { name } });
-      }
-      ctx.pointBookmarks.clear();
+    // bookmark waiting for it.
+    for (const name of ctx.openBookmarks.keys()) ctx.openBookmarks.set(name, true);
+    for (const name of new Set([...ctx.openBookmarks.keys(), ...ctx.pointBookmarks])) {
+      marks.push({ type: 'bookmark', attrs: { name } });
     }
-    const comment = hfFields ? undefined : ctx.openComments.values().next().value;
+    ctx.pointBookmarks.clear();
+    const comment = ctx.openComments.values().next().value;
     if (comment) marks.push({ type: 'comment', attrs: comment });
-    const insertion = hfFields ? undefined : ctx.openInsertions.values().next().value;
+    const insertion = ctx.openInsertions.values().next().value;
     if (insertion) marks.push({ type: 'insertion', attrs: insertion });
     if (extra) marks.push(extra);
     const node: Node = { type: 'text', text: clean };
@@ -2413,6 +2305,8 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             continue;
           }
           case 'note': {
+            // The zone schema has no notes.
+            if (ctx.zone) continue;
             const note = convertNote(e, ctx, defaults);
             if (note) out.push(note);
             continue;
@@ -2442,9 +2336,9 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             const name = e.getAttributeNS(NS.text, 'ref-name');
             const fmt = e.getAttributeNS(NS.text, 'reference-format');
             // A format the editor cannot recompute (chapter, a user variable) keeps the
-            // value the file cached, and so does a reference in a header or footer.
+            // value the file cached.
             const kind = e.localName === 'sequence-ref' ? 'sequence' : e.localName === 'note-ref' ? 'note' : 'bookmark';
-            if (!hfFields && name && isCrossRefFormat(fmt)) {
+            if (name && isCrossRefFormat(fmt)) {
               const field: Node = {
                 type: 'crossRef',
                 attrs: { name, format: fmt, text: e.textContent ?? '', ...(kind === 'bookmark' ? {} : { kind }) },
@@ -2471,10 +2365,11 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             continue;
           case 'change-start':
           case 'change-end': {
-            // A recorded insertion brackets its runs; the registry holds who and when.
+            // A recorded insertion brackets its runs; the registry holds who and when. The
+            // zone schema records no revisions.
             const id = e.getAttributeNS(NS.text, 'change-id');
             const rev = id ? ctx.revisions.get(id) : undefined;
-            if (!hfFields && id && rev?.kind === 'insertion') {
+            if (!ctx.zone && id && rev?.kind === 'insertion') {
               if (e.localName === 'change-start') ctx.openInsertions.set(id, { id, author: rev.author, date: rev.date });
               else ctx.openInsertions.delete(id);
             }
@@ -2486,7 +2381,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             // are real styled runs, so they convert like any inline content.
             const id = e.getAttributeNS(NS.text, 'change-id');
             const rev = id ? ctx.revisions.get(id) : undefined;
-            if (!hfFields && id && rev?.kind === 'deletion' && (rev.paras.length || rev.text)) {
+            if (!ctx.zone && id && rev?.kind === 'deletion' && (rev.paras.length || rev.text)) {
               const del = { type: 'deletion', attrs: { id, author: rev.author, date: rev.date } };
               if (!rev.paras.length) {
                 out.push({ type: 'text', text: rev.text, marks: [...marksFor(props, ctx.resolver, defaults), del] });
@@ -2505,7 +2400,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
           default:
             // In headers/footers, page fields stay live fields (pageField.ts). The atom
             // carries the run's marks so its digits render in the run's font/size.
-            if (hfFields && (e.localName === 'page-number' || e.localName === 'page-count')) {
+            if (ctx.zone && (e.localName === 'page-number' || e.localName === 'page-count')) {
               const field: Node = { type: e.localName === 'page-count' ? 'pageCount' : 'pageNumber' };
               const marks = marksFor(props, ctx.resolver, defaults);
               if (marks.length) field.marks = marks;
@@ -2514,7 +2409,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             }
             // The running head's chapter name; text:display="number"/"plain-number" is a
             // numbering we don't track, so those keep the file's cached string.
-            if (hfFields && e.localName === 'chapter' && e.getAttributeNS(NS.text, 'display') === 'name') {
+            if (ctx.zone && e.localName === 'chapter' && e.getAttributeNS(NS.text, 'display') === 'name') {
               const level = Number(e.getAttributeNS(NS.text, 'outline-level')) || 1;
               const field: Node = { type: 'chapterField', attrs: { level, text: e.textContent ?? '' } };
               const marks = marksFor(props, ctx.resolver, defaults);
@@ -2540,7 +2435,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             }
             // A placeholder field (Insert ▸ Field ▸ Placeholder): the label is the
             // shown text without the <>/‹› brackets either producer draws around it.
-            if (!hfFields && e.localName === 'placeholder') {
+            if (e.localName === 'placeholder') {
               const label = (e.textContent ?? '').trim().replace(/^[<‹]/, '').replace(/[>›]$/, '');
               const field: Node = { type: 'placeholderField', attrs: { text: label } };
               const marks = marksFor(props, ctx.resolver, defaults);
@@ -2552,7 +2447,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             // A caption's running number (caption.ts). Only the two categories the
             // editor counts survive as a live field; any other sequence (a user
             // variable, a chapter counter) keeps its evaluated text.
-            if (!hfFields && e.localName === 'sequence') {
+            if (e.localName === 'sequence') {
               const field = convertSequenceField(e);
               const refName = e.getAttributeNS(NS.text, 'ref-name');
               const anchor: Mark | undefined = refName && ctx.seqRefNames.has(refName)
@@ -2576,17 +2471,17 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
             // A place marked for the alphabetical index. LibreOffice writes a point
             // mark; a range one (-mark-start/-end) is kept at its start, the editor's
             // entry being a place too.
-            if (!hfFields && (e.localName === 'alphabetical-index-mark' || e.localName === 'alphabetical-index-mark-start')) {
+            if (e.localName === 'alphabetical-index-mark' || e.localName === 'alphabetical-index-mark-start') {
               const term = e.getAttributeNS(NS.text, 'string-value') ?? '';
               if (term.trim()) {
                 out.push({ type: 'indexEntry', attrs: { term: term.trim(), key1: (e.getAttributeNS(NS.text, 'key1') ?? '').trim() } });
               }
               continue;
             }
-            if (!hfFields && e.localName === 'alphabetical-index-mark-end') continue;
+            if (e.localName === 'alphabetical-index-mark-end') continue;
             // A citation. Every field is an attribute of the mark, so the source record
             // travels with it; the element's text is what the citation showed.
-            if (!hfFields && e.localName === 'bibliography-mark') {
+            if (e.localName === 'bibliography-mark') {
               const entry = bibEntryFromMark(e);
               if (entry) { out.push(entry); continue; }
             }
@@ -2605,26 +2500,12 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
           if (marks.length) field.marks = marks;
           out.push(field);
         } else {
-          for (const n of convertInline(e, ctx, props, defaults, hfFields)) out.push(n);
+          for (const n of convertInline(e, ctx, props, defaults)) out.push(n);
         }
         continue;
       }
       if (e.namespaceURI === NS.draw) {
         const conv = convertDrawElement(e, ctx);
-        // The one-paragraph zone flows as-char images; a positioned frame is out of
-        // flow — the page-anchored letterhead or watermark a title page is made of —
-        // and keeps its wrap plus its position from the page corner. Boxes are dropped.
-        if (hfFields) {
-          const img = conv?.inline?.type === 'image' ? conv.inline : null;
-          const wrap = img?.attrs?.wrap;
-          if (img && (!wrap || wrap === 'inline')) {
-            out.push({ ...img, attrs: { ...img.attrs, wrap: 'inline' } });
-          } else if (img) {
-            const at = (a: string) => Math.max(0, lengthToCm(e.getAttributeNS(NS.svg, a)) ?? 0);
-            out.push({ ...img, attrs: { ...img.attrs, wrapOffset: at('x'), wrapOffsetY: at('y') } });
-          } else if (conv) ctx.warnings.add('Drawings were removed');
-          continue;
-        }
         // A box is inline like a picture, so it stays exactly where the frame sits.
         if (conv?.inline) out.push(conv.inline);
         else if (conv?.block) out.push(conv.block);
@@ -2634,7 +2515,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
         // A ranged comment brackets its text with a named annotation/annotation-end pair;
         // a point one (LibreOffice's comment with nothing selected) carries no name and
         // sits after the text it was made on. The zone schema has no comment mark.
-        if (hfFields) continue;
+        if (ctx.zone) continue;
         if (e.localName === 'annotation-end') {
           const name = e.getAttributeNS(NS.office, 'name');
           if (name) ctx.openComments.delete(name);

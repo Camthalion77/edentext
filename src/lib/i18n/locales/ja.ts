@@ -1198,8 +1198,6 @@ const ja: Messages = {
     drawingsRemoved: '描画オブジェクトを削除しました',
     structureRepaired: '文書構造に合わない内容があったため調整しました',
     noDictionary: (tag: string) => `スペルチェックの言語「${tag}」には同梱の辞書がないため、スペルチェックをオフにしました`,
-    hfFlattened: 'ヘッダー/フッター内のリストや表をテキストに変換しました',
-    hfBoxFlattened: 'ヘッダー/フッター内のテキスト ボックスをテキストに変換しました',
     textBoxFlattened: '表のセルや他のテキスト ボックス内のテキスト ボックスをテキストに変換しました',
     nestedTables: '入れ子の表を段落に変換しました',
     comments: 'コメントを削除しました',

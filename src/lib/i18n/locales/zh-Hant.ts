@@ -1195,8 +1195,6 @@ const zhHant: Messages = {
     drawingsRemoved: '繪圖已被移除',
     structureRepaired: '部分內容不符合文件結構，已作調整',
     noDictionary: (tag: string) => `拼字檢查語言「${tag}」沒有隨附字典——已關閉拼字檢查`,
-    hfFlattened: '頁首或頁尾中的清單/表格已攤平為文字',
-    hfBoxFlattened: '頁首或頁尾中的文字方塊已攤平為文字',
     textBoxFlattened: '巢狀於儲存格或其他文字方塊中的文字方塊已被攤平',
     nestedTables: '巢狀表格已攤平為段落',
     comments: '註解已被移除',

@@ -1194,8 +1194,6 @@ const zhHans: Messages = {
     drawingsRemoved: '绘图已被移除',
     structureRepaired: '部分内容不符合文档结构，已作调整',
     noDictionary: (tag: string) => `拼写检查语言“${tag}”没有随附词典——已关闭拼写检查`,
-    hfFlattened: '页眉或页脚中的列表/表格已展平为文本',
-    hfBoxFlattened: '页眉或页脚中的文本框已展平为文本',
     textBoxFlattened: '嵌套在单元格或其他文本框中的文本框已被展平',
     nestedTables: '嵌套表格已展平为段落',
     comments: '批注已被移除',
