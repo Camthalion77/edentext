@@ -27,7 +27,7 @@ import type { Orientation } from '../storage/pageOrientation';
 import { pageDimsCm, PAGE_FORMAT_CM, type PageFormat } from '../storage/pageFormat';
 import { DEFAULT_TAB_INTERVAL_CM } from '../storage/tabInterval';
 import type { SpacingModel } from '../storage/spacingModel';
-import { HF_DISTANCE_CM, hfIsEmpty, type HfDoc, type HfSet } from '../storage/headerFooter';
+import { HF_DISTANCE_CM, HF_ZONE_KEYS, hfIsEmpty, type HfDoc, type HfSet } from '../storage/headerFooter';
 import { DEFAULT_NOTE_SETTINGS, type NoteKind, type NoteNumFormat, type NoteSettings } from '../storage/noteSettings';
 import { DOCX_SEQ_NAME, seqCategoryOf } from '../editor/extensions/caption';
 import { sanitizeBookmarkName } from '../editor/extensions/bookmark';
@@ -198,6 +198,9 @@ let docFormulas: FormulaDocx[] = [];
 type RubyDocx = { base: string; text: string };
 let docRubies: RubyDocx[] = [];
 let docPlaceholders: string[] = [];
+// Every list instance a header or footer uses (zoneLists): the package writes
+// numbering.xml before its header parts, so their instances are registered ahead.
+let docZoneLists: { reference: string; instance: number }[] | null = null;
 
 // The sources cited, one per tag in document order — Word keeps them in a custom-XML
 // part and the CITATION fields only name the tag. Module-level like docFormulas.
@@ -2506,6 +2509,7 @@ function listToParagraphs(
         listToParagraphs(child, depth + 1, ref, indentCm, num, out, cChild, style, ref === reference ? instance : 0);
       } else if (child.type === 'paragraph' || child.type === 'heading') {
         if (!numberedFirst) {
+          docZoneLists?.push({ reference, instance });
           out.push(paragraphToDocx(child, { numbering: { reference, level: depth, instance } }));
           numberedFirst = true;
         } else {
@@ -3287,6 +3291,7 @@ export async function buildDocx(
   // A zone's blocks at its section's text width; a header has no index to hold.
   const blocks = (content: TiptapNode[], i: number) =>
     blocksToDocx(content, num, sectionWidthCm(i)) as (Paragraph | Table)[];
+  docZoneLists = [];
   // Fresh instances per section (Word's per-sectPr references, i.e. no "Link to
   // Previous"). A first-page variant rides `first:` and is activated by titlePage below.
   const mkHeaders = (i: number) => {
@@ -3328,6 +3333,16 @@ export async function buildDocx(
     return fo;
   };
 
+  // The zones are walked before the document is built: their lists register numbering
+  // the document reads when it is constructed. Only the group that begins a section's
+  // set carries them; a later columns group links to them ("Link to Previous"): a
+  // reference of its own makes LibreOffice switch page styles there, which breaks the
+  // page as a continuous break never may.
+  const groupZones = groups.map((g, i) => (groups.findIndex((x) => x.section === g.section) === i
+    ? { headers: mkHeaders(g.section), footers: mkFooters(g.section) } : { headers: undefined, footers: undefined }));
+  // Styles the zones name count as used, as the body's do.
+  const withZones: TiptapNode = { ...docJson, content: [...(docJson.content ?? []),
+    ...hfSets.flatMap((set) => HF_ZONE_KEYS.flatMap((k) => (set[k]?.content ?? []) as TiptapNode[]))] };
   const doc = new Document({
     // Word's File ▸ Info; an empty field is left out so it does not overwrite Word's own.
     // Creator and last modifier are what the library fills in ("Un-named") otherwise,
@@ -3347,7 +3362,7 @@ export async function buildDocx(
     ...(hasToc || recordChanges
       ? { features: { ...(hasToc ? { updateFields: true } : {}), ...(recordChanges ? { trackRevisions: true } : {}) } }
       : {}),
-    styles: buildStyles(styles, usedStyleNames(docJson, styles), language),
+    styles: buildStyles(styles, usedStyleNames(withZones, styles), language),
     numbering: { config: num.config },
     ...(Object.keys(notesByClass.footnote).length ? { footnotes: notesByClass.footnote } : {}),
     ...(Object.keys(notesByClass.endnote).length ? { endnotes: notesByClass.endnote } : {}),
@@ -3394,18 +3409,16 @@ export async function buildDocx(
           ? { column: { count: g.columns.count, space: cmToTwip(g.columns.gapCm), equalWidth: true } }
           : {}),
       },
-      // A later columns group of its section links to the zones ("Link to Previous"): a
-      // reference of its own makes LibreOffice switch page styles there, which breaks
-      // the page as a continuous break never may.
-      headers: groups.findIndex((x) => x.section === g.section) === i ? mkHeaders(g.section) : undefined,
-      footers: groups.findIndex((x) => x.section === g.section) === i ? mkFooters(g.section) : undefined,
+      ...groupZones[i],
       children: g.children.length ? g.children : [new Paragraph({})],
     })),
   });
 
+  for (const { reference, instance } of docZoneLists) doc.Numbering.createConcreteNumberingInstance(reference, instance);
+  docZoneLists = null;
   const blob = await Packer.toBlob(doc);
   const styled = applyRawStylesDocx(new Uint8Array(await blob.arrayBuffer()), [
-    ...usedTableStyles(docJson, styles).map(tableStyleXml),
+    ...usedTableStyles(withZones, styles).map(tableStyleXml),
     ...num.styleLinks().map((l) => numberingStyleXml(l.name)),
   ]);
   const linked = applyOutlineNumberingDocx(applyListStylesDocx(styled, num.styleLinks()), outlineIndex);

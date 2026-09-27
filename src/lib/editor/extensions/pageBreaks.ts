@@ -360,6 +360,8 @@ export function leftInEditor(view: EditorView, el: HTMLElement): number {
 // page the anchor lands on. Both are written as margins off the frame's static position,
 // which is where the anchor character sits — so each is measured, not assumed.
 export function placeFromPage(view: EditorView, el: HTMLElement, grid?: PageGrid): void {
+  // A header/footer zone has no page grid of its own: its layer places the frame by CSS.
+  if ((view.dom as HTMLElement).closest('.hf-zone')) return;
   const g = grid ?? readVerticalMargins(view.dom as HTMLElement).grid;
   el.style.marginTop = '0px';
   el.style.marginLeft = '0px';

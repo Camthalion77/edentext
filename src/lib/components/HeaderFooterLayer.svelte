@@ -169,25 +169,6 @@
   const boxStyle = (b: { top: number; left: number; width: number; height: number }) =>
     `top: ${b.top}px; left: ${b.left}px; width: ${b.width}px; height: ${b.height}px;`;
 
-  // A positioned frame in a zone is out of flow: the page-anchored letterhead or
-  // watermark a title page is made of. It paints once per page from the page corner,
-  // behind the body, and the zone's own box never sees it (editor.css hides it there).
-  type PageBg = { src: string; x: number; y: number; width: number; height: number };
-  function backgrounds(doc: HfDoc): PageBg[] {
-    const inline = ((doc?.content?.[0] as { content?: { type?: string; attrs?: Record<string, unknown> }[] } | undefined)?.content ?? []);
-    const out: PageBg[] = [];
-    for (const n of inline) {
-      if (n.type !== 'image' || typeof n.attrs?.src !== 'string' || (n.attrs.wrap ?? 'inline') === 'inline') continue;
-      out.push({
-        src: n.attrs.src,
-        x: cmToPx(Number(n.attrs.wrapOffset) || 0),
-        y: cmToPx(Number(n.attrs.wrapOffsetY) || 0),
-        width: Number(n.attrs.width) || pageWidthPx,
-        height: Number(n.attrs.height) || pageHeightPx,
-      });
-    }
-    return out;
-  }
   // Section 1 is the app's own editable state; the rest live in extraHfSections.
   let sets = $derived<HfSet[]>([
     {
@@ -234,11 +215,12 @@
       },
     };
   }
-  let setBg = $derived(sets.map((s) => ({
-    header: backgrounds(s.header), footer: backgrounds(s.footer),
-    headerFirst: backgrounds(s.headerFirst), footerFirst: backgrounds(s.footerFirst),
-    headerEven: backgrounds(s.headerEven), footerEven: backgrounds(s.footerEven),
-  })));
+  // Whether a zone holds a frame behind the text: the background layer paints those, from
+  // a second clone of the zone, so they sit under the body as they do in both products.
+  type ZoneNode = { type?: string; attrs?: Record<string, unknown>; content?: ZoneNode[] };
+  const behind = (n: ZoneNode): boolean =>
+    (n.attrs?.wrap === 'through' && !n.attrs.inFront) || !!n.content?.some(behind);
+  let setBehind = $derived(sets.map((s) => Object.fromEntries(HF_ZONE_KEYS.map((k) => [k, !!s[k] && behind(s[k] as ZoneNode)]))));
 
   // Off-screen copy of every zone at its section's text width. What the body has to
   // clear is the height the zone renders at: counting paragraphs sees neither a line
@@ -284,19 +266,17 @@
     if (s.differentOddEven && isLeftPage(pageNumberAt(page))) return 'even';
     return 'default';
   }
-  // The zone a page shows: its set and key, and that zone's signature.
-  function zoneOf(zone: HfZone, page: number): { id: string; sig: string } {
+  // The zone a page shows: its set and key, that zone's signature, and whether it holds
+  // a frame behind the text.
+  function zoneOf(zone: HfZone, page: number): { id: string; sig: string; bg: boolean } {
     const index = Math.min(sectionOf(page), setSig.length - 1);
     const key = zoneKey(zone, variantFor(page, index));
-    return { id: `${index}:${key}`, sig: setSig[index][key] };
+    return { id: `${index}:${key}`, sig: setSig[index][key], bg: setBehind[index][key] };
   }
-  function zoneBackgrounds(zone: HfZone, page: number): PageBg[] {
-    const index = sectionOf(page);
-    const v = variantFor(page, index);
-    const b = setBg[index] ?? setBg[0];
-    if (zone === 'header') return v === 'first' ? b.headerFirst : v === 'even' ? b.headerEven : b.header;
-    return v === 'first' ? b.footerFirst : v === 'even' ? b.footerEven : b.footer;
-  }
+  // A frame placed against the page takes its top from there (--page-y); the zone's own
+  // distance below the page top is what its layer subtracts.
+  const pageVar = (b: { top: number }, page: number) => ` --hf-page-y: ${b.top - boxOf(page).top}px;`;
+
 
   // Page, the page count and chapter map (only where the zone shows them), its source
   // editor's DOM and version, the zone and the number the page shows: everything the
@@ -518,18 +498,20 @@
 </div>
 
 <!-- Own layer below the body (z-index -1 against .paper's zoom stacking context), so a
-     full-page background sits under the text the way LibreOffice paints it. -->
+     frame behind the text sits under it the way LibreOffice paints it: a second clone of
+     the zone with only those frames showing, laid out exactly as the zone above it. -->
 <div class="hf-bg-layer">
   {#each pages as p}
     {#each ['header', 'footer'] as const as zone}
-      {#each zoneBackgrounds(zone, p) as bg}
-        <img
-          class="hf-page-bg"
-          src={bg.src}
-          alt=""
-          style="top: {boxOf(p).top + bg.y}px; left: {boxOf(p).left + bg.x}px; width: {bg.width}px; height: {bg.height}px;"
-        />
-      {/each}
+      {@const { id, sig, bg } = zoneOf(zone, p)}
+      {#if bg && !(interactive && hfActive === zone && editingPage === p)}
+        {@const zb = zoneBox(zone, p)}
+        <div
+          class="hf-zone hf-zone-bg hf-{zone}"
+          style={boxStyle(zb) + pageVar(zb, p)}
+          use:fillZone={[p, sig.includes('"pageCount"') ? numPages : 0, sources[id], sig.includes('"chapterField"') ? chapterStarts : null, zone, pageLabel(p), sourceVersion]}
+        ></div>
+      {/if}
     {/each}
   {/each}
 </div>
@@ -538,7 +520,7 @@
   {#each pages as p}
     {#each ['header', 'footer'] as const as zone}
       {#if !(interactive && hfActive === zone && editingPage === p)}
-        {@const { id, sig } = zoneOf(zone, p)}
+        {@const { id, sig, bg } = zoneOf(zone, p)}
         {@const total = sig.includes('"pageCount"') ? numPages : 0}
         {@const chapters = sig.includes('"chapterField"') ? chapterStarts : null}
         {@const src = sig ? sources[id] : undefined}
@@ -546,8 +528,9 @@
         <div
           class="hf-zone hf-{zone}"
           class:hf-empty={!sig}
+          class:hf-has-bg={bg}
           data-hf-label={zone === 'header' ? t().hf.addHeaderHint : t().hf.addFooterHint}
-          style={boxStyle(zb) + (interactive ? hitVars(zone, p, zb) : '')}
+          style={boxStyle(zb) + pageVar(zb, p) + (interactive ? hitVars(zone, p, zb) : '')}
           ondblclick={() => interactive && startEdit(zone, p)}
           role="button"
           tabindex="-1"
@@ -561,7 +544,7 @@
     {@const box = activeZoneBox(hfActive, editingPage)}
     {@const index = sectionOf(editingPage)}
     {@const variant = variantFor(editingPage, index)}
-    <div class="hf-zone hf-{hfActive} hf-active" style={boxStyle(box) + ` --hf-tb-offset: ${-activeTrailingPx}px;`} bind:this={liveMount}></div>
+    <div class="hf-zone hf-{hfActive} hf-active" style={boxStyle(box) + pageVar(box, editingPage) + ` --hf-tb-offset: ${-activeTrailingPx}px;`} bind:this={liveMount}></div>
     <div class="hf-tag" style="top: {box.top}px; left: {box.left}px;">
       {hfActive === 'header'
         ? (variant === 'first' ? t().hf.firstPageHeader : variant === 'even' ? t().hf.evenPageHeader : t().hf.headerLabel)
@@ -597,13 +580,37 @@
     z-index: -1;
     pointer-events: none;
   }
-  .hf-page-bg {
-    position: absolute;
+  /* The background clone shows the frames behind the text and nothing else; the zone
+     above shows everything but them. The one being edited shows them all, on top. */
+  .hf-zone-bg {
+    pointer-events: none;
   }
-  /* The frame is painted by .hf-bg-layer; inside the zone it would grow the box and,
-     while editing, flow as a line. Selecting it still works from the keyboard. */
-  .hf-zone :global([data-wrap]) {
-    display: none;
+  .hf-zone-bg::after {
+    content: none;
+  }
+  .hf-zone-bg :global(*) {
+    visibility: hidden;
+  }
+  .hf-zone-bg :global([data-wrap='through']:not([data-in-front])),
+  .hf-zone-bg :global([data-wrap='through']:not([data-in-front]) *) {
+    visibility: visible;
+  }
+  .hf-has-bg:not(.hf-active) :global([data-wrap='through']:not([data-in-front])) {
+    visibility: hidden;
+  }
+
+  /* A frame placed against the page is placed from the zone box (its containing block,
+     so neither the editor nor its paragraph may take a position of their own): its x in
+     the text column, which is the zone's, and its y from the page top, which the zone
+     sits --hf-page-y below. Out of the flow, it leaves the zone's height alone. */
+  .hf-zone :global(.tiptap),
+  .hf-zone :global(:is(p, h1, h2, h3, h4, h5, h6):has(> [data-page-y])) {
+    position: static !important;
+  }
+  .hf-zone :global([data-page-y]) {
+    margin: 0 !important;
+    left: var(--page-x);
+    top: calc(var(--page-y) - var(--hf-page-y, 0px));
   }
 
   .hf-measure {

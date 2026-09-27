@@ -1959,7 +1959,7 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   }
 
   /* While editing a header/footer, dim the body so focus is on the margin zone. */
-  .paper.hf-editing :global(.tiptap) {
+  .paper.hf-editing :global(.tiptap-host .tiptap) {
     opacity: 0.5;
     transition: opacity 0.15s;
   }

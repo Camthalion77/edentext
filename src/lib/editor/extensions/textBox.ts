@@ -10,7 +10,7 @@ import type { EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { placeFromPage } from './pageBreaks';
-import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, applyRunThrough, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
+import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
 import { SHAPES, shapePath, linePaths, arrowHeadPx, isShapeKind, isLineKind, type ShapeKind } from '../../utils/shapes';
 import { cmToPx } from '../../storage/pageMargins';
 import { normalizeColor } from '../../utils/color';
@@ -765,6 +765,7 @@ class TextBoxView {
     d.style.verticalAlign = '';
     d.style.margin = '';
     this.rotor.style.left = '';
+    clearPagePlace(d);
     if (a.wrap === 'left' || a.wrap === 'right') {
       d.style.float = a.wrap;
       d.style.margin = frameMargins(a.wrap, a.wrapOffset, this.wrapperWidth(), null, a.wrapDist);
@@ -912,7 +913,7 @@ class TextBoxView {
     const sinT = Math.sin(th);
     const zoom = this.dom.getBoundingClientRect().width / this.dom.offsetWidth || 1;
     const maxW = this.boxMaxWidth();
-    const maxH = pageContentHeightPx();
+    const maxH = pageContentHeightPx(this.dom);
     const sx = event.clientX;
     const sy = event.clientY;
     const win = this.dom.ownerDocument.defaultView ?? window;

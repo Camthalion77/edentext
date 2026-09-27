@@ -157,6 +157,8 @@ function loOptions(canon: N, fmt: Fmt, opts: FuzzOptions, authored: boolean): N 
   // Via DOCX a zone's runs come back in the look LibreOffice gives fields and headings,
   // so there a zone compares by its text and fields alone.
   const zoneFix = (zone: N): void => {
+    // A zone's lists and tables read back as the body's do.
+    if (zone?.content) zone.content = zone.content.map((b: N) => loNoise(b, fmt));
     for (const p of zone?.content ?? []) {
       if (fmt === 'docx') p.content = p.content?.filter((c: N) => c.type !== 'chapterField').map((c: N) => (c.type === 'text' ? { type: 'text', text: c.text } : { type: c.type }));
       for (const c of p.content ?? []) if (c.type === 'chapterField') delete c.attrs.text;

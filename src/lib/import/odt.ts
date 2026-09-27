@@ -158,6 +158,9 @@ type Ctx = {
   // `docContentWidthCm` is the first section's, where the export keeps an index's stop.
   contentWidthCm: number;
   docContentWidthCm: number;
+  // The section's left page margin: a frame placed against the page is kept against the
+  // text column, as the DOCX importer keeps it.
+  leftMarginCm: number;
   // The page's own direction: a block declaring the same one is inheriting, not
   // formatted, so only a block that differs carries a `dir` attr.
   pageRtl: boolean;
@@ -273,7 +276,7 @@ function boxTextFlow(el: Element, ctx: Ctx, attrs: Record<string, unknown>): voi
   if (anchor === 'middle' || anchor === 'bottom') attrs.textVAlign = anchor;
 }
 
-function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, gp: PropMap, contentCm = 0): void {
+function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, gp: PropMap, contentCm = 0, leftMarginCm = 0): void {
   const deg = frameRotationDeg(el);
   if (deg) attrs.rotation = deg;
   const anchor = el.getAttributeNS(NS.text, 'anchor-type');
@@ -294,9 +297,13 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
     if (dist != null && dist > 0) attrs.wrapDist = Math.round(dist * 1000) / 1000;
   }
   // A frame placed by coordinate (style:horizontal-pos="from-left") keeps its x in the
-  // column; the wrap mode alone would snap it to a side.
+  // column; the wrap mode alone would snap it to a side. An x the file measures from the
+  // page edge (or the start margin, which begins there) counts from the column here too.
   const hpos = gp['style:horizontal-pos'];
-  const x = hpos === 'from-left' ? lengthToCm(el.getAttributeNS(NS.svg, 'x')) : null;
+  const hrel = gp['style:horizontal-rel'];
+  const pageX = hrel === 'page' || hrel === 'page-start-margin' ? leftMarginCm : 0;
+  const rawX = hpos === 'from-left' ? lengthToCm(el.getAttributeNS(NS.svg, 'x')) : null;
+  const x = rawX == null ? null : rawX - pageX;
   if (x != null && attrs.wrap) attrs.wrapOffset = Math.round(x * 100) / 100;
   // Where the file names no side (parallel/dynamic), the text takes whichever side of
   // the frame has room: a frame set past the middle of the column is a float on the
@@ -426,7 +433,7 @@ function convertFrame(frame: Element, ctx: Ctx): Node | null {
   if (hCm != null) attrs.height = framePx(cmToPx(hCm));
   const title = frame.getElementsByTagNameNS(NS.svg, 'title')[0]?.textContent;
   if (title) attrs.alt = title;
-  applyFrameRotationAndWrap(frame, attrs, ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name')), ctx.contentWidthCm);
+  applyFrameRotationAndWrap(frame, attrs, ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name')), ctx.contentWidthCm, ctx.leftMarginCm);
   if (!attrs.wrap || attrs.wrap === 'inline') fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   return { type: 'image', attrs };
 }
@@ -526,7 +533,7 @@ function convertTextBoxFrame(frame: Element, textBoxEl: Element, ctx: Ctx): Node
     ?? lengthToCm(frame.getAttributeNS(NS.svg, 'height'));
   if (hCm != null) attrs.height = framePx(cmToPx(hCm));
   const gp = ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name'));
-  applyFrameRotationAndWrap(frame, attrs, gp, ctx.contentWidthCm);
+  applyFrameRotationAndWrap(frame, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   boxWrapAlign(gp, attrs);
   const padCm = lengthToCm(gp['fo:padding']);
   if (padCm != null && Math.abs(padCm - TEXTBOX_PADDING_CM) > 0.01) attrs.paddingCm = Math.round(padCm * 1000) / 1000;
@@ -568,7 +575,7 @@ function convertChartFrame(frame: Element, ctx: Ctx): Node | null {
   const src = doc && odfChartDataUrl(doc, cmToPx(wCm), cmToPx(hCm));
   if (!src) return null;
   const attrs: Record<string, unknown> = { src, width: framePx(cmToPx(wCm)), height: framePx(cmToPx(hCm)), alt: 'Chart' };
-  applyFrameRotationAndWrap(frame, attrs, ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name')), ctx.contentWidthCm);
+  applyFrameRotationAndWrap(frame, attrs, ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name')), ctx.contentWidthCm, ctx.leftMarginCm);
   if (!attrs.wrap || attrs.wrap === 'inline') fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   return { type: 'image', attrs };
 }
@@ -638,7 +645,7 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
   if (wCm != null) attrs.width = framePx(cmToPx(wCm));
   if (hCm != null) attrs.height = framePx(cmToPx(hCm));
   const gp = ctx.resolver.graphicProps(el.getAttributeNS(NS.draw, 'style-name'));
-  applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm);
+  applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   boxWrapAlign(gp, attrs);
   shapeStyleAttrs(gp, attrs, true);
   boxTextFlow(el, ctx, attrs);
@@ -684,7 +691,7 @@ function convertFreeform(el: Element, ctx: Ctx): Node | null {
     shapePath: path, width: framePx(cmToPx(wCm)), height: framePx(cmToPx(hCm)),
   };
   const gp = ctx.resolver.graphicProps(el.getAttributeNS(NS.draw, 'style-name'));
-  applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm);
+  applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   boxWrapAlign(gp, attrs);
   shapeStyleAttrs(gp, attrs, true);
   return { type: 'textBox', attrs, content: [{ type: 'paragraph' }] };
@@ -705,7 +712,7 @@ function convertLine(el: Element, ctx: Ctx): Node | null {
   };
   // The editor draws a line across its frame, so only the direction is left to keep.
   if ((y2 - y1) * (x2 - x1) < 0) attrs.flipV = true;
-  applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm);
+  applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   boxWrapAlign(gp, attrs);
   shapeStyleAttrs(gp, attrs, true);
   return { type: 'textBox', attrs, content: [{ type: 'paragraph' }] };
@@ -837,7 +844,7 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
   const first = resolver.hasMasterPage(masters.leading) ? masters.leading : null;
   const geo = resolver.pageGeometry(first) ?? resolver.pageGeometry();
   const contentWidthCm = contentWidthOf(geo);
-  const ctx: Ctx = { resolver, styleNames, usedStyles: new Set(), charStyleNames, usedCharStyles: new Set(), usedListStyles: new Set(), warnings, seqRefNames: sequenceRefNames(body), files, imageCache: new Map(), convertedImages, contentWidthCm, docContentWidthCm: contentWidthCm, pageRtl: geo?.rtl ?? false, masterPages: [], leadingMaster: masters.leading ?? 'Standard', masterPageStarts: [], bodyBlocks: 0, openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), commentReplies: odfCommentReplies(body), revisions: odfRevisions(body), openInsertions: new Map(), notes: [], foldMarks: false };
+  const ctx: Ctx = { resolver, styleNames, usedStyles: new Set(), charStyleNames, usedCharStyles: new Set(), usedListStyles: new Set(), warnings, seqRefNames: sequenceRefNames(body), files, imageCache: new Map(), convertedImages, contentWidthCm, docContentWidthCm: contentWidthCm, leftMarginCm: geo?.margins.left ?? 0, pageRtl: geo?.rtl ?? false, masterPages: [], leadingMaster: masters.leading ?? 'Standard', masterPageStarts: [], bodyBlocks: 0, openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), commentReplies: odfCommentReplies(body), revisions: odfRevisions(body), openInsertions: new Map(), notes: [], foldMarks: false };
   let blocks = convertBlocks(Array.from(body.children), ctx, 'body');
   if (blocks.length === 0) blocks.push({ type: 'paragraph' });
   pairAlignedFrames(blocks, Math.floor(cmToPx(contentWidthCm)));
@@ -888,7 +895,7 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
 
   const docNumFormat = resolver.pageNumberFormat(first);
   const zoneOf = (el: Element | null, footer = false) =>
-    (el ? convertHfZone(el, ctx, ctx.docContentWidthCm, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
+    (el ? convertHfZone(el, ctx, geo, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
   const headerFirst = zoneOf(hf.headerFirst);
   const footerFirst = zoneOf(hf.footerFirst, true);
   // The presence of a first-page element is the flag, even when it's empty (an empty
@@ -954,9 +961,9 @@ function hfSetOfMasterPage(
   docEdge: { top: number; bottom: number } | null,
 ): HfSet {
   const hf = ctx.resolver.masterPageHF(name);
-  const zoneGeo = ctx.resolver.pageGeometry(name);
+  // Its zones measure against the section's own page layout (`geo`, below).
   const zone = (el: Element | null, footer = false) =>
-    (el ? convertHfZone(el, ctx, zoneGeo ? contentWidthOf(zoneGeo) : ctx.docContentWidthCm, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
+    (el ? convertHfZone(el, ctx, geo, footer ? hf.footerBandCm : hf.headerBandCm, footer) : null);
   // Odd/even is per zone: an absent left variant repeats the default one on left pages.
   const oddEven = !!(hf.headerLeft || hf.footerLeft);
   // Its page layout is the section's own geometry; where the master hands over, that
@@ -1011,9 +1018,9 @@ function hfSetOfMasterPage(
 // paragraph's own margin-bottom is not part of the band — probed: a header of one 10pt
 // line with a 12mm bottom margin puts the body at min-height, and a footer's is dropped
 // the same way, while every margin *between* two of its paragraphs counts in full.
-function convertHfZone(zoneEl: Element, ctx: Ctx, widthCm: number, bandCm = 0, footer = false): HfDoc {
+function convertHfZone(zoneEl: Element, ctx: Ctx, geo: Parameters<typeof contentWidthOf>[0], bandCm = 0, footer = false): HfDoc {
   const zoneCtx: Ctx = {
-    ...ctx, zone: true, contentWidthCm: widthCm, foldMarks: false,
+    ...ctx, zone: true, contentWidthCm: contentWidthOf(geo), leftMarginCm: geo?.margins.left ?? ctx.leftMarginCm, foldMarks: false,
     openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), openInsertions: new Map(),
   };
   const blocks = convertBlocks(Array.from(zoneEl.children), zoneCtx, 'zone');
@@ -1805,7 +1812,7 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
     const restart = Number(paraProps['style:page-number']);
     ctx.masterPageStarts.push(Number.isFinite(restart) ? clampPageStart(restart) : null);
     const geo = resolver.pageGeometry(master!);
-    if (geo) ctx.contentWidthCm = contentWidthOf(geo);
+    if (geo) { ctx.contentWidthCm = contentWidthOf(geo); ctx.leftMarginCm = geo.margins.left; }
   }
   const attrs = blockAttrs(paraProps, baseTextProps, defaults, kind);
   if (paraProps['style:contextual-spacing'] === 'true') applyContextualSpacing(el, styleName, attrs);
@@ -3025,7 +3032,7 @@ function sectionFlowAttrs(master: string | null, breakBefore: boolean, ctx: Ctx)
     ctx.masterPages.push(master);
     ctx.masterPageStarts.push(null);
     const geo = ctx.resolver.pageGeometry(master);
-    if (geo) ctx.contentWidthCm = contentWidthOf(geo);
+    if (geo) { ctx.contentWidthCm = contentWidthOf(geo); ctx.leftMarginCm = geo.margins.left; }
     attrs.sectionBreak = true;
   }
   if (master && ctx.bodyBlocks) attrs.breakBefore = 'page';

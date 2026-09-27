@@ -122,10 +122,26 @@ export function applyRunThrough(el: HTMLElement, offsetCm: unknown, offsetYCm: u
   el.style.position = 'absolute';
   el.style.margin = `${px(offsetYCm)}px 0 0 ${px(offsetCm)}px`;
   el.style.zIndex = inFront ? '1' : '-1';
+  // Which side of the text it lands on, for the header/footer layer's stacking.
+  if (inFront) el.dataset.inFront = ''; else delete el.dataset.inFront;
+  clearPagePlace(el);
   // A page-placed frame states its corner instead: placeFromPage turns the pair into
-  // the margins that reach it, and pagination re-places it from these same numbers.
-  if (fromPage) { el.dataset.pageX = String(px(offsetCm)); el.dataset.pageY = String(px(offsetYCm)); }
-  else { delete el.dataset.pageX; delete el.dataset.pageY; }
+  // the margins that reach it, and pagination re-places it from these same numbers. A
+  // header/footer zone places it by CSS from the same pair (HeaderFooterLayer).
+  if (fromPage) {
+    el.dataset.pageX = String(px(offsetCm));
+    el.dataset.pageY = String(px(offsetYCm));
+    el.style.setProperty('--page-x', `${px(offsetCm)}px`);
+    el.style.setProperty('--page-y', `${px(offsetYCm)}px`);
+  }
+}
+
+// A frame leaving run-through, or its page, takes no page place along.
+export function clearPagePlace(el: HTMLElement): void {
+  delete el.dataset.pageX;
+  delete el.dataset.pageY;
+  el.style.removeProperty('--page-x');
+  el.style.removeProperty('--page-y');
 }
 
 // Drag a frame that is out of the flow. Its offsets count from a point the drag cannot
@@ -190,9 +206,11 @@ export function inlineVerticalAlign(vAlign: unknown, boxHeightPx: number, offset
 }
 
 // The page text height in px, capping how tall an image can be stretched. Read live
-// from the :root vars the editor maintains (orientation/margins change them).
-export function pageContentHeightPx(): number {
+// from the :root vars the editor maintains (orientation/margins change them). A frame in
+// a header or footer may reach over the whole page.
+export function pageContentHeightPx(frame?: Element): number {
   const cs = getComputedStyle(document.documentElement);
+  if (frame?.closest('.hf-zone')) return parseFloat(cs.getPropertyValue('--user-page-height')) || 4000;
   const h =
     parseFloat(cs.getPropertyValue('--user-page-height')) -
     parseFloat(cs.getPropertyValue('--user-margin-top')) -
@@ -611,6 +629,7 @@ class ImageView {
     d.style.top = '';
     d.style.left = '';
     this.rotor.style.top = '';
+    clearPagePlace(d);
     const a = this.node.attrs;
     if (typeof a.anchorPage === 'number' && a.anchorPage > 0) {
       this.applyPageAnchor(a.anchorPage);
@@ -816,7 +835,7 @@ class ImageView {
     // The wrapper is axis-aligned, so its scaled/unscaled width ratio is the zoom.
     const zoom = this.dom.getBoundingClientRect().width / this.dom.offsetWidth || 1;
     const maxW = this.boxMaxWidth();
-    const maxH = pageContentHeightPx();
+    const maxH = pageContentHeightPx(this.dom);
     const sx = event.clientX;
     const sy = event.clientY;
     const win = this.dom.ownerDocument.defaultView ?? window;
