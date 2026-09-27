@@ -1198,6 +1198,7 @@ const es: Messages = {
     imagesSkipped: 'Algunas imágenes no se han podido leer y se han omitido',
     shapesRemoved: 'Se han eliminado formas no admitidas',
     drawingsRemoved: 'Se han eliminado los dibujos',
+    structureRepaired: 'Algunos contenidos no encajaban en la estructura del documento y se han ajustado',
     noDictionary: (tag) => `El idioma de revisión «${tag}» no tiene diccionario incluido: se ha desactivado la revisión ortográfica`,
     hfFlattened: 'Las listas y tablas de los encabezados o pies se han convertido en texto',
     hfBoxFlattened: 'Los cuadros de texto de los encabezados o pies se han convertido en texto',

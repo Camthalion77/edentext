@@ -14,6 +14,8 @@
   import { loadRecentFiles, rememberRecentFile, readRecentFile, forgetRecentFile, forgetRecentFiles, pruneRecentFiles, type RecentFile } from './lib/storage/recentFiles';
   import { isProtected, decryptPackage, WRONG_PASSWORD } from './lib/crypto/protect';
   import { convertUnsupportedImages } from './lib/import/imageFormats';
+  import { repairContent } from './lib/import/repairContent';
+  import en from './lib/i18n/locales/en';
   import { getPageBreakDebug } from './lib/editor/extensions/pageBreaks';
   import { RECORDING } from './lib/editor/extensions/trackChanges';
   import { getColumnsFlowDebug } from './lib/editor/extensions/columnsFlow';
@@ -836,6 +838,11 @@
           isDocx = !isDocx;
         } catch { throw err; }
       }
+      const { content, error: structureError } = repairContent(result.content, editor.schema);
+      if (structureError) {
+        console.warn('[import] Repaired invalid structure:', structureError);
+        result.warnings.push(en.importWarn.structureRepaired);
+      }
 
       const hasContent = editor.state.doc.textContent.length > 0 || editor.state.doc.childCount > 1;
       if (hasContent && !confirm(t().dialogs.confirmReplace)) {
@@ -848,7 +855,7 @@
       void saveEmbeddedFonts(result.fonts);
       noteEmbeddedFonts(result.fonts.map((f) => f.family));
 
-      loadContent(result.content); // onUpdate fires → autosave
+      loadContent(content); // onUpdate fires → autosave
       documentEpoch++;
       resetHistory();
       // Adopt the opened file's name as the document name (drives the save filename).

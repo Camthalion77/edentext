@@ -1203,6 +1203,7 @@ const de: Messages = {
     imagesSkipped: 'Einige Bilder konnten nicht gelesen werden und wurden übersprungen',
     shapesRemoved: 'Nicht unterstützte Formen wurden entfernt',
     drawingsRemoved: 'Zeichnungen wurden entfernt',
+    structureRepaired: 'Einige Inhalte passten nicht in die Dokumentstruktur und wurden angepasst',
     noDictionary: (tag) => `Für die Rechtschreibsprache „${tag}" ist kein Wörterbuch enthalten — die Rechtschreibprüfung wurde deaktiviert`,
     hfFlattened: 'Listen/Tabellen in Kopf- oder Fußzeilen wurden in Text umgewandelt',
     hfBoxFlattened: 'Textfelder in Kopf- oder Fußzeilen wurden in Text umgewandelt',

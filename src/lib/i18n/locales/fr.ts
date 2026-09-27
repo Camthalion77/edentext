@@ -1202,6 +1202,7 @@ const fr: Messages = {
     imagesSkipped: 'Certaines images n’ont pas pu être lues et ont été ignorées',
     shapesRemoved: 'Les formes non prises en charge ont été supprimées',
     drawingsRemoved: 'Les dessins ont été supprimés',
+    structureRepaired: 'Certains contenus ne correspondaient pas à la structure du document et ont été ajustés',
     noDictionary: (tag) => `La langue de vérification orthographique « ${tag} » ne dispose d’aucun dictionnaire intégré : la vérification orthographique a été désactivée`,
     hfFlattened: 'Les listes et tableaux des en-têtes ou pieds de page ont été convertis en texte',
     hfBoxFlattened: 'Les zones de texte des en-têtes ou pieds de page ont été converties en texte',

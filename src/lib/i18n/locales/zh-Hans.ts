@@ -1195,6 +1195,7 @@ const zhHans: Messages = {
     imagesSkipped: '有些图片无法读取，已跳过',
     shapesRemoved: '不支持的形状已被移除',
     drawingsRemoved: '绘图已被移除',
+    structureRepaired: '部分内容不符合文档结构，已作调整',
     noDictionary: (tag: string) => `拼写检查语言“${tag}”没有随附词典——已关闭拼写检查`,
     hfFlattened: '页眉或页脚中的列表/表格已展平为文本',
     hfBoxFlattened: '页眉或页脚中的文本框已展平为文本',

@@ -1197,6 +1197,7 @@ const pt: Messages = {
     imagesSkipped: 'Não foi possível ler algumas imagens, que foram ignoradas',
     shapesRemoved: 'As formas não suportadas foram removidas',
     drawingsRemoved: 'Os desenhos foram removidos',
+    structureRepaired: 'Alguns conteúdos não se ajustavam à estrutura do documento e foram ajustados',
     noDictionary: (tag) => `O idioma de verificação ortográfica « ${tag} » não tem dicionário integrado: a verificação ortográfica foi desativada`,
     hfFlattened: 'Listas e tabelas em cabeçalhos ou rodapés foram convertidas em texto',
     hfBoxFlattened: 'Caixas de texto em cabeçalhos ou rodapés foram convertidas em texto',

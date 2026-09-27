@@ -1212,6 +1212,7 @@ const en = {
     imagesSkipped: 'Some images could not be read and were skipped',
     shapesRemoved: 'Unsupported shapes were removed',
     drawingsRemoved: 'Drawings were removed',
+    structureRepaired: 'Some content did not fit the document structure and was adjusted',
     noDictionary: (tag: string) => `Spell-check language "${tag}" has no bundled dictionary — spell check was turned off`,
     hfFlattened: 'Lists/tables in headers or footers were flattened to text',
     hfBoxFlattened: 'Text boxes in headers or footers were flattened to text',

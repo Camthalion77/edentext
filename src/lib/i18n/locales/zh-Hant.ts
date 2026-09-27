@@ -1196,6 +1196,7 @@ const zhHant: Messages = {
     imagesSkipped: '有些圖片無法讀取，已略過',
     shapesRemoved: '不支援的圖案已被移除',
     drawingsRemoved: '繪圖已被移除',
+    structureRepaired: '部分內容不符合文件結構，已作調整',
     noDictionary: (tag: string) => `拼字檢查語言「${tag}」沒有隨附字典——已關閉拼字檢查`,
     hfFlattened: '頁首或頁尾中的清單/表格已攤平為文字',
     hfBoxFlattened: '頁首或頁尾中的文字方塊已攤平為文字',

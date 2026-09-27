@@ -24,6 +24,8 @@ editor defaults must remain implicit, or each round trip accumulates formatting.
 Fit imported content to the editor schema without changing its semantic role: paragraph,
 heading, list, table, frame, note, and field paths have separate constraints. Keep ODF and
 DOCX behavior aligned unless the formats expose an unavoidable difference.
+`repairContent.ts` checks the imported body against the schema on open; content it rejects is
+refitted and reported as a warning. It is a safety net: an importer still emits valid structure.
 
 Both formats carry western, asian and complex-script text properties side by side. The
 **font** is read as a pair: `fontFamily` from the western slot, `fontFamilyAsian` from the
