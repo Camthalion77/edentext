@@ -1034,6 +1034,15 @@ const de: Messages = {
       capitalize: 'Jedes Wort großschreiben',
       smallCaps: 'Kapitälchen',
     },
+    emphasis: {
+      title: 'Betonungszeichen',
+      none: 'Keine',
+      dotBelow: 'Punkt unten',
+      dotAbove: 'Punkt oben',
+      circle: 'Kreis',
+      disc: 'Scheibe',
+      accent: 'Akzent',
+    },
     lineStyles: {
       solid: 'Einfach',
       double: 'Doppelt',

@@ -39,6 +39,7 @@ import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
 import { parseBorderAttr, type BorderSide } from '../editor/extensions/tableCellBorders';
 import { parseCellPadding, DEFAULT_CELL_PADDING } from '../editor/extensions/tableCellPadding';
 import { parseTabStops, type TabAlign } from '../editor/extensions/tabStops';
+import { emphasisToWord, isEmphasis } from '../editor/extensions/textEffects';
 import { firstLineCm, leftCm, rightCm } from '../editor/extensions/indent';
 import { charStyleProps, listMarkerFormat } from '../editor/extensions/listMarker';
 import { effectiveOrderedDefAt, formatOrdinal, childCycle, orderedTypeDef, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
@@ -552,6 +553,8 @@ function runPropsFromMarks(marks: TiptapNode['marks'] = [], force: TextProps = {
   // Half-points, as Word writes them: LibreOffice takes the number and ignores a unit
   // behind it. The library's type wants the unit, the file does not.
   if (typeof pos === 'number' && pos) props.position = String(Math.round(pos * 2)) as `${number}pt`;
+  const em = ts?.attrs?.emphasis;
+  if (isEmphasis(em)) props.emphasisMark = { type: emphasisToWord(em) as 'dot' };
 
   const font = fontPair(ts?.attrs?.fontFamily ?? force.fontFamily, ts?.attrs?.fontFamilyAsian ?? force.fontFamilyAsian, screenToDoc);
   if (font) props.font = font;
@@ -1138,6 +1141,7 @@ function txbxRunPropsXml(marks: TiptapNode['marks'] = [], blockLangs: unknown[] 
   else if (caps === 'uppercase') parts.push('<w:caps/>');
   const pos = ts?.attrs?.textPosition;
   if (typeof pos === 'number' && pos) parts.push(`<w:position w:val="${Math.round(pos * 2)}"/>`);
+  if (isEmphasis(ts?.attrs?.emphasis)) parts.push(`<w:em w:val="${emphasisToWord(ts.attrs.emphasis)}"/>`);
   const col = ts?.attrs?.color;
   if (col) {
     const h = hexColor(String(col));

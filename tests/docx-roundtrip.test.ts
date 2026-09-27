@@ -47,6 +47,8 @@ describe('DOCX export → import round trip', () => {
         text('petite ', [{ type: 'textStyle', attrs: { caps: 'smallCaps' } }]),
         text('dotted ', [{ type: 'underline', attrs: { lineStyle: 'dotted', lineColor: '#FF0000' } }]),
         text('crossed ', [{ type: 'strike', attrs: { lineStyle: 'double' } }]),
+        text('stressed ', [{ type: 'textStyle', attrs: { emphasis: 'dot below' } }]),
+        text('ringed ', [{ type: 'textStyle', attrs: { emphasis: 'circle above' } }]),
         text('raised', [{ type: 'textStyle', attrs: { fontSize: '14pt', textPosition: 3 } }]),
       ]),
       { type: 'paragraph', attrs: { fontSize: '22pt', textAlign: 'center' } }, // empty sized line
@@ -311,7 +313,7 @@ describe('DOCX export → import round trip', () => {
     expect(mlSub.attrs?.listStyleType ?? null).toBe(null);
   });
 
-  it('round-trips the character effects (case, line shapes, raised run)', () => {
+  it('round-trips the character effects (case, line shapes, emphasis, raised run)', () => {
     const runs = walk(doc, 'text');
     const of = (t: string) => runs.find((r: N) => r.text === t)!.marks!;
     const attrs = (t: string, type: string) => of(t).find((m: N) => m.type === type)!.attrs!;
@@ -320,6 +322,18 @@ describe('DOCX export → import round trip', () => {
     expect(attrs('dotted ', 'underline')).toMatchObject({ lineStyle: 'dotted', lineColor: '#FF0000' });
     expect(attrs('crossed ', 'strike').lineStyle).toBe('double');
     expect(attrs('raised', 'textStyle').textPosition).toBe(3);
+    expect(documentXml).toMatch(/<w:em w:val="underDot"\/>/);
+    expect(attrs('stressed ', 'textStyle').emphasis).toBe('dot below');
+    expect(attrs('ringed ', 'textStyle').emphasis).toBe('circle above');
+  });
+
+  it("reads Word's emphasis marks as LibreOffice does", async () => {
+    const files = unzipSync(await buildDocx({ type: 'doc', content: [para('a'), para('b')] }));
+    const vals = ['dot', 'none'];
+    let i = 0;
+    files['word/document.xml'] = strToU8(strFromU8(files['word/document.xml']).replace(/<w:r>/g, () => `<w:r><w:rPr><w:em w:val="${vals[i++]}"/></w:rPr>`));
+    const runs = walk(importDocx(zipSync(files)).content, 'text');
+    expect(runs.map((r: N) => markAttrs(r, 'textStyle')?.emphasis ?? null)).toEqual(['dot above', null]);
   });
 
   it('round-trips the image (size + floating wrap)', () => {

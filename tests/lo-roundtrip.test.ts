@@ -68,6 +68,7 @@ const fixture: N = {
       T('dotted ', { type: 'underline', attrs: { lineStyle: 'dotted', lineColor: '#FF0000' } }),
       T('twice ', { type: 'underline', attrs: { lineStyle: 'double' } }),
       T('crossed ', { type: 'strike', attrs: { lineStyle: 'double' } }),
+      T('stressed ', { type: 'textStyle', attrs: { emphasis: 'dot below' } }),
       // 4pt at 16pt is a whole 25%, the unit ODF stores it in — LibreOffice rounds
       // the percentage when it re-saves, so a fractional one comes back a notch off.
       T('raised', { type: 'textStyle', attrs: { fontSize: '16pt', textPosition: 4 } }),

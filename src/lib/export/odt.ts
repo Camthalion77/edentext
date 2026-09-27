@@ -27,6 +27,7 @@ import { outlineIsEmpty, type OutlineLevel, type OutlineNumbering } from '../sty
 // Options), collected by exportTable in document order.
 type TableStyleRef = { name: string; look: TableLook };
 import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
+import { isEmphasis } from '../editor/extensions/textEffects';
 import { BORDER_SIDES, parseBorderAttr } from '../editor/extensions/tableCellBorders';
 import { parseCellPadding, DEFAULT_CELL_PADDING, type CellPadding } from '../editor/extensions/tableCellPadding';
 import { TEXTBOX_PADDING_CM, type TextVAlign } from '../editor/extensions/textBox';
@@ -3694,6 +3695,8 @@ export function odfExtraTextProps(marks: TiptapNode['marks'] = [], baseSizePt = 
   else if (typeof st?.lineStyle === 'string' && ODF_LINE_STYLE[st.lineStyle]) {
     a.push(`style:text-line-through-style="${ODF_LINE_STYLE[st.lineStyle]}"`);
   }
+  const em = marks.find(m => m.type === 'textStyle')?.attrs?.emphasis;
+  if (isEmphasis(em)) a.push(`style:text-emphasize="${em}"`);
   // ODF places a raised run in percent of its font size, Word and the editor in pt.
   const pos = marks.find(m => m.type === 'textStyle')?.attrs?.textPosition;
   if (typeof pos === 'number' && pos) {

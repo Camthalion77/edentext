@@ -21,7 +21,7 @@
   import { isInHeaderCell } from '../../../editor/extensions/tableHeaderRow';
   import { cellRegionText } from '../../../editor/extensions/tableStyle';
   import { styleSheet } from '../../../styles/sheet.svelte';
-  import type { CapsMode, LineStyle } from '../../../editor/extensions/textEffects';
+  import { emphasisCss, type CapsMode, type Emphasis, type LineStyle } from '../../../editor/extensions/textEffects';
   import type { StyleFamily } from '../../../styles/styleSheet';
   import { t } from '../../../i18n/i18n.svelte';
   import { withShortcut } from '../../../i18n/shortcut';
@@ -59,6 +59,7 @@
   let isItalic = $derived(tick >= 0 && !!editor?.isActive('italic'));
   let isUnderline = $derived(tick >= 0 && !!editor?.isActive('underline'));
   let isStrike = $derived(tick >= 0 && !!editor?.isActive('strike'));
+  let emphasis = $derived(tick >= 0 ? editor?.getAttributes('textStyle').emphasis ?? null : null);
   let isSuper = $derived(tick >= 0 && !!editor?.isActive('superscript'));
   let isSub = $derived(tick >= 0 && !!editor?.isActive('subscript'));
   let isBulletList = $derived(tick >= 0 && !!editor?.isActive('bulletList'));
@@ -93,6 +94,21 @@
   }
 
   const LINE_STYLES: LineStyle[] = ['solid', 'double', 'dotted', 'dashed', 'wavy'];
+
+  // Chinese sets its emphasis dots below the characters, so that is the button's own.
+  const EMPHASES: { mode: Emphasis | null; key: 'none' | 'dotBelow' | 'dotAbove' | 'circle' | 'disc' | 'accent' }[] = [
+    { mode: null, key: 'none' },
+    { mode: 'dot below', key: 'dotBelow' },
+    { mode: 'dot above', key: 'dotAbove' },
+    { mode: 'circle above', key: 'circle' },
+    { mode: 'disc above', key: 'disc' },
+    { mode: 'accent above', key: 'accent' },
+  ];
+
+  function setEmphasis(mode: Emphasis | null) {
+    closeMenu();
+    editor?.chain().focus().setMark('textStyle', { emphasis: mode }).run();
+  }
 
   // The mark has to exist before its line style means anything, so turn it on too.
   function setLineStyle(mark: 'underline' | 'strike', style: LineStyle) {
@@ -266,6 +282,18 @@
           </div>
         {/if}
       </div>
+      <div class="rb-menu-wrap" use:clickOutside={'emphasis'}>
+        <RibbonButton content={emphasisIcon} title={t().ribbon.emphasis.title} active={!!emphasis} caret caretActive={isMenuOpen('emphasis')} onclick={() => editor?.chain().focus().setMark('textStyle', { emphasis: emphasis ? null : 'dot below' }).run()} onCaret={() => toggleMenu('emphasis')} />
+        {#if isMenuOpen('emphasis')}
+          <div class="ribbon-menu line-menu" use:anchored role="menu">
+            {#each EMPHASES as e}
+              <button onclick={() => setEmphasis(e.mode)}>
+                <span class="line-sample" style={e.mode ? emphasisCss(e.mode) : null}>{t().ribbon.emphasis[e.key]}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
       <RibbonButton content={subIcon} title={`${t().toolbarExpanded.subscript} (${shortcutHint('subscript')})`} active={isSub} onclick={toggleSub} />
       <RibbonButton content={superIcon} title={`${t().toolbarExpanded.superscript} (${shortcutHint('superscript')})`} active={isSuper} onclick={toggleSuper} />
       <span class="rb-mini-sep"></span>
@@ -410,6 +438,7 @@
 {#snippet boldIcon()}<span class="glyph" style="font-weight: 800">B</span>{/snippet}
 {#snippet italicIcon()}<span class="glyph" style="font-style: italic; font-family: serif">I</span>{/snippet}
 {#snippet underlineIcon()}<span class="glyph" style="text-decoration: underline">U</span>{/snippet}
+{#snippet emphasisIcon()}<span class="glyph" style="text-emphasis: filled dot; text-emphasis-position: under right">文</span>{/snippet}
 {#snippet strikeIcon()}<span class="glyph" style="text-decoration: line-through">S</span>{/snippet}
 {#snippet subIcon()}<span class="glyph">X<span class="glyph-script down">2</span></span>{/snippet}
 {#snippet superIcon()}<span class="glyph">X<span class="glyph-script up">2</span></span>{/snippet}

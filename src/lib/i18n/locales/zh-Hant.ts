@@ -1029,6 +1029,15 @@ const zhHant: Messages = {
       capitalize: '每個字首字母大寫',
       smallCaps: '小型大寫字',
     },
+    emphasis: {
+      title: '著重號',
+      none: '無',
+      dotBelow: '下方圓點',
+      dotAbove: '上方圓點',
+      circle: '圓圈',
+      disc: '實心圓',
+      accent: '重音符',
+    },
     lineStyles: {
       solid: '單線',
       double: '雙線',

@@ -1043,6 +1043,15 @@ const ru: Messages = {
       capitalize: 'Каждое Слово С Прописной Буквы',
       smallCaps: 'Малые прописные',
     },
+    emphasis: {
+      title: 'Знак выделения',
+      none: 'Нет',
+      dotBelow: 'Точка снизу',
+      dotAbove: 'Точка сверху',
+      circle: 'Круг',
+      disc: 'Диск',
+      accent: 'Акцент',
+    },
     lineStyles: {
       solid: 'Одинарная',
       double: 'Двойная',

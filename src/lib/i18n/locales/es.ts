@@ -1029,6 +1029,15 @@ const es: Messages = {
       capitalize: 'Cada Palabra En Mayúscula',
       smallCaps: 'Versalitas',
     },
+    emphasis: {
+      title: 'Signo de énfasis',
+      none: 'Ninguno',
+      dotBelow: 'Punto debajo',
+      dotAbove: 'Punto encima',
+      circle: 'Círculo',
+      disc: 'Disco',
+      accent: 'Acento',
+    },
     lineStyles: {
       solid: 'Sencilla',
       double: 'Doble',

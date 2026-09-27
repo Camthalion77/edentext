@@ -1033,6 +1033,15 @@ const fr: Messages = {
       capitalize: 'Majuscule À Chaque Mot',
       smallCaps: 'Petites capitales',
     },
+    emphasis: {
+      title: "Signe d'accentuation",
+      none: 'Aucun',
+      dotBelow: 'Point dessous',
+      dotAbove: 'Point dessus',
+      circle: 'Cercle',
+      disc: 'Disque',
+      accent: 'Accent',
+    },
     lineStyles: {
       solid: 'Simple',
       double: 'Double',

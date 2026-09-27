@@ -12,7 +12,7 @@ import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
 import { fitInlineImage, framePx } from '../editor/extensions/image';
 import { odfChartDataUrl } from './chart';
 import { formatTabStops, normalizeLeader } from '../editor/extensions/tabStops';
-import type { CapsMode, LineStyle } from '../editor/extensions/textEffects';
+import { isEmphasis, type CapsMode, type LineStyle } from '../editor/extensions/textEffects';
 import {
   TABLE_REGIONS, builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr,
   type TableLook, type TableRegion,
@@ -2828,6 +2828,8 @@ function marksFor(props: PropMap, resolver: StyleResolver, defaults: BlockDefaul
 
   const caps = capsFromOdf(props);
   if (caps && caps !== defaults.caps) textStyle.caps = caps;
+  const em = props['style:text-emphasize'];
+  if (isEmphasis(em)) textStyle.emphasis = em;
 
   const langs = langTagsOfProps(props);
   if (langs.west && langs.west !== defaults.lang) textStyle.lang = langs.west;

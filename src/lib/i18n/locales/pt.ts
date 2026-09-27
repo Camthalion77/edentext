@@ -1027,6 +1027,15 @@ const pt: Messages = {
       capitalize: 'Cada Palavra Em Maiúscula',
       smallCaps: 'Versaletes',
     },
+    emphasis: {
+      title: 'Marca de ênfase',
+      none: 'Nenhuma',
+      dotBelow: 'Ponto abaixo',
+      dotAbove: 'Ponto acima',
+      circle: 'Círculo',
+      disc: 'Disco',
+      accent: 'Acento',
+    },
     lineStyles: {
       solid: 'Simples',
       double: 'Duplo',

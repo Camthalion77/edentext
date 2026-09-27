@@ -2209,6 +2209,7 @@ function marksFor(props: RunProps, defaults: BlockDefaults, inLink: boolean): Ma
 
   if (props.caps && props.caps !== defaults.caps) textStyle.caps = props.caps;
   if (props.positionPt) textStyle.textPosition = props.positionPt;
+  if (props.emphasis) textStyle.emphasis = props.emphasis;
   if (props.lang && props.lang !== defaults.lang) textStyle.lang = props.lang;
   if (props.langEastAsia && props.langEastAsia !== defaults.langAsian) textStyle.langAsian = props.langEastAsia;
 

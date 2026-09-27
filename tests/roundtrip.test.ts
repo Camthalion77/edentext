@@ -84,6 +84,7 @@ const fixture: N = {
       T('twice ', { type: 'underline', attrs: { lineStyle: 'double' } }),
       T('crossed ', { type: 'strike', attrs: { lineStyle: 'double' } }),
       T('waved ', { type: 'strike', attrs: { lineStyle: 'wavy' } }),
+      T('stressed ', { type: 'textStyle', attrs: { emphasis: 'dot below' } }),
       T('raised', { type: 'textStyle', attrs: { fontSize: '14pt', textPosition: 3 } }),
     ),
     P(null,

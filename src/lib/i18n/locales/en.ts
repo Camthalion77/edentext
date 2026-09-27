@@ -1041,6 +1041,15 @@ const en = {
       capitalize: 'Capitalize Each Word',
       smallCaps: 'Small caps',
     },
+    emphasis: {
+      title: 'Emphasis mark',
+      none: 'None',
+      dotBelow: 'Dot below',
+      dotAbove: 'Dot above',
+      circle: 'Circle',
+      disc: 'Disc',
+      accent: 'Accent',
+    },
     lineStyles: {
       solid: 'Single',
       double: 'Double',

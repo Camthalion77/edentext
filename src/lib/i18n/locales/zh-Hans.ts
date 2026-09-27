@@ -1028,6 +1028,15 @@ const zhHans: Messages = {
       capitalize: '每个单词首字母大写',
       smallCaps: '小型大写字母',
     },
+    emphasis: {
+      title: '着重号',
+      none: '无',
+      dotBelow: '下方圆点',
+      dotAbove: '上方圆点',
+      circle: '圆圈',
+      disc: '实心圆',
+      accent: '重音符',
+    },
     lineStyles: {
       solid: '单线',
       double: '双线',

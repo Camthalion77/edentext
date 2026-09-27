@@ -1030,6 +1030,15 @@ const ja: Messages = {
       capitalize: '各単語の先頭文字を大文字にする',
       smallCaps: '小型英大文字',
     },
+    emphasis: {
+      title: '圏点',
+      none: 'なし',
+      dotBelow: '下に点',
+      dotAbove: '上に点',
+      circle: '白丸',
+      disc: '黒丸',
+      accent: 'ゴマ点',
+    },
     lineStyles: {
       solid: '一重線',
       double: '二重線',
