@@ -69,7 +69,10 @@ recoverable text.
 
 Use the default paragraph style and named style chain as the DOCX yardstick. Word's `Normal`
 maps to the registry default even if its display name differs. A heading can be identified by
-outline level as well as style name, and must never become a list item.
+outline level as well as style name, and must never become a list item. WPS repeats the chapter
+numbering's `w:numPr` on every heading paragraph; that stays chapter numbering, and where the
+heading style carries none, the first heading of a level supplies it. Chapter numbering takes
+every list format, the CJK ones included.
 
 Resolve table borders and conditional table-style areas before baking them into cells, because
 the editor registry does not retain file table styles. Honor compatibility mode when interpreting

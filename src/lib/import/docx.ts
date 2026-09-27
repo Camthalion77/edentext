@@ -16,7 +16,7 @@ import { TEXTBOX_PADDING_CM } from '../editor/extensions/textBox';
 import { formatTabStops, parseTabStops, type TabStop } from '../editor/extensions/tabStops';
 import type { CapsMode, LineStyle } from '../editor/extensions/textEffects';
 import { builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr } from '../styles/tableStyles';
-import { formatOrdinal, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
+import { formatOrdinal, knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromDocx } from '../utils/bulletListTypes';
 import { DATE_FORMATS, TIME_FORMATS, docxPicture, findFormat, toDateValue } from '../utils/dateTime';
 import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath } from '../utils/shapes';
@@ -73,6 +73,9 @@ type Ctx = {
   imageCache: Map<string, string>;
   convertedImages: ConvertedImages;
   listCounters: Map<number, Map<number, number>>; // numId → ilvl → last number used
+  // Heading level → the first w:numPr a heading of it states on itself, for chapter
+  // numbering where the heading style carries none.
+  headingNumPr: Map<number, { numId: number; ilvl: number }>;
   usedListStyles: Map<number, string>; // numId → the named numbering style it links to
   // Text width (cm) of the file's page setup; a table's margins are relative to it.
   contentWidthCm: number;
@@ -250,7 +253,7 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
   const sectPr = fc(body, 'sectPr');
   const contentWidthCm = sectionContentWidthCm(sectPr);
   const leftMarginCm = twipToCm(intAttr(fc(sectPr, 'pgMar'), W, 'left') ?? 1440);
-  const ctx: Ctx = { styles, styleNames, usedStyles: new Set(), charStyleNames, usedCharStyles: new Set(), warnings, files, rels: parseRels(files['word/_rels/document.xml.rels']), imageCache: new Map(), convertedImages, listCounters: new Map(), usedListStyles: new Map(), contentWidthCm, leftMarginCm, pageRtl: sectPrRtl(sectPr), mainLang: docLangs.main, hyphenate: docSetting(files, 'autoHyphenation'), cellSpacing: {}, tblIndToText: tblIndIsToText(files), accents: themeAccents(themeDoc), themeColors: themeColors(themeDoc), openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), commentDefs: docxComments(files), bibSources: docxSources(files), citationStyle: docxCitationStyle(files), notes: [], noteParts: {
+  const ctx: Ctx = { styles, styleNames, usedStyles: new Set(), charStyleNames, usedCharStyles: new Set(), warnings, files, rels: parseRels(files['word/_rels/document.xml.rels']), imageCache: new Map(), convertedImages, listCounters: new Map(), headingNumPr: new Map(), usedListStyles: new Map(), contentWidthCm, leftMarginCm, pageRtl: sectPrRtl(sectPr), mainLang: docLangs.main, hyphenate: docSetting(files, 'autoHyphenation'), cellSpacing: {}, tblIndToText: tblIndIsToText(files), accents: themeAccents(themeDoc), themeColors: themeColors(themeDoc), openBookmarks: new Map(), pointBookmarks: new Set(), openComments: new Map(), commentDefs: docxComments(files), bibSources: docxSources(files), citationStyle: docxCitationStyle(files), notes: [], noteParts: {
     footnote: noteParts(files, 'footnotes', 'footnote'),
     endnote: noteParts(files, 'endnotes', 'endnote'),
   }, noteBookmarks: new Map() };
@@ -761,13 +764,16 @@ function nextListNumber(ctx: Ctx, numId: number, ilvl: number): number {
 
 function paragraphNum(el: Element, ctx: Ctx): { numId: number; ilvl: number } | null {
   const ppr = fc(el, 'pPr');
-  let np: { numId: number; ilvl: number } | null = null;
   const numPr = fc(ppr, 'numPr');
-  if (numPr) np = readNumPr(numPr);
+  let np = numPr ? readNumPr(numPr) : null;
+  // A numbered heading is chapter numbering, never a list item — whether the numbering
+  // rides its style, the paragraph (WPS repeats it there) or both.
+  const level = headingLevelOf(ppr, ctx);
+  if (level != null) {
+    if (np && np.numId !== 0 && !ctx.headingNumPr.has(level)) ctx.headingNumPr.set(level, np);
+    return null;
+  }
   if (!np) {
-    // Chapter numbering rides the heading styles' own w:numPr, which is how both
-    // products write it — a numbered heading is a heading, never a list item.
-    if (headingLevelOf(ppr, ctx) != null) return null;
     const ps = fc(ppr, 'pStyle');
     np = ctx.styles.styleNumPr(ps ? wVal(ps) : null);
   }
@@ -1113,9 +1119,11 @@ function outlineFromDocx(ctx: Ctx): OutlineNumbering | null {
   let numbered = false;
   for (let level = 1; level <= MAX_OUTLINE_LEVELS; level++) {
     const styleId = byName.get(`heading${level}`) ?? `Heading${level}`;
-    const np = ctx.styles.styleNumPr(styleId);
-    const def = np ? ctx.styles.level(np.numId, np.ilvl) : null;
-    const format = def?.numFmt ? DOCX_PAGE_NUM_FORMAT[def.numFmt] : null;
+    const np = ctx.styles.styleNumPr(styleId) ?? ctx.headingNumPr.get(level);
+    const def = np && np.numId !== 0 ? ctx.styles.level(np.numId, np.ilvl) : null;
+    // wordFmtChar falls back to decimal, which only a decimal level is.
+    const fmt = def?.numFmt ? knownNumFormat(wordFmtChar(def.numFmt)) : null;
+    const format = fmt === '1' && def?.numFmt !== 'decimal' ? null : fmt;
     if (!def || !format) { out.push({ ...DEFAULT_OUTLINE_LEVEL }); continue; }
     numbered = true;
     const text = def.lvlText ?? '';

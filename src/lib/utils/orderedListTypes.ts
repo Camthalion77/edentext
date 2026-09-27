@@ -201,6 +201,12 @@ const HALF_WIDTH_KANA: Record<string, CjkNumFormat> = {
   'ｲ, ﾛ, ﾊ, ...': 'イ, ロ, ハ, ...',
 };
 
+// An ODF style:num-format the lists render, else null (a bullet, 'none', an unknown one).
+export function knownNumFormat(numFormat: string | null): OrderedTypeDef['numFormat'] | null {
+  const f = HALF_WIDTH_KANA[numFormat ?? ''] ?? numFormat;
+  return ORDERED_LIST_TYPES.find(t => t.numFormat === f)?.numFormat ?? null;
+}
+
 // Reverse lookup for the ODT importer: ODF numbering attrs → listStyleType key.
 // Unknown formats (e.g. figure numbering) fall back to decimal.
 export function orderedTypeFromFormat(numFormat: string | null, numSuffix: string | null): OrderedListType {

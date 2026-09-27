@@ -17,7 +17,7 @@ import {
   TABLE_REGIONS, builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr,
   type TableLook, type TableRegion,
 } from '../styles/tableStyles';
-import { orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
+import { knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromOdf } from '../utils/bulletListTypes';
 import { docxPicture, matchFormat, toDateValue, type Token } from '../utils/dateTime';
 import {
@@ -1759,8 +1759,8 @@ function outlineFromOdf(el: Element | null, ctx: Ctx): OutlineNumbering | null {
   for (let level = 1; level <= MAX_OUTLINE_LEVELS; level++) {
     const def = Array.from(el.children).find(
       (c) => c.localName === 'outline-level-style' && c.getAttributeNS(NS.text, 'level') === String(level));
-    const format = def?.getAttributeNS(NS.style, 'num-format') ?? '';
-    if (!def || !['1', 'a', 'A', 'i', 'I'].includes(format)) {
+    const format = def ? knownNumFormat(def.getAttributeNS(NS.style, 'num-format')) : null;
+    if (!def || !format) {
       out.push({ ...DEFAULT_OUTLINE_LEVEL });
       continue;
     }
@@ -1770,7 +1770,7 @@ function outlineFromOdf(el: Element | null, ctx: Ctx): OutlineNumbering | null {
     const labelText = charStyle ? textPropsFromOdf(ctx.resolver.spanTextProps(charStyle), ctx.resolver) : null;
     const geometry = outlineLevelGeometry(def);
     out.push({
-      format: format as NoteNumFormat,
+      format,
       prefix: def.getAttributeNS(NS.style, 'num-prefix') ?? '',
       suffix: (def.getAttributeNS(NS.style, 'num-suffix') ?? '') + geometry.pad,
       displayLevels: Math.max(1, parseInt(def.getAttributeNS(NS.text, 'display-levels') ?? '1', 10) || 1),
