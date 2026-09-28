@@ -1641,7 +1641,7 @@ export const PageBreaks = Extension.create({
                   naturalY: 0,
                 });
               } else if (effectiveTop >= contentEnd) {
-                const target = pageContentStart(page + 1, vm.top, grid);
+                const target = pageContentStart(page + 1, topRest, grid);
                 const { docPos, row } = leafSpacer(leaf);
                 breaks.push({
                   height: target - effectiveTop,
@@ -1669,7 +1669,7 @@ export const PageBreaks = Extension.create({
                   } else if (leaf.naturalHeight <= CONTENT_HEIGHT || cf) {
                     // A columns fragment may be pushed even when taller than a page:
                     // the flow splits it again once it sits at the next page top.
-                    const target = pageContentStart(page + 1, vm.top, grid);
+                    const target = pageContentStart(page + 1, topRest, grid);
                     const { docPos, row } = leafSpacer(leaf);
                     breaks.push({
                       height: target - effectiveTop,
@@ -1697,7 +1697,7 @@ export const PageBreaks = Extension.create({
                   while (boundaryNatural < leaf.naturalHeight) {
                     const split = findLineSplit(leaf.el, boundaryNatural, scale, minLines);
                     if (split === null) break;
-                    const target = pageContentStart(targetPage, vm.top, grid);
+                    const target = pageContentStart(targetPage, topRest, grid);
                     const h = target - (effectiveTop + extraShift + split.naturalLineTop);
                     if (h <= 0) break;
                     breaks.push({
@@ -1714,7 +1714,7 @@ export const PageBreaks = Extension.create({
                   }
                   if (breaks.length === 0) {
                     if (leaf.naturalHeight <= CONTENT_HEIGHT) {
-                      const target = pageContentStart(page + 1, vm.top, grid);
+                      const target = pageContentStart(page + 1, topRest, grid);
                       breaks.push({
                         height: target - effectiveTop,
                         docPos: preLeafDocPos(leaf.el),
@@ -1746,7 +1746,7 @@ export const PageBreaks = Extension.create({
                   ? Math.min(next.naturalHeight, CONTENT_HEIGHT)
                   : firstLinesHeight(next.el, scale, wantLines) + (parseFloat(getComputedStyle(next.el).paddingTop) || 0);
                 if (effectiveBottom + (leaf.spaceAfter ?? 0) + needed > contentEnd) {
-                  const target = pageContentStart(page + 1, vm.top, grid);
+                  const target = pageContentStart(page + 1, topRest, grid);
                   const { docPos, row } = leafSpacer(leaf);
                   breaks.push({
                     height: target - effectiveTop,
