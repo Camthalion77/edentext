@@ -400,7 +400,11 @@ export function styleCss(sheet: StyleSheet): string {
     rules.push(`.paper .tiptap ${attr} {\n  ${decls.join(';\n  ')};\n}`);
   }
   for (const style of Object.values(sheet.paragraph)) {
-    const decls = declarations(resolveStyle(sheet, style.name));
+    const resolved = resolveStyle(sheet, style.name);
+    const decls = declarations(resolved);
+    // A character indent counts in the style's size, whatever the block's own mark or
+    // runs say (probed in LibreOffice); indent.ts reads it.
+    if (resolved.text.fontSizePt != null) decls.push(`--char-unit: ${resolved.text.fontSizePt}pt`);
     if (!decls.length) continue;
     const attr = `[data-style="${cssString(style.name)}"]`;
     const selectors = [`.paper .tiptap ${attr}`];
