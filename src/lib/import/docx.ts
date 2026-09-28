@@ -2529,9 +2529,10 @@ function anchorOffsetY(anchor: Element): { cm: number | null; fromPage: boolean;
   if (!Number.isFinite(off)) return none;
   // The exporter floors this offset at one twip (LO derails on 0); sub-visible
   // remainders round back to none, not to a 0 that would accrete as an attribute.
-  // A page-relative one keeps its sign — a cover block may start above the page top.
+  // A page-relative one keeps its sign — a cover block may start above the page top —
+  // and so does one in front of or behind the text (anchorWrap drops it for the rest).
   const cm = round2(off / 360000);
-  return { cm: fromPage || fromBody || cm > 0 ? cm : null, fromPage, fromBody };
+  return { cm: fromPage || fromBody || cm !== 0 ? cm : null, fromPage, fromBody };
 }
 
 // The frame's own x in the text column, cm from its left edge. null where the file
@@ -2566,7 +2567,9 @@ function anchorWrap(anchor: Element, ctx: Ctx): { wrap: 'left' | 'right' | 'topB
     const emu = parseInt(anchor.getAttribute(wrap === 'right' ? 'distL' : 'distR') ?? '', 10);
     return Number.isFinite(emu) && emu > 0 ? round2(emu / 360000) : null;
   };
-  const at = (wrap: 'left' | 'right' | 'topBottom' | 'through') => ({ wrap, offsetCm, offsetYCm, fromPage, fromBody, alignH, distCm: distOf(wrap) });
+  // A wrapped frame can't start above its paragraph; a run-through one simply overlaps.
+  const y = (wrap: string) => (offsetYCm != null && offsetYCm < 0 && wrap !== 'through' && !fromPage && !fromBody ? null : offsetYCm);
+  const at = (wrap: 'left' | 'right' | 'topBottom' | 'through') => ({ wrap, offsetCm, offsetYCm: y(wrap), fromPage, fromBody, alignH, distCm: distOf(wrap) });
   // wrapNone is Word's in-front-of / behind-text: the text runs through the frame, so it
   // reserves neither width nor height. behindDoc picks the side of the text it lands on.
   if (anchor.getElementsByTagNameNS(WP, 'wrapNone')[0]) return at('through');

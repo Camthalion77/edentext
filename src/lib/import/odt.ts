@@ -324,7 +324,7 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   const fromBody = rel === 'page-content';
   const y = gp['style:vertical-pos'] === 'from-top' && (!rel || rel.startsWith('paragraph') || rel === 'line' || fromPage || fromBody)
     ? lengthToCm(el.getAttributeNS(NS.svg, 'y')) : null;
-  if (y != null && attrs.wrap && (fromPage || fromBody || y > 0)) {
+  if (y != null && attrs.wrap && (fromPage || fromBody || y > 0 || (attrs.wrap === 'through' && y < 0))) {
     attrs.wrapOffsetY = Math.round(y * 100) / 100;
     if (fromPage) attrs.wrapFromPage = true;
     if (fromBody) attrs.wrapFromBody = true;
