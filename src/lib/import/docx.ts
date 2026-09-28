@@ -1343,10 +1343,12 @@ function convertParagraph(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault:
     if (name !== (level ? `Heading ${level}` : DEFAULT_STYLE)) attrs.styleName = name;
   }
 
-  // The paragraph mark's own run props (w:pPr/w:rPr) set the line-height floor for
-  // every line, not just an empty one — a block whose text is smaller than its style
-  // would otherwise keep the style's taller strut. Carried as a block attr.
-  const fs = paragraphMarkFontSize(ppr, ctx, baseRun, defaults.fontSizePt);
+  // The block's size is the strut of every line. LibreOffice sets a line with text by its
+  // runs alone (probed: a 28pt and a 10pt mark over 12pt text, 4.9mm pitch both), so runs
+  // agreeing on a size set it; the mark's own (w:pPr/w:rPr) only where they do not.
+  const runSize = uniformRunSize(content);
+  const ownSize = Math.abs(ownSizePt - defaults.fontSizePt) > 0.05 ? `${Math.round(ownSizePt * 10) / 10}pt` : null;
+  const fs = runSize !== undefined ? runSize ?? ownSize : paragraphMarkFontSize(ppr, ctx, baseRun, defaults.fontSizePt);
   if (fs) attrs.fontSize = fs;
   const ff = paragraphMarkFont(ppr, ctx, baseRun, defaults);
   if (ff.west) attrs.fontFamily = ff.west;
@@ -1378,6 +1380,14 @@ function applyContextualSpacing(el: Element, ppr: Element | null, ctx: Ctx, styl
 // The paragraph mark's resolved font size (w:pPr/w:rPr, incl. its rStyle), as a CSS
 // pt string, or null when it matches what the block renders at anyway (suppressed
 // like run sizes, against the same yardstick).
+// The size every text run of a block shares: null where each keeps the one it was
+// measured against (`runDefaults`), undefined where there is no text or they differ.
+function uniformRunSize(content: Node[]): string | null | undefined {
+  const sizes = new Set(content.filter((n) => n.type === 'text')
+    .map((n) => (n.marks?.find((m) => m.type === 'textStyle')?.attrs?.fontSize as string | undefined) ?? null));
+  return sizes.size === 1 ? [...sizes][0] : undefined;
+}
+
 function paragraphMarkFontSize(ppr: Element | null, ctx: Ctx, baseRun: RunProps, defaultPt: number): string | null {
   const rPr = fc(ppr, 'rPr');
   const rStyle = fc(rPr, 'rStyle');
