@@ -94,7 +94,7 @@ export async function settle(page, loaded = false) {
   }, loaded, { timeout: 180_000, polling: 500 });
 }
 
-// Runs in the browser: every rendered word with its page and mm position.
+// Runs in the browser: every rendered word and picture with its page and mm position.
 export function extractLayout() {
   const PAGE_GAP = 20, PX_MM = 25.4 / 96;
   const paper = document.querySelector('.paper');
@@ -188,6 +188,16 @@ export function extractLayout() {
       }
     }
   }
+  // Every picture drawn, on the page its middle falls on: a sheet-sized background that
+  // starts a hair above its page would otherwise count to the gap's page above.
+  const images = [];
+  for (const img of paper.querySelectorAll('img')) {
+    const r = img.getBoundingClientRect();
+    if (!r.width || !r.height || skip(img) || getComputedStyle(img).visibility === 'hidden') continue;
+    const y = r.top - origin.top, page = pageAt(y + r.height / 2), box = boxes[page];
+    images.push({ page, x: (r.left - origin.left - box.left) * PX_MM, y: (y - box.top) * PX_MM,
+      w: r.width * PX_MM, h: r.height * PX_MM });
+  }
   // Folded, not spread: a several-hundred-page document has more words than a call
   // takes arguments, and Math.max(...words) then blows the stack instead of measuring.
   // Every page the grid draws counts, a page holding only a picture too, as in the PDF.
@@ -200,6 +210,7 @@ export function extractLayout() {
   const mm = (v) => parseFloat(cs.getPropertyValue(v)) * PX_MM;
   return {
     pages,
+    images,
     margins: { top: mm('--user-margin-top'), bottom: mm('--user-margin-bottom'),
                left: mm('--user-margin-left'), right: mm('--user-margin-right') },
   };
