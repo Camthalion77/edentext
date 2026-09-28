@@ -381,9 +381,21 @@ export function placeFromPage(view: EditorView, el: HTMLElement, grid?: PageGrid
 export function placeInColumn(view: EditorView, el: HTMLElement): void {
   if (!el.isConnected || el.dataset.columnX == null) return;
   el.style.marginLeft = '0px';
+  el.style.marginLeft = `${Math.round(frameColumn(view, el) + (Number(el.dataset.columnX) || 0) - leftInEditor(view, el))}px`;
+}
+
+// The x in cm a drag moves a run-through frame on from: its own, or for one placed in its
+// column without an x, the static place it shows — any x the drag sets counts from the
+// column instead, and starting from 0 would make the frame jump.
+export function freeDragX(view: EditorView, el: HTMLElement, x: unknown): number {
+  if (typeof x === 'number') return x;
+  if (el.dataset.wrap !== 'through' || el.dataset.pageX != null || el.dataset.anchorPage != null) return 0;
+  return Math.round(((leftInEditor(view, el) - frameColumn(view, el)) * 2.54 * 1000) / 96) / 1000;
+}
+
+function frameColumn(view: EditorView, el: HTMLElement): number {
   const box = el.parentElement?.closest<HTMLElement>('td, th, .textbox-content');
-  const column = box ? leftInEditor(view, box) + (parseFloat(getComputedStyle(box).paddingLeft) || 0) : columnLeft(view, el);
-  el.style.marginLeft = `${Math.round(column + (Number(el.dataset.columnX) || 0) - leftInEditor(view, el))}px`;
+  return box ? leftInEditor(view, box) + (parseFloat(getComputedStyle(box).paddingLeft) || 0) : columnLeft(view, el);
 }
 
 // The body column's left edge: the page margin, and in a section with margins of its own

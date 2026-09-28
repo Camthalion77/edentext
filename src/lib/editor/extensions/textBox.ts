@@ -9,7 +9,7 @@ import { NodeSelection, Selection, TextSelection, Plugin } from '@tiptap/pm/stat
 import type { EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
-import { placeFromPage, placeInColumn } from './pageBreaks';
+import { placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
 import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
 import { SHAPES, shapePath, linePaths, arrowHeadPx, isShapeKind, isLineKind, type ShapeKind } from '../../utils/shapes';
 import { cmToPx } from '../../storage/pageMargins';
@@ -534,6 +534,7 @@ class TextBoxView {
   private resizing = false;
   // Live offsets while a free drag runs (cm), added to the node's own by offX/offY.
   private dragBy: { x: number; y: number } | null = null;
+  private dragX = 0;
   // The polygon outline, for a shape CSS cannot draw; null for the three it can.
   private outline: SVGPathElement | null = null;
   // The line and its arrow heads, for the kinds that are two endpoints, not a box.
@@ -593,7 +594,7 @@ class TextBoxView {
   }
 
   // The frame's offsets, carrying a running free drag (see ImageView).
-  private offX(): unknown { const v = this.attrs().wrapOffset; return this.dragBy ? (typeof v === 'number' ? v : 0) + this.dragBy.x : v; }
+  private offX(): unknown { return this.dragBy ? this.dragX + this.dragBy.x : this.attrs().wrapOffset; }
   private offY(): unknown { const v = this.attrs().wrapOffsetY; return this.dragBy ? (typeof v === 'number' ? v : 0) + this.dragBy.y : v; }
 
   // Past its zone, as on an image (ImageView.pastZone).
@@ -793,8 +794,10 @@ class TextBoxView {
       // paints a cover page in; a box the file puts in front of the text sits above both.
       applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true);
       if (a.inFront !== true) d.style.zIndex = '-2';
-      // Deferred: the frame has to be laid out before its own page can be read.
-      requestAnimationFrame(() => (a.wrapFromPage || a.wrapFromBody ? placeFromPage : placeInColumn)(this.editor.view, d));
+      // Deferred: the frame has to be laid out before its own page can be read. Its
+      // column only needs it in the document, so one already there lands at once.
+      if (!a.wrapFromPage && !a.wrapFromBody && d.isConnected) placeInColumn(this.editor.view, d);
+      else requestAnimationFrame(() => (a.wrapFromPage || a.wrapFromBody ? placeFromPage : placeInColumn)(this.editor.view, d));
     } else if (a.wrap === 'topBottom') {
       // A full-width float, as on an image: text may only flow above and below it, and
       // a block box on an inline node view splits the paragraph's inline content into
@@ -878,7 +881,8 @@ class TextBoxView {
       // Out of the flow there is no text position to re-anchor to, so the ring drag
       // moves the box by its own offsets instead of PM's native node move.
       if (this.attrs().wrap === 'through' || this.pastZone()) {
-        startFreeMove(e, this.dom, this.node.attrs, by => { this.dragBy = by; this.applyWrap(); },
+        this.dragX = freeDragX(view, this.dom, this.attrs().wrapOffset);
+        startFreeMove(e, this.dom, { ...this.node.attrs, wrapOffset: this.dragX }, by => { this.dragBy = by; this.applyWrap(); },
           offsets => { if (offsets) this.commit(offsets); });
       }
     } else if (!this.editing(view.state)) {

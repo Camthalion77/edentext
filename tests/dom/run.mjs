@@ -420,16 +420,18 @@ try {
     `a frame out of the flow is dragged by its own offsets (moved ${dx}/${dy}, wanted 60/40)`);
 
   // A text box in that mode moves the same way, but by its frame ring — its own drag
-  // is ProseMirror's node move, which would re-anchor it instead.
+  // is ProseMirror's node move, which would re-anchor it instead. Past the autosave's
+  // debounce, or its write puts the dragged picture back in the text box's place.
+  await page.waitForTimeout(1500);
   await page.evaluate((d) => localStorage.setItem('edentext-doc', JSON.stringify(d)), { type: 'doc', content: [
     block(words('before the box '), { type: 'textBox', attrs: { width: 200, height: 80, wrap: 'through' },
       content: [block(words('in the box'))] }, words(' after it')),
   ] });
   await page.reload({ waitUntil: 'load' });
-  await page.waitForSelector('.tiptap .image-node[data-wrap="through"]', { timeout: 15_000 });
+  await page.waitForSelector('.tiptap .textbox-node[data-wrap="through"]', { timeout: 15_000 });
   await settle(page, true);
   const boxAt = () => page.evaluate(() => {
-    const r = document.querySelector('.tiptap .image-node[data-wrap="through"]').getBoundingClientRect();
+    const r = document.querySelector('.tiptap .textbox-node[data-wrap="through"]').getBoundingClientRect();
     return { x: r.left, y: r.top };
   });
   const boxBefore = await boxAt();

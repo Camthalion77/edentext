@@ -7,7 +7,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { dropCursor } from '@tiptap/pm/dropcursor';
 import { cmToPx } from '../../storage/pageMargins';
-import { readVerticalMargins, placeFromPage, placeInColumn } from './pageBreaks';
+import { readVerticalMargins, placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
 
 // Inline, as-character image, or a floating text-wrapped frame (wrap = flow mode);
 // width/height are doc px @96dpi, rotation CW degrees. Export → cm + ODF
@@ -151,8 +151,8 @@ export function clearPagePlace(el: HTMLElement): void {
 }
 
 // Drag a frame that is out of the flow. Its offsets count from a point the drag cannot
-// move — the anchor's static position, the page's corner — so the pointer delta is
-// simply added to them. `done(null)` reports a click that never moved.
+// move — the column, the page's corner — so the pointer delta is simply added to them
+// (a frame without an x comes with the one it shows, freeDragX). `done(null)` reports a click that never moved.
 export function startFreeMove(
   event: MouseEvent,
   dom: HTMLElement,
@@ -531,6 +531,7 @@ class ImageView {
   private getPos: () => number;
   // Live offsets while a free drag runs (cm), added to the node's own by offX/offY.
   private dragBy: { x: number; y: number } | null = null;
+  private dragX = 0;
 
   constructor(node: PMNode, editor: Editor, getPos: () => number, view: EditorView) {
     this.node = node;
@@ -594,7 +595,7 @@ class ImageView {
   private boxWidth(): number { return parseFloat(this.dom.style.width) || this.attrW() || 0; }
   // The frame's offsets, carrying a running drag. Without one the attr passes through
   // as it stands: null means "no offset stated", which places the frame flush.
-  private offX(): unknown { const v = this.node.attrs.wrapOffset; return this.dragBy ? (typeof v === 'number' ? v : 0) + this.dragBy.x : v; }
+  private offX(): unknown { return this.dragBy ? this.dragX + this.dragBy.x : this.node.attrs.wrapOffset; }
   private offY(): unknown { const v = this.node.attrs.wrapOffsetY; return this.dragBy ? (typeof v === 'number' ? v : 0) + this.dragBy.y : v; }
   // A frame out of the flow is placed by those offsets alone, so it is dragged by them.
   private isFree(): boolean { return this.attrWrap() === 'through' || typeof this.node.attrs.anchorPage === 'number' || this.pastZone(); }
@@ -664,8 +665,10 @@ class ImageView {
     if (wrap === 'through') {
       applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true);
       // Deferred like sinkToOffset: the frame has to be laid out before its own page
-      // can be read off the grid.
-      requestAnimationFrame(() => (a.wrapFromPage || a.wrapFromBody ? placeFromPage : placeInColumn)(this.view, d));
+      // can be read off the grid. Its column only needs it in the document, so a frame
+      // already there (a drag, an edit) lands at once instead of a frame late.
+      if (!a.wrapFromPage && !a.wrapFromBody && d.isConnected) placeInColumn(this.view, d);
+      else requestAnimationFrame(() => (a.wrapFromPage || a.wrapFromBody ? placeFromPage : placeInColumn)(this.view, d));
       return;
     }
     if (wrap === 'left' || wrap === 'right') {
@@ -808,7 +811,8 @@ class ImageView {
   // wraps around it, so there is no text position to follow. A click that never moved
   // selects it, as it does everywhere else.
   private startFreeDrag(event: MouseEvent): void {
-    startFreeMove(event, this.dom, this.node.attrs, by => { this.dragBy = by; this.applyWrap(); }, offsets => {
+    this.dragX = freeDragX(this.view, this.dom, this.node.attrs.wrapOffset);
+    startFreeMove(event, this.dom, { ...this.node.attrs, wrapOffset: this.dragX }, by => { this.dragBy = by; this.applyWrap(); }, offsets => {
       if (offsets) { this.commit(offsets); return; }
       const pos = this.getPos();
       if (typeof pos === 'number') {
