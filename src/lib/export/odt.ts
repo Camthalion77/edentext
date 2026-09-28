@@ -4367,7 +4367,10 @@ function imageGraphicStyle(img: ImageExport, index: number): string {
     return (
       `<style:style style:name="ImgFr${index + 1}" style:family="graphic">` +
       `<style:graphic-properties style:wrap="run-through" style:run-through="${img.inFront ? 'foreground' : 'background'}"` +
-      ` style:horizontal-rel="paragraph-content" style:horizontal-pos="${img.wrapOffsetCm != null ? 'from-left' : 'left'}"` +
+      // An x counts from the column ("paragraph" in LibreOffice, probed); none keeps the
+      // frame at the anchor paragraph's text edge.
+      (img.wrapOffsetCm != null ? ` style:horizontal-rel="paragraph" style:horizontal-pos="from-left"`
+        : ` style:horizontal-rel="paragraph-content" style:horizontal-pos="left"`) +
       // Against the page the anchor lands on, which is what the file the frame came from
       // said and what places a cover block; the anchor itself stays in the flow.
       ` style:vertical-rel="${verticalRel(img)}" style:vertical-pos="${img.wrapOffsetYCm != null ? 'from-top' : 'top'}"/></style:style>`
@@ -4716,7 +4719,8 @@ function textBoxGraphicStyle(box: TextBoxExport, index: number): string {
     ? ' style:vertical-pos="top" style:vertical-rel="baseline"'
     : ` ${imageWrapProps(box.wrap, box.wrapOffsetCm, box.wrapAlign, box.wrapDistCm, 'left')} style:number-wrapped-paragraphs="no-limit"`
       + (box.wrap === 'through' && box.inFront ? ' style:run-through="foreground"' : '') +
-      ` style:horizontal-rel="paragraph-content"` +
+      // A run-through x counts from the column, as on an image.
+      ` style:horizontal-rel="${box.wrap === 'through' && box.wrapOffsetCm != null ? 'paragraph' : 'paragraph-content'}"` +
       ` style:vertical-pos="${box.wrapOffsetYCm != null ? 'from-top' : 'top'}"` +
       ` style:vertical-rel="${verticalRel(box)}"`;
   // auto-grow only for plain text boxes; a custom-shape needs both explicitly

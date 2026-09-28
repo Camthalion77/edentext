@@ -9,7 +9,7 @@ import { NodeSelection, Selection, TextSelection, Plugin } from '@tiptap/pm/stat
 import type { EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
-import { placeFromPage } from './pageBreaks';
+import { placeFromPage, placeInColumn } from './pageBreaks';
 import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
 import { SHAPES, shapePath, linePaths, arrowHeadPx, isShapeKind, isLineKind, type ShapeKind } from '../../utils/shapes';
 import { cmToPx } from '../../storage/pageMargins';
@@ -794,7 +794,7 @@ class TextBoxView {
       applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true);
       if (a.inFront !== true) d.style.zIndex = '-2';
       // Deferred: the frame has to be laid out before its own page can be read.
-      if (a.wrapFromPage || a.wrapFromBody) requestAnimationFrame(() => placeFromPage(this.editor.view, d));
+      requestAnimationFrame(() => (a.wrapFromPage || a.wrapFromBody ? placeFromPage : placeInColumn)(this.editor.view, d));
     } else if (a.wrap === 'topBottom') {
       // A full-width float, as on an image: text may only flow above and below it, and
       // a block box on an inline node view splits the paragraph's inline content into

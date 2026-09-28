@@ -367,7 +367,7 @@ export function placeFromPage(view: EditorView, el: HTMLElement, grid?: PageGrid
   el.style.marginLeft = '0px';
   const top = topInEditor(view, el);
   const left = leftInEditor(view, el);
-  const column = parseFloat(getComputedStyle(view.dom as HTMLElement).paddingLeft) || 0;
+  const column = columnLeft(view, el);
   // One set against the body text counts from where that page's body begins.
   const page = g.pageAt(top);
   const from = el.dataset.fromBody != null ? g.contentTopOf(page) : g.topOf(page);
@@ -375,10 +375,33 @@ export function placeFromPage(view: EditorView, el: HTMLElement, grid?: PageGrid
   el.style.marginLeft = `${Math.round(column + (Number(el.dataset.pageX) || 0) - left)}px`;
 }
 
+// Any other run-through frame keeps its y below the anchor, but its x counts from the
+// column too (a table cell's, a text box's): the static position it starts from carries
+// the anchor paragraph's indent and whatever text precedes the anchor in its line.
+export function placeInColumn(view: EditorView, el: HTMLElement): void {
+  if (!el.isConnected || el.dataset.columnX == null) return;
+  el.style.marginLeft = '0px';
+  const box = el.parentElement?.closest<HTMLElement>('td, th, .textbox-content');
+  const column = box ? leftInEditor(view, box) + (parseFloat(getComputedStyle(box).paddingLeft) || 0) : columnLeft(view, el);
+  el.style.marginLeft = `${Math.round(column + (Number(el.dataset.columnX) || 0) - leftInEditor(view, el))}px`;
+}
+
+// The body column's left edge: the page margin, and in a section with margins of its own
+// the inset its top-level block carries (descendants clear it, editor.css).
+function columnLeft(view: EditorView, el: HTMLElement): number {
+  let block = el;
+  while (block.parentElement && block.parentElement !== view.dom) block = block.parentElement;
+  return (parseFloat(getComputedStyle(view.dom as HTMLElement).paddingLeft) || 0)
+    + (parseFloat(getComputedStyle(block).getPropertyValue('--sec-inset-left')) || 0);
+}
+
 // Pagination moves the page grid under those frames, so every pass re-places them.
 export function placePageFrames(view: EditorView, grid: PageGrid): void {
   for (const el of Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('[data-page-y]'))) {
     placeFromPage(view, el, grid);
+  }
+  for (const el of Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('[data-column-x]'))) {
+    placeInColumn(view, el);
   }
 }
 

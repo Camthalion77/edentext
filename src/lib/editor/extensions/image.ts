@@ -7,7 +7,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { dropCursor } from '@tiptap/pm/dropcursor';
 import { cmToPx } from '../../storage/pageMargins';
-import { readVerticalMargins, placeFromPage } from './pageBreaks';
+import { readVerticalMargins, placeFromPage, placeInColumn } from './pageBreaks';
 
 // Inline, as-character image, or a floating text-wrapped frame (wrap = flow mode);
 // width/height are doc px @96dpi, rotation CW degrees. Export → cm + ODF
@@ -135,6 +135,8 @@ export function applyRunThrough(el: HTMLElement, offsetCm: unknown, offsetYCm: u
     el.dataset.pageY = String(px(offsetYCm));
     el.style.setProperty('--page-x', `${px(offsetCm)}px`);
     el.style.setProperty('--page-y', `${px(offsetYCm)}px`);
+  } else if (typeof offsetCm === 'number') {
+    el.dataset.columnX = String(px(offsetCm));
   }
 }
 
@@ -143,6 +145,7 @@ export function clearPagePlace(el: HTMLElement): void {
   delete el.dataset.fromBody;
   delete el.dataset.pageX;
   delete el.dataset.pageY;
+  delete el.dataset.columnX;
   el.style.removeProperty('--page-x');
   el.style.removeProperty('--page-y');
 }
@@ -662,7 +665,7 @@ class ImageView {
       applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true);
       // Deferred like sinkToOffset: the frame has to be laid out before its own page
       // can be read off the grid.
-      if (a.wrapFromPage || a.wrapFromBody) requestAnimationFrame(() => placeFromPage(this.view, d));
+      requestAnimationFrame(() => (a.wrapFromPage || a.wrapFromBody ? placeFromPage : placeInColumn)(this.view, d));
       return;
     }
     if (wrap === 'left' || wrap === 'right') {
