@@ -81,7 +81,7 @@ everything that writes a block margin (`editor.css`, `indent.ts`, `styleSheet.ts
 a block lands on is read *after* its own spacer, so a forced break onto the section's second
 page takes the "rest" pair. Not carried: the ruler and a frame's `COLUMN_WIDTH_CSS` stay document-wide.
 
-**A node decoration does not survive its node being replaced** — a block's type or attrs changing is exactly that step — so the pass marks them (`blockDeco`) and re-cuts the spans `onRemove` reports lost (`repairBlockDecos`). Without it the inset, a page-top margin, a note offset or a column fragment's height was gone until the next pass: a heading in a narrow section sat 164px left, as if the page had turned landscape.
+**A node decoration does not survive its node being replaced** — a block's type or attrs changing is exactly that step — so the pass marks them (`blockDeco`) and re-cuts the spans `onRemove` reports lost (`repairDecos`). Without it the inset, a page-top margin, a note offset or a column fragment's height was gone until the next pass: a heading in a narrow section sat 164px left, as if the page had turned landscape. A **spacer widget** sits on the boundary between two blocks, so replacing either one deletes its position too; `repairDecos` re-seats it (`spacerDeco`) wherever the mapping still puts it before a block. The next pass cannot restore a lost spacer on its own, since it finds the same placements and skips the dispatch: switching the document's language rewrote every block and left a document with only its first page break.
 
 **Per-section paper.** A section's own format/orientation (`HfSet.format`/`.orientation`,
 null = the document's) makes the pages differ in size, which a repeating background

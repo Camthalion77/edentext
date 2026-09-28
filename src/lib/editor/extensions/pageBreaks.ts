@@ -564,16 +564,24 @@ type FootnoteBox = { id: string; el: HTMLElement; height: number };
 // bounded, because a note that keeps its own anchor moving never settles.
 const MAX_NOTE_FIT_PASSES = 3;
 
-/** A node decoration that survives its node being replaced (see repairBlockDecos). */
+/** A node decoration that survives its node being replaced (see repairDecos). */
 export const blockDeco = (from: number, to: number, attrs: Record<string, string>): Decoration =>
   Decoration.node(from, to, attrs, { block: attrs });
 
 export const isBlockDeco = (spec: { block?: Record<string, string> }): boolean => spec.block !== undefined;
 
+/** A widget in front of a block that survives its neighbours being replaced. */
+export const spacerDeco = (pos: number, toDOM: () => HTMLElement, key: string): Decoration =>
+  Decoration.widget(pos, toDOM, { side: -1, key, spacer: toDOM });
+
+/** A decoration repairDecos can restore when a mapping drops it. */
+export const isRepairable = (spec: { block?: unknown; spacer?: unknown }): boolean =>
+  spec.block !== undefined || spec.spacer !== undefined;
+
 // The mapping drops a node decoration whose node a step replaced, and changing a block's
-// type or attrs is exactly that step — the block would lose its inset or its page-top rule
-// until the next pass. Re-cut those spans by hand, over the blocks the range now holds.
-export function repairBlockDecos(before: DecorationSet, mapped: DecorationSet, tr: Transaction): DecorationSet {
+// type or attrs is exactly that step; a spacer between two blocks goes with either. Re-cut
+// the node spans over the blocks the range now holds, and re-seat a spacer still before one.
+export function repairDecos(before: DecorationSet, mapped: DecorationSet, tr: Transaction): DecorationSet {
   const decos = mapped.find(undefined, undefined, (spec) => !isBlockDeco(spec));
   for (const d of before.find(undefined, undefined, isBlockDeco)) {
     const to = tr.mapping.map(d.to, 1);
@@ -583,6 +591,11 @@ export function repairBlockDecos(before: DecorationSet, mapped: DecorationSet, t
       decos.push(blockDeco(pos, pos + node.nodeSize, d.spec.block));
       pos += node.nodeSize;
     }
+  }
+  for (const d of before.find(undefined, undefined, (spec) => spec.spacer !== undefined)) {
+    if (!tr.mapping.mapResult(d.from, -1).deleted) continue;
+    const pos = tr.mapping.map(d.from, 1);
+    if (tr.doc.resolve(pos).nodeAfter?.isBlock) decos.push(spacerDeco(pos, d.spec.spacer, d.spec.key));
   }
   return DecorationSet.create(tr.doc, decos);
 }
@@ -631,8 +644,8 @@ export const PageBreaks = Extension.create({
           if (tr.docChanged) {
             let dropped = false;
             const mapped = decorations.map(tr.mapping, tr.doc,
-              { onRemove: (spec) => { dropped ||= isBlockDeco(spec); } });
-            decorations = dropped ? repairBlockDecos(decorations, mapped, tr) : mapped;
+              { onRemove: (spec) => { dropped ||= isRepairable(spec); } });
+            decorations = dropped ? repairDecos(decorations, mapped, tr) : mapped;
           }
           const recalc = value.recalc + (tr.getMeta(FORCE_PAGE_RECALC) ? 1 : 0);
           const edit = value.edit
@@ -2007,7 +2020,7 @@ export const PageBreaks = Extension.create({
             // Every spacer is built per view: a split pane renders the same decorations,
             // and one DOM node cannot sit in two documents at once — each would keep
             // taking it back from the other.
-            const decoArray: Decoration[] = placements.map((p) => Decoration.widget(p.docPos, () => {
+            const decoArray: Decoration[] = placements.map((p) => spacerDeco(p.docPos, () => {
               if (p.row) {
                 // A table breaks between rows: the spacer must be a <tr> so it's
                 // valid inside <tbody> and creates a borderless gap that pushes
@@ -2051,7 +2064,7 @@ export const PageBreaks = Extension.create({
               spacerEl.style.userSelect = 'none';
               spacerEl.setAttribute('contenteditable', 'false');
               return spacerEl;
-            }, { side: -1, key: spacerKey(p) }));
+            }, spacerKey(p)));
             if (collapsedTrailing) {
               decoArray.push(blockDeco(collapsedTrailing.from, collapsedTrailing.to, {
                 style: 'height:0;min-height:0;margin:0;overflow:hidden',
