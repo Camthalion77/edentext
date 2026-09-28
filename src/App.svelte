@@ -2403,12 +2403,14 @@
     height: 26px;
     display: flex;
     align-items: center;
+    gap: 0.85rem;
     padding: 0 1rem;
     background: var(--color-toolbar-bg);
     border-top: 1px solid var(--color-border);
     font-family: var(--font-sans);
     font-size: 0.75rem;
     color: var(--color-text);
+    white-space: nowrap;
     user-select: none;
     z-index: 50;
   }
@@ -2617,5 +2619,19 @@
 
   .zoom-pct:hover {
     background: var(--color-btn-hover);
+  }
+
+  /* A narrow window drops the slider, a very narrow one the −/+ buttons too; the
+     percentage stays as the reset button. */
+  @media (max-width: 720px) {
+    .zoom-slider {
+      display: none;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .zoom-btn {
+      display: none;
+    }
   }
 </style>

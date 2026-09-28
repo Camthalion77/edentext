@@ -100,7 +100,9 @@
     opacity: 0.8;
   }
 
+  /* Sized to the chosen option rather than the longest one, which crowds a narrow bar. */
   select {
+    field-sizing: content;
     appearance: none;
     border: none;
     background: transparent;
