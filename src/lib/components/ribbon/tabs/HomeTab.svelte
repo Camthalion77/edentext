@@ -9,7 +9,7 @@
   import ColorPicker from '../../ColorPicker.svelte';
   import ParagraphBorderPicker from '../../ParagraphBorderPicker.svelte';
   import { anchored, clickOutside, isMenuOpen, toggleMenu, closeMenu } from '../menu.svelte';
-  import { uniformMarkColor, uniformBlockAttr } from '../../../utils/selectionFormat';
+  import { uniformMarkColor, uniformBlockAttr, hasAsianLanguage } from '../../../utils/selectionFormat';
   import { stepFontSize } from '../../../editor/extensions/shortcuts';
 
   import { clipboardCommand, readClipboard } from '../../../editor/contextMenuItems';
@@ -27,9 +27,10 @@
   import { withShortcut } from '../../../i18n/shortcut';
   import { shortcutHint, type ShortcutId } from '../../../editor/shortcuts';
 
-  let { editor, tick, showFormattingMarks = $bindable(false), onManageStyles, onFind, onParagraphDialog }: {
+  let { editor, tick, showFormattingMarks = $bindable(false), onManageStyles, onFind, onParagraphDialog, asianDocument = false }: {
     editor: Editor | null;
     tick: number;
+    asianDocument?: boolean;
     showFormattingMarks?: boolean;
     onManageStyles?: (family: StyleFamily) => void;
     onFind?: (mode: 'find' | 'replace') => void;
@@ -59,6 +60,7 @@
   let isItalic = $derived(tick >= 0 && !!editor?.isActive('italic'));
   let isUnderline = $derived(tick >= 0 && !!editor?.isActive('underline'));
   let isStrike = $derived(tick >= 0 && !!editor?.isActive('strike'));
+  let asianSelection = $derived(tick >= 0 && !!editor && hasAsianLanguage(editor.state));
   let emphasis = $derived(tick >= 0 ? editor?.getAttributes('textStyle').emphasis ?? null : null);
   let isSuper = $derived(tick >= 0 && !!editor?.isActive('superscript'));
   let isSub = $derived(tick >= 0 && !!editor?.isActive('subscript'));
@@ -282,6 +284,8 @@
           </div>
         {/if}
       </div>
+      <!-- East Asian typography only (document, UI or selected text language); a mark already in the text keeps the button to clear it. -->
+      {#if asianDocument || asianSelection || emphasis}
       <div class="rb-menu-wrap" use:clickOutside={'emphasis'}>
         <RibbonButton content={emphasisIcon} title={t().ribbon.emphasis.title} active={!!emphasis} caret caretActive={isMenuOpen('emphasis')} onclick={() => editor?.chain().focus().setMark('textStyle', { emphasis: emphasis ? null : 'dot below' }).run()} onCaret={() => toggleMenu('emphasis')} />
         {#if isMenuOpen('emphasis')}
@@ -294,6 +298,7 @@
           </div>
         {/if}
       </div>
+      {/if}
       <RibbonButton content={subIcon} title={`${t().toolbarExpanded.subscript} (${shortcutHint('subscript')})`} active={isSub} onclick={toggleSub} />
       <RibbonButton content={superIcon} title={`${t().toolbarExpanded.superscript} (${shortcutHint('superscript')})`} active={isSuper} onclick={toggleSuper} />
       <span class="rb-mini-sep"></span>
