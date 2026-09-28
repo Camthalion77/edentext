@@ -368,7 +368,10 @@ export function placeFromPage(view: EditorView, el: HTMLElement, grid?: PageGrid
   const top = topInEditor(view, el);
   const left = leftInEditor(view, el);
   const column = parseFloat(getComputedStyle(view.dom as HTMLElement).paddingLeft) || 0;
-  el.style.marginTop = `${Math.round(g.topOf(g.pageAt(top)) + (Number(el.dataset.pageY) || 0) - top)}px`;
+  // One set against the body text counts from where that page's body begins.
+  const page = g.pageAt(top);
+  const from = el.dataset.fromBody != null ? g.contentTopOf(page) : g.topOf(page);
+  el.style.marginTop = `${Math.round(from + (Number(el.dataset.pageY) || 0) - top)}px`;
   el.style.marginLeft = `${Math.round(column + (Number(el.dataset.pageX) || 0) - left)}px`;
 }
 

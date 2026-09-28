@@ -39,6 +39,7 @@
     chapterStarts = [],
     pageNumbering = DEFAULT_PAGE_NUMBERING,
     zoneHeights = $bindable([]),
+    zoneIntrusions = $bindable([]),
     interactive = true,
   }: {
     headerDoc: HfDoc;
@@ -68,6 +69,9 @@
     /** Rendered height (px) of each set's six zones, in HF_ZONE_KEYS order — read back
      *  by Editor.svelte, whose margins have to clear the band the zone really needs. */
     zoneHeights?: number[][];
+    /** How far past the body's top each zone's frames set against the body keep its text
+     *  (px, same layout) — a letterhead block the body wraps below. */
+    zoneIntrusions?: number[][];
     /** False in a split view's second pane: it draws the zones, it does not edit them. */
     interactive?: boolean;
   } = $props();
@@ -229,11 +233,14 @@
   $effect(() => {
     const root = measureRoot;
     if (!root) return;
+    void sourceVersion; // a frame past the zone changes no box size
     const boxes = Array.from(root.querySelectorAll<HTMLElement>('.hf-measure-box'));
     const n = HF_ZONE_KEYS.length;
     const read = () => {
       const next = setSig.map((_, i) => HF_ZONE_KEYS.map((_, k) => boxes[i * n + k]?.offsetHeight ?? 0));
       if (String(next) !== String(untrack(() => zoneHeights))) zoneHeights = next;
+      const past = setSig.map((_, i) => HF_ZONE_KEYS.map((key, k) => (key.startsWith('header') ? intrusion(boxes[i * n + k]) : 0)));
+      if (String(past) !== String(untrack(() => zoneIntrusions))) zoneIntrusions = past;
     };
     // A web font arriving late (an embedded one lands after the import) reflows the zone,
     // so the height is observed rather than read once.
@@ -242,6 +249,32 @@
     read();
     return () => ro.disconnect();
   });
+
+  // The body text a header's frames set against it keep clear: down to the frame's
+  // bottom, unless LibreOffice would wrap the text beside it — it leaves a gap under
+  // 2cm empty ("optimal" wrap). ponytail: the lines a deeper frame leaves above it are
+  // pushed down too; place them above once a document needs it.
+  const WRAP_ROOM_PX = cmToPx(2);
+  function intrusion(box: HTMLElement | undefined): number {
+    let px = 0;
+    for (const el of Array.from(box?.querySelectorAll<HTMLElement>('[data-from-body]') ?? [])) {
+      const wrap = el.dataset.wrap;
+      const x = Number(el.dataset.pageX) || 0;
+      const room = wrap === 'left' ? box!.clientWidth - x - el.offsetWidth : wrap === 'right' ? x : 0;
+      if (wrap === 'through' || room >= WRAP_ROOM_PX) continue;
+      px = Math.max(px, (Number(el.dataset.pageY) || 0) + el.offsetHeight);
+    }
+    return px;
+  }
+
+  // Where a page's body text begins before any frame pushes it: its margin, or below
+  // its header where that reaches further (as Editor.svelte works it out).
+  function bodyTopOf(page: number): number {
+    const index = Math.min(sectionOf(page), setSig.length - 1);
+    const key = zoneKey('header', variantFor(page, index));
+    const band = setSig[index]?.[key] ? zoneHeights[index]?.[HF_ZONE_KEYS.indexOf(key)] ?? 0 : 0;
+    return Math.max(cmToPx(marginsOf(page).top), band ? distancesOf(page).header + band : 0);
+  }
 
   // Which section a page belongs to: the count of section starts at or before it,
   // clamped to what the document actually carries.
@@ -275,7 +308,8 @@
   }
   // A frame placed against the page takes its top from there (--page-y); the zone's own
   // distance below the page top is what its layer subtracts.
-  const pageVar = (b: { top: number }, page: number) => ` --hf-page-y: ${b.top - boxOf(page).top}px;`;
+  const pageVar = (b: { top: number }, page: number) =>
+    ` --hf-page-y: ${b.top - boxOf(page).top}px; --hf-body-y: ${bodyTopOf(page)}px;`;
 
 
   // Page, the page count and chapter map (only where the zone shows them), its source
@@ -612,6 +646,9 @@
     margin: 0 !important;
     left: var(--page-x);
     top: calc(var(--page-y) - var(--hf-page-y, 0px));
+  }
+  .hf-zone :global([data-from-body]) {
+    top: calc(var(--hf-body-y, 0px) + var(--page-y) - var(--hf-page-y, 0px));
   }
 
   .hf-measure {

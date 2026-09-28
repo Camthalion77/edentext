@@ -318,13 +318,16 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   // Likewise down the page — against the anchor paragraph, or against the top of the
   // page it lands on (`page`, which is how LibreOffice writes a Word cover block; the
   // node view resolves the page, so the frame stays in the flow it is anchored in).
+  // `page-content` counts from where the page's body text begins, below its header.
   const rel = gp['style:vertical-rel'];
   const fromPage = rel === 'page';
-  const y = gp['style:vertical-pos'] === 'from-top' && (!rel || rel.startsWith('paragraph') || rel === 'line' || fromPage)
+  const fromBody = rel === 'page-content';
+  const y = gp['style:vertical-pos'] === 'from-top' && (!rel || rel.startsWith('paragraph') || rel === 'line' || fromPage || fromBody)
     ? lengthToCm(el.getAttributeNS(NS.svg, 'y')) : null;
-  if (y != null && attrs.wrap && (fromPage || y > 0)) {
+  if (y != null && attrs.wrap && (fromPage || fromBody || y > 0)) {
     attrs.wrapOffsetY = Math.round(y * 100) / 100;
     if (fromPage) attrs.wrapFromPage = true;
+    if (fromBody) attrs.wrapFromBody = true;
   }
   // A page-anchored frame is out of the text flow, placed from its page's corner: the
   // cover graphic or watermark of a title page. Its offsets are that corner's, not the
@@ -527,8 +530,13 @@ export function unnestBoxes(blocks: Node[], ctx: { warnings: Set<string> }): Nod
 // box), else the frame's computed svg:height (LibreOffice re-saves).
 function convertTextBoxFrame(frame: Element, textBoxEl: Element, ctx: Ctx): Node {
   const attrs: Record<string, unknown> = {};
-  // A frame that grows with its text states its least width instead (fo:min-width).
-  const wCm = lengthToCm(frame.getAttributeNS(NS.svg, 'width')) ?? lengthToCm(textBoxEl.getAttributeNS(NS.fo, 'min-width'));
+  // A floating frame that grows with its text (fo:min-width, no width) spans what its
+  // anchor leaves it: LibreOffice lays it out at the column's width (probed).
+  const minCm = lengthToCm(textBoxEl.getAttributeNS(NS.fo, 'min-width'));
+  const xCm = lengthToCm(frame.getAttributeNS(NS.svg, 'x')) ?? 0;
+  const spans = minCm != null && frame.getAttributeNS(NS.text, 'anchor-type') !== 'as-char';
+  const wCm = lengthToCm(frame.getAttributeNS(NS.svg, 'width'))
+    ?? (spans ? Math.max(minCm, Math.round((ctx.contentWidthCm - xCm) * 1000) / 1000) : minCm);
   if (wCm != null) attrs.width = framePx(cmToPx(wCm));
   const hCm = lengthToCm(textBoxEl.getAttributeNS(NS.fo, 'min-height'))
     ?? lengthToCm(frame.getAttributeNS(NS.svg, 'height'));
@@ -1872,7 +1880,16 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
   if (markFont && !defaults.fonts.has(markFont.toLowerCase())) attrs.fontFamily = markFont;
   const markAsian = resolver.asianFontOf(baseTextProps);
   if (markAsian && !defaults.asianFonts.has(markAsian.toLowerCase())) attrs.fontFamilyAsian = markAsian;
+  // Outside the body the named style's font is baked in rather than declared, so runs
+  // that all agree on another one still make it the block's, as they do in the body.
+  const styleText = kind !== 'body' && named ? resolver.paraTextProps(named) : null;
+  const baked = {
+    fontSize: styleText && styleText['fo:font-size'] === baseTextProps['fo:font-size'] ? attrs.fontSize : undefined,
+    fontFamily: styleText && resolver.fontFamilyOf(styleText) === markFont ? attrs.fontFamily : undefined,
+  };
+  for (const [k, v] of Object.entries(baked)) if (v != null) delete attrs[k];
   applyUniformRunFont(attrs, content);
+  for (const [k, v] of Object.entries(baked)) if (v != null && attrs[k] == null) attrs[k] = v;
   sinkOffsetFrames(content);
 
   const node: Node = { type: isHeading ? 'heading' : 'paragraph' };

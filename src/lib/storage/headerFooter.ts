@@ -185,10 +185,13 @@ export function hfUsesChapterField(sets: HfSet[]): boolean {
     || inZone(s.footerFirst) || inZone(s.headerEven) || inZone(s.footerEven));
 }
 
-// Empty = null or only text blocks without inline content AND without a visible box
+// Empty = null or one text block without inline content AND without a visible box
 // (a footer that is just a colored rule line has no text but must still render/export).
+// Several blank lines are content: both word processors reserve each of them.
 export function hfIsEmpty(doc: HfDoc): boolean {
-  return !(doc?.content as ZoneNode[] | undefined)?.some((b) => {
+  const blocks = doc?.content as ZoneNode[] | undefined;
+  if ((blocks?.length ?? 0) > 1) return false;
+  return !blocks?.some((b) => {
     if (b.type !== 'paragraph' && b.type !== 'heading') return true;
     if (b.content?.length) return true;
     const a = b.attrs ?? {};

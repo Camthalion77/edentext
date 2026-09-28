@@ -4,8 +4,10 @@ import { hfIsEmpty, hfUsesChapterField, EMPTY_HF_SET, type HfDoc } from '../../s
 const p = (text?: string) => ({ type: 'paragraph', ...(text ? { content: [{ type: 'text', text }] } : {}) });
 
 describe('zone helpers over every block', () => {
-  it('a zone is empty only when no block carries anything', () => {
-    expect(hfIsEmpty({ type: 'doc', content: [p(), p()] })).toBe(true);
+  it('a zone is empty only when its one block carries nothing', () => {
+    expect(hfIsEmpty({ type: 'doc', content: [p()] })).toBe(true);
+    // Each blank line takes its height in the band.
+    expect(hfIsEmpty({ type: 'doc', content: [p(), p()] })).toBe(false);
     expect(hfIsEmpty({ type: 'doc', content: [p(), p('second')] })).toBe(false);
     expect(hfIsEmpty({ type: 'doc', content: [p(), { type: 'table', content: [] }] })).toBe(false);
   });

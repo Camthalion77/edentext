@@ -468,7 +468,7 @@ function replaceSectionBreaks(doc: TiptapNode): TiptapNode {
 // bytes is ArrayBuffer-backed to match fflate's zip entry map. rotationDeg is CW;
 // wrap floats the frame at its anchor paragraph (left/right/top-bottom/run-through).
 type WrapMode = 'inline' | 'left' | 'right' | 'topBottom' | 'through';
-type ImageExport = { path: string; bytes: Uint8Array<ArrayBuffer>; mimeType: string; widthCm: number; heightCm: number; alt: string; rotationDeg: number; wrap: WrapMode; wrapOffsetCm: number | null; wrapOffsetYCm: number | null; wrapDistCm: number | null; wrapAlign: string | null; anchorPage: number | null; vAlign: string | null; inFront: boolean; wrapFromPage: boolean };
+type ImageExport = { path: string; bytes: Uint8Array<ArrayBuffer>; mimeType: string; widthCm: number; heightCm: number; alt: string; rotationDeg: number; wrap: WrapMode; wrapOffsetCm: number | null; wrapOffsetYCm: number | null; wrapDistCm: number | null; wrapAlign: string | null; anchorPage: number | null; vAlign: string | null; inFront: boolean; wrapFromPage: boolean; wrapFromBody: boolean };
 
 function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   const bin = atob(b64);
@@ -515,6 +515,7 @@ function imageDescriptor(node: TiptapNode, index: number, namePrefix = 'image'):
     wrapAlign: node.attrs?.wrapAlign === 'left' || node.attrs?.wrapAlign === 'right' ? node.attrs.wrapAlign : null,
     anchorPage: typeof node.attrs?.anchorPage === 'number' && node.attrs.anchorPage > 0 ? node.attrs.anchorPage : null,
     wrapFromPage: node.attrs?.wrapFromPage === true,
+    wrapFromBody: node.attrs?.wrapFromBody === true,
     vAlign: typeof node.attrs?.vAlign === 'string' ? node.attrs.vAlign : null,
     inFront: node.attrs?.inFront === true,
   };
@@ -1023,6 +1024,7 @@ type TextBoxExport = {
   wrapDistCm: number | null;
   wrapAlign: string | null;
   wrapFromPage: boolean;
+  wrapFromBody: boolean;
   inFront: boolean;
   paddingCm: number;
   shapeKind: ShapeKind;
@@ -1053,6 +1055,7 @@ function textBoxDescriptor(node: TiptapNode): TextBoxExport {
     wrapDistCm: typeof a.wrapDist === 'number' ? round3(a.wrapDist) : null,
     wrapAlign: a.wrapAlign === 'center' || a.wrapAlign === 'right' ? a.wrapAlign : null,
     wrapFromPage: a.wrapFromPage === true,
+    wrapFromBody: a.wrapFromBody === true,
     inFront: a.inFront === true,
     paddingCm: typeof a.paddingCm === 'number' ? round3(a.paddingCm) : TEXTBOX_PADDING_CM,
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
@@ -4339,6 +4342,11 @@ const INLINE_VALIGN_ODF: Record<string, string> = {
   offset: 'style:vertical-pos="from-top" style:vertical-rel="text"',
 };
 
+// What a floating frame's y counts from: its anchor paragraph, its page, or the top of
+// that page's body text.
+const verticalRel = (f: { wrapFromPage: boolean; wrapFromBody: boolean }) =>
+  f.wrapFromPage ? 'page' : f.wrapFromBody ? 'page-content' : 'paragraph';
+
 // Graphic style for a floating frame (wrap + side, anchored to the paragraph top).
 // Inline images need none. Injected into content.xml automatic-styles by applyImages.
 function imageGraphicStyle(img: ImageExport, index: number): string {
@@ -4357,7 +4365,7 @@ function imageGraphicStyle(img: ImageExport, index: number): string {
       ` style:horizontal-rel="paragraph-content" style:horizontal-pos="${img.wrapOffsetCm != null ? 'from-left' : 'left'}"` +
       // Against the page the anchor lands on, which is what the file the frame came from
       // said and what places a cover block; the anchor itself stays in the flow.
-      ` style:vertical-rel="${img.wrapFromPage ? 'page' : 'paragraph'}" style:vertical-pos="${img.wrapOffsetYCm != null ? 'from-top' : 'top'}"/></style:style>`
+      ` style:vertical-rel="${verticalRel(img)}" style:vertical-pos="${img.wrapOffsetYCm != null ? 'from-top' : 'top'}"/></style:style>`
     );
   }
   if (img.wrap === 'inline') {
@@ -4372,7 +4380,7 @@ function imageGraphicStyle(img: ImageExport, index: number): string {
     `<style:graphic-properties ${imageWrapProps(img.wrap, img.wrapOffsetCm, img.wrapAlign, img.wrapDistCm)}` +
     ` style:number-wrapped-paragraphs="no-limit"` +
     ` style:horizontal-rel="paragraph-content"` +
-    ` style:vertical-pos="${img.wrapOffsetYCm != null ? 'from-top' : 'top'}" style:vertical-rel="paragraph"/>` +
+    ` style:vertical-pos="${img.wrapOffsetYCm != null ? 'from-top' : 'top'}" style:vertical-rel="${verticalRel(img)}"/>` +
     `</style:style>`
   );
 }
@@ -4705,7 +4713,7 @@ function textBoxGraphicStyle(box: TextBoxExport, index: number): string {
       + (box.wrap === 'through' && box.inFront ? ' style:run-through="foreground"' : '') +
       ` style:horizontal-rel="paragraph-content"` +
       ` style:vertical-pos="${box.wrapOffsetYCm != null ? 'from-top' : 'top'}"` +
-      ` style:vertical-rel="${box.wrapFromPage ? 'page' : 'paragraph'}"`;
+      ` style:vertical-rel="${verticalRel(box)}"`;
   // auto-grow only for plain text boxes; a custom-shape needs both explicitly
   // false, or LibreOffice's shape autofit shrinks it to its text.
   const grow = box.shapeKind === 'textbox' && !box.shapePath

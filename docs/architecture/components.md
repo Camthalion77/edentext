@@ -82,7 +82,11 @@ serve its editor (`uiEditor`), and only the body dims.
 A frame in a zone flows there when it wraps (side or band) and stays out of the zone's height
 when it runs through. One placed against the page is placed by CSS from the zone box:
 `--page-x`/`--page-y` from the node view against the zone's `--hf-page-y`, so the zone's editor
-and that paragraph take no position of their own. Frames behind the text paint from a second
+and that paragraph take no position of their own. One placed against the body's top
+(`wrapFromBody`) is placed from `--hf-body-y`, where that page's body begins; a wrapping one
+there pushes the body down past it (`zoneIntrusions` → Editor.svelte's reaches), since
+LibreOffice leaves less than 2cm beside it empty. Only header frames are measured, and the
+whole body top moves, not just the lines beside the frame. Frames behind the text paint from a second
 clone of the zone in `.hf-bg-layer`, which shows only them; the open zone shows them all.
 
 Zones live inside scaled `.paper` but use unscaled document coordinates. Page fields are

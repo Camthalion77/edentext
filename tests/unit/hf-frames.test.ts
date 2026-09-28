@@ -75,3 +75,28 @@ describe('page-placed header frame', () => {
     expect(place(logo(importOdt(zipSync(files)).header))).toEqual(want);
   });
 });
+
+// Measured from the text area's top (DOCX "margin", ODF "page-content"): a header frame
+// that reaches into the body and pushes it down there.
+describe('body-placed header frame', () => {
+  const body = importDocx(zipSync({
+    ...unzipSync(source),
+    'word/header1.xml': strToU8(HEADER.replace('<wp:positionV relativeFrom="page">', '<wp:positionV relativeFrom="margin">')
+      .replace('<wp:wrapNone/>', '<wp:wrapTopAndBottom/>')),
+  }));
+  const fromBody = (a: any) => ({ y: a?.wrapOffsetY, fromBody: !!a?.wrapFromBody, fromPage: !!a?.wrapFromPage });
+  const want = { y: 1, fromBody: true, fromPage: false };
+
+  it('is read against the body top', () => {
+    expect(fromBody(logo(body.header))).toEqual(want);
+  });
+
+  it('keeps it through ODT and back through DOCX', async () => {
+    const odt = await buildOdt(body.content as any, margins, 'portrait', { header: body.header, footer: null, pageCount: 1 });
+    expect(strFromU8(unzipSync(odt)['styles.xml'])).toMatch(/vertical-rel="page-content"/);
+    const viaOdt = importOdt(odt);
+    expect(fromBody(logo(viaOdt.header))).toEqual(want);
+    const viaDocx = importDocx(await buildDocx(viaOdt.content as any, margins, 'portrait', { header: viaOdt.header, footer: null, pageCount: 1 }));
+    expect(fromBody(logo(viaDocx.header))).toEqual(want);
+  });
+});

@@ -184,6 +184,10 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   let hfZoneHeights = $state<number[][]>([]);
   const zoneHeightPx = (section: number, key: HfZoneKey): number =>
     hfZoneHeights[section]?.[HF_ZONE_KEYS.indexOf(key)] ?? 0;
+  // How far a header's frames set against the body push its text down (HeaderFooterLayer).
+  let hfZoneIntrusions = $state<number[][]>([]);
+  const pushed = (top: number, section: number, key: HfZoneKey): number =>
+    top + (hfZoneIntrusions[section]?.[HF_ZONE_KEYS.indexOf(key)] ?? 0);
   function hfReachPx(doc: HfDoc, distPx: number, footer = false, measuredPx = 0): number {
     if (!doc || hfIsEmpty(doc)) return 0;
     // The measured band wins where there is one: the estimate below cannot see a line
@@ -240,12 +244,13 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   // Effective top/bottom margins (px) pageBreaks reads to keep content clear of the
   // header/footer: "first" = page 1's own zone, "rest" = every page ≥ 2 with the even
   // variant folded in (max), since one --pb-content-*-rest covers all of them.
-  let evenTopReach = $derived(differentOddEven ? hfReachPx(headerEvenDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'headerEven')) : 0);
+  let evenTopReach = $derived(differentOddEven
+    ? pushed(Math.max(mTopPx, hfReachPx(headerEvenDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'headerEven'))), 0, 'headerEven') : 0);
   let evenBottomReach = $derived(differentOddEven ? hfReachPx(footerEvenDoc ?? null, footerDistPx, true, zoneHeightPx(0, 'footerEven')) : 0);
-  let effTopRest = $derived(Math.max(mTopPx, hfReachPx(headerDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'header')), evenTopReach));
-  let effTopFirst = $derived(Math.max(mTopPx, differentFirstPage
-    ? hfReachPx(headerFirstDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'headerFirst'))
-    : hfReachPx(headerDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'header'))));
+  let effTopRest = $derived(Math.max(pushed(Math.max(mTopPx, hfReachPx(headerDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'header'))), 0, 'header'), evenTopReach));
+  let effTopFirst = $derived(differentFirstPage
+    ? pushed(Math.max(mTopPx, hfReachPx(headerFirstDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'headerFirst'))), 0, 'headerFirst')
+    : pushed(Math.max(mTopPx, hfReachPx(headerDoc ?? null, headerDistPx, false, zoneHeightPx(0, 'header'))), 0, 'header'));
   let effBottomRest = $derived(Math.max(mBottomPx, hfReachPx(footerDoc ?? null, footerDistPx, true, zoneHeightPx(0, 'footer')), evenBottomReach));
   let effBottomFirst = $derived(Math.max(mBottomPx, differentFirstPage
     ? hfReachPx(footerFirstDoc ?? null, footerDistPx, true, zoneHeightPx(0, 'footerFirst'))
@@ -267,9 +272,11 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
       const fDist = (d: HfDistances | null) => (d ? cmToPx(d.footer) : footerDistPx);
       const reach = (key: HfZoneKey, dist: number, footer = false) =>
         hfReachPx(s[key] ?? null, dist, footer, zoneHeightPx(i + 1, key));
+      const firstKey = s.differentFirstPage ? 'headerFirst' : 'header';
       return [
-        Math.max(topOf(first), reach(s.differentFirstPage ? 'headerFirst' : 'header', hDist(firstD))),
-        Math.max(topOf(rest), reach('header', hDist(restD)), s.differentOddEven ? reach('headerEven', hDist(restD)) : 0),
+        pushed(Math.max(topOf(first), reach(firstKey, hDist(firstD))), i + 1, firstKey),
+        Math.max(pushed(Math.max(topOf(rest), reach('header', hDist(restD))), i + 1, 'header'),
+          s.differentOddEven ? pushed(Math.max(topOf(rest), reach('headerEven', hDist(restD))), i + 1, 'headerEven') : 0),
         Math.max(bottomOf(first), reach(s.differentFirstPage ? 'footerFirst' : 'footer', fDist(firstD), true)),
         Math.max(bottomOf(rest), reach('footer', fDist(restD), true), s.differentOddEven ? reach('footerEven', fDist(restD), true) : 0),
       ];
@@ -1818,6 +1825,7 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
         {chapterStarts}
         {pageNumbering}
         bind:zoneHeights={hfZoneHeights}
+        bind:zoneIntrusions={hfZoneIntrusions}
         interactive={i === 0}
       />
     </div>
