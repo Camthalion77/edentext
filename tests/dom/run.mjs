@@ -85,6 +85,27 @@ try {
   await page.waitForSelector('.tiptap', { timeout: 15_000 });
   await settled(opened);
 
+  // A language for all text rewrites every block's attrs, the blocks on both sides of each
+  // page break included; the breaks have to stay where they were, and through the undo.
+  // Kept-together paragraphs break between blocks, and a language of their own first
+  // gives clearing it something to change. Every step is undone again after.
+  const breaks = () => page.evaluate(() => Array.from(document.querySelectorAll('[data-page-break-spacer]'),
+    (s) => Math.round(s.getBoundingClientRect().top)).join(','));
+  const relabel = async (how) => { await page.evaluate(how); await page.waitForTimeout(1500); return breaks(); };
+  const undo = () => document.querySelector('.tiptap').editor.commands.undo();
+  const breaksKept = await relabel(() => document.querySelector('.tiptap').editor.chain()
+    .selectAll().updateAttributes('paragraph', { keepLines: true }).setTextSelection(1).run());
+  const breaksLabelled = await relabel(() => document.querySelector('.tiptap').editor.chain()
+    .selectAll().setBlockLanguage('fr-FR').setTextSelection(1).run());
+  await page.locator('.statusbar .lang-picker select').selectOption('doc:de');
+  const breaksCleared = await relabel(() => {});
+  const breaksUndone = await relabel(undo);
+  check(breaksKept.includes(',') && [breaksLabelled, breaksCleared, breaksUndone].every((b) => b === breaksKept),
+    `a language for all text keeps the page breaks (${breaksKept} → ${breaksLabelled} → ${breaksCleared} → ${breaksUndone})`);
+  await page.evaluate(undo);
+  await page.evaluate(undo);
+  await settled(opened);
+
   // The caret is placed through the editor: a click lands wherever the element's centre
   // happens to be. The focus itself arrives on the next animation frame, so a key sent
   // before it is lost — wait for it.
