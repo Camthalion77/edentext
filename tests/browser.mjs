@@ -190,7 +190,8 @@ export function extractLayout() {
   }
   // Folded, not spread: a several-hundred-page document has more words than a call
   // takes arguments, and Math.max(...words) then blows the stack instead of measuring.
-  const numPages = words.reduce((m, w) => (w.page > m ? w.page : m), 0) + 1;
+  // Every page the grid draws counts, a page holding only a picture too, as in the PDF.
+  const numPages = Math.max(boxes.length, words.reduce((m, w) => (w.page > m ? w.page : m), 0) + 1);
   const pages = Array.from({ length: numPages }, (_, i) => ({
     words: words.filter((w) => w.page === i).map(({ page, ...r }) => r),
     width: (boxes[i]?.width ?? pageW) * PX_MM,
