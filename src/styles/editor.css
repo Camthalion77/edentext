@@ -412,6 +412,12 @@
 .paper .tiptap .image-node.image-line:not([data-v-align='offset']) {
   vertical-align: bottom !important;
 }
+/* ProseMirror's caret shim after a paragraph-ending image: an image wider than the line
+   leaves it no room, and it wrapped onto an empty line of its own that neither word
+   processor sets. Out of flow it takes none. */
+.paper .tiptap .image-node.image-line + img.ProseMirror-separator {
+  position: absolute;
+}
 /* While selected, lift the node (and its handles) above the header/footer layer
    (z-index 22) so a rotate/resize handle poking into a margin stays grabbable. */
 .paper .tiptap .image-node.image-selected {
