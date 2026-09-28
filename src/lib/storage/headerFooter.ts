@@ -1,4 +1,4 @@
-// Header/footer content: one TipTap doc per zone (hfExtensions schema).
+// Header/footer content: one TipTap doc per zone (zoneExtensions schema).
 // 'default' repeats on every page (odd pages when odd/even is on), 'first' overrides
 // page 1, 'even' overrides even pages — also their precedence. null = empty zone.
 

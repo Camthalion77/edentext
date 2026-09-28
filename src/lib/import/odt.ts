@@ -95,7 +95,7 @@ export interface OdtImportResult {
   // (settings.xml AddParaTableSpacing=false, what LibreOffice writes for a Word import).
   spacingModel: SpacingModel;
   spacingAtPageStart: boolean;
-  // Single-paragraph docs in the hfExtensions schema; null = no zone.
+  // Zone docs in the zoneExtensions schema; null = no zone.
   header: HfDoc;
   footer: HfDoc;
   // First-page variants (Word "Different First Page" / ODF header-first). null when
