@@ -311,7 +311,7 @@ function hasCustomAttrs(attrs: TiptapNode['attrs']): boolean {
   if (typeof attrs.fontSize === 'string' && attrs.fontSize) return true;
   if (typeof attrs.fontFamily === 'string' && attrs.fontFamily) return true;
   if (typeof attrs.fontFamilyAsian === 'string' && attrs.fontFamilyAsian) return true;
-  if (typeof attrs.indent === 'number' && attrs.indent > 0) return true;
+  if (typeof attrs.indent === 'number' && attrs.indent >= 0) return true;
   if (typeof attrs.indentFirst === 'number' && attrs.indentFirst !== 0) return true;
   if (typeof attrs.indentFirstChars === 'number' && attrs.indentFirstChars !== 0) return true;
   if (typeof attrs.indentChars === 'number' && attrs.indentChars !== 0) return true;
@@ -1389,7 +1389,8 @@ function paraStyleFromAttrs(attrs: TiptapNode['attrs'], withIndents = true): Par
     borderBottom: border(attrs?.borderBottom),
     borderLeft: border(attrs?.borderLeft),
     dir: attrs?.dir === 'rtl' || attrs?.dir === 'ltr' ? attrs.dir : null,
-    indent: cm(attrs?.indent),
+    // An explicit 0 is kept: it overrides the named style's indent.
+    indent: withIndents && attrs?.indent === 0 ? 0 : cm(attrs?.indent),
     indentFirst: cm(attrs?.indentFirst),
     indentFirstChars: cm(attrs?.indentFirstChars),
     indentChars: cm(attrs?.indentChars),
@@ -5417,7 +5418,8 @@ export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAU
       if (spacing.spaceBefore != null) opts.spaceBefore = `${spacing.spaceBefore}pt`;
       if (spacing.spaceAfter != null) opts.spaceAfter = `${spacing.spaceAfter}pt`;
       // Left indent → fo:margin-left (odf-kit emits it natively from indentLeft).
-      if (typeof node.attrs?.indent === 'number' && node.attrs.indent > 0) {
+      // An explicit 0 is kept: it overrides the named style's indent.
+      if (typeof node.attrs?.indent === 'number' && node.attrs.indent >= 0) {
         opts.indentLeft = `${node.attrs.indent}cm`;
       }
       // First-line indent → fo:text-indent; negative is a hanging indent.

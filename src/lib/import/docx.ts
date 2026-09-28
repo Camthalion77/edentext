@@ -1268,6 +1268,12 @@ function convertParagraph(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault:
     baked ? ctx.styles.paragraphSpacing(styleId, kind === 'cell' ? ctx.cellSpacing : undefined) : {},
     bidi ?? ctx.pageRtl, kind === 'zone' ? null : styleJc);
   applyContextualSpacing(el, ppr, ctx, styleId, attrs);
+  // A direct left indent at or below 0 still overrides the style's own one.
+  const ind = kind !== 'list' && !baked ? fc(ppr, 'ind') : null;
+  const directLeft = ind && !intAttr(ind, W, 'leftChars') ? intAttr(ind, W, 'left') ?? intAttr(ind, W, 'start') : null;
+  if (directLeft != null && attrs.indent == null && (ctx.styles.styleIndentTwip(styleId) ?? 0) > 0) {
+    attrs.indent = Math.max(0, round2(twipToCm(directLeft)));
+  }
   // The editor has no rule node, so Word's horizontal line becomes its paragraph's own
   // bottom rule — a real w:pBdr keeps precedence, only one line can be drawn.
   const hr = hrBorderAttr(el);

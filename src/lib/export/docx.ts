@@ -2439,7 +2439,8 @@ function paragraphToDocx(node: TiptapNode, opts: ParaOpts = {}): Paragraph {
   const indChars = opts.numbering ? '' : indentCharsPayload(attrs);
   if (!opts.numbering) {
     const left = leftCm(attrs, pt);
-    if (left > 0) indent.left = cmToTwip(left);
+    // An explicit 0 is kept: it overrides the named style's indent.
+    if (left > 0 || attrs.indent === 0) indent.left = cmToTwip(left);
     else if (opts.indentLeftTwip) indent.left = opts.indentLeftTwip;
     const right = rightCm(attrs, pt);
     if (right > 0) indent.right = cmToTwip(right);
