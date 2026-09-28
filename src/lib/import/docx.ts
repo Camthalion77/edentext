@@ -196,6 +196,7 @@ const DEFAULT_FONTS = new Set(['times new roman', 'liberation serif']);
 // Headings render sans (HEADING_FONT); Word writes Arial, LibreOffice Liberation Sans.
 const DEFAULT_HEADING_FONTS = new Set(['arial', 'liberation sans']);
 const LIST_LEFT_STEP_CM = 1.27; // matches export/docx.ts
+const LIST_HANGING_CM = 0.635; // matches export/docx.ts
 const LIST_INDENT_EPS_CM = 0.05;
 const LINK_BLUE = '#0563C1'; // the visual the exporter paints on hyperlink runs
 
@@ -671,11 +672,11 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
         if (top && top.ilvl === num.ilvl && top.numId !== num.numId) { closeTop(); top = stack[stack.length - 1]; }
         // Only the item's own level takes its w:ind; the levels opened above it to reach
         // it have no item of their own to speak for them.
-        const ownLeft = listIndentTwip(el);
+        const own = listItemIndent(el, ctx);
         while (stack.length === 0 || stack[stack.length - 1].ilvl < num.ilvl) {
           const ilvl = stack.length ? stack[stack.length - 1].ilvl + 1 : 0;
           stack.push({ ilvl, numId: num.numId,
-            list: makeListNode(ctx, num.numId, ilvl, ilvl === num.ilvl ? ownLeft : null) });
+            list: makeListNode(ctx, num.numId, ilvl, ilvl === num.ilvl ? own : EMPTY_ITEM_INDENT) });
           if (ilvl === num.ilvl) break;
         }
         const targetList = stack[stack.length - 1].list;
@@ -796,17 +797,30 @@ function listBaseCycle(ctx: Ctx, numId: number, ilvl: number): OrderedCycle {
   return cycle;
 }
 
-// `ownLeftTwip`: the item's own w:pPr/w:ind w:left, which overrides the level's — Word
-// resolves direct paragraph properties over the numbering's. The editor keeps one indent
-// per list, so the item opening it is the one that sets it.
-// A list item's own left indent (twips), direct w:pPr only — as blockAttrs reads the
-// other indents.
-function listIndentTwip(el: Element): number | null {
-  const ind = fc(fc(el, 'pPr'), 'ind');
-  return ind ? intAttr(ind, W, 'left') ?? intAttr(ind, W, 'start') : null;
+// A list item's own left indent and hang (twips), which override the level's — Word
+// resolves direct paragraph properties over the numbering's. The editor keeps one
+// geometry per list, so the item opening it is the one that sets it. A character count
+// wins over the twips and counts in the paragraph style's size, as blockAttrs reads it.
+type ItemIndent = { left: number | null; hang: number | null };
+const EMPTY_ITEM_INDENT: ItemIndent = { left: null, hang: null };
+function listItemIndent(el: Element, ctx: Ctx): ItemIndent {
+  const ppr = fc(el, 'pPr');
+  const ind = fc(ppr, 'ind');
+  if (!ind) return EMPTY_ITEM_INDENT;
+  const charTwip = blockDefaults(ctx.styles.paragraphRun(styleIdOf(ppr, ctx)), null, false).fontSizePt * 20 / 100;
+  const pick = (chars: string, twips: string) => {
+    const c = intAttr(ind, W, chars);
+    return c ? Math.round(c * charTwip) : intAttr(ind, W, twips);
+  };
+  const hanging = pick('hangingChars', 'hanging');
+  const first = pick('firstLineChars', 'firstLine');
+  return {
+    left: pick('leftChars', 'left') ?? intAttr(ind, W, 'start'),
+    hang: hanging ?? (first != null ? -first : null),
+  };
 }
 
-function makeListNode(ctx: Ctx, numId: number, ilvl: number, ownLeftTwip: number | null = null): Node {
+function makeListNode(ctx: Ctx, numId: number, ilvl: number, own: ItemIndent = EMPTY_ITEM_INDENT): Node {
   const def = ctx.styles.level(numId, ilvl);
   const bullet = !def.numFmt || def.numFmt === 'bullet' || def.numFmt === 'none';
   // A linked numbering style travels as `listStyleName` on the outermost list; its
@@ -836,7 +850,7 @@ function makeListNode(ctx: Ctx, numId: number, ilvl: number, ownLeftTwip: number
     }
     if (def.start != null && def.start > 1) attrs.start = def.start;
   }
-  const ownLeft = ownLeftTwip ?? def.leftTwip;
+  const ownLeft = own.left ?? def.leftTwip;
   if (ownLeft != null) {
     // A level's w:ind w:left is absolute, the editor nests one LIST_LEFT_STEP_CM per
     // level — so the attr is this level's step past the one above. Signed (w:left="360"
@@ -850,6 +864,9 @@ function makeListNode(ctx: Ctx, numId: number, ilvl: number, ownLeftTwip: number
     if (Math.abs(extra) > LIST_INDENT_EPS_CM) attrs.indent = extra;
   }
   if (def.rightAligned) attrs.markerAlign = 'right';
+  const hang = own.hang ?? def.hangingTwip;
+  if (hang != null && Math.abs(twipToCm(hang) - LIST_HANGING_CM) > LIST_INDENT_EPS_CM) attrs.hanging = round2(twipToCm(hang));
+  if (def.suffix === 'space' || def.suffix === 'nothing') attrs.markerSuffix = def.suffix;
   const node: Node = { type: bullet ? 'bulletList' : 'orderedList', content: [] };
   if (Object.keys(attrs).length) node.attrs = attrs;
   return node;

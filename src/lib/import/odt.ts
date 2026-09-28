@@ -806,6 +806,7 @@ const DEFAULT_HEADING_FONTS = new Set(['arial', 'liberation sans']);
 // A top-level list's margin beyond this level-1 base is its whole-list indent.
 const LIST_BASE_MARGIN_CM = 1.27;
 const LIST_INDENT_EPS_CM = 0.05;
+const LIST_HANGING_CM = 0.635; // the hang every list export writes (export/docx.ts)
 
 // ---- entry --------------------------------------------------------------------
 
@@ -2907,6 +2908,7 @@ function convertList(el: Element, ctx: Ctx, inheritedStyleName: string | null, d
       if (bulletChar) attrs.bulletChar = bulletChar;
       if (indent != null) attrs.indent = indent;
       if (listLevelRightAligned(levelDef)) attrs.markerAlign = 'right';
+      Object.assign(attrs, listLevelLabel(levelDef, depth));
     }
     const node: Node = { type: 'bulletList', content: items };
     if (Object.keys(attrs).length) node.attrs = attrs;
@@ -2932,6 +2934,7 @@ function convertList(el: Element, ctx: Ctx, inheritedStyleName: string | null, d
     if (listStyleType) attrs.listStyleType = listStyleType;
     if (indent != null) attrs.indent = indent;
     if (listLevelRightAligned(levelDef)) attrs.markerAlign = 'right';
+    Object.assign(attrs, listLevelLabel(levelDef, depth));
   }
   const node: Node = { type: 'orderedList', content: items };
   if (Object.keys(attrs).length) node.attrs = attrs;
@@ -2947,6 +2950,21 @@ function listLevelRightAligned(levelDef: Element | null): boolean {
     return align === 'end' || align === 'right';
   }
   return false;
+}
+
+// The label's hang (the negated fo:text-indent) and what follows it, where they differ
+// from the flat 0.635cm and tab the editor draws. odf-kit writes depth × 0.635cm, which
+// is the same default.
+function listLevelLabel(levelDef: Element | null, depth: number): { hanging?: number; markerSuffix?: 'space' | 'nothing' } {
+  const la = levelDef?.getElementsByTagNameNS(NS.style, 'list-level-label-alignment')[0];
+  if (!la) return {};
+  const out: { hanging?: number; markerSuffix?: 'space' | 'nothing' } = {};
+  const ti = lengthToCm(la.getAttributeNS(NS.fo, 'text-indent'));
+  const hang = ti == null ? null : Math.round(-ti * 100) / 100;
+  if (hang != null && ![LIST_HANGING_CM, depth * LIST_HANGING_CM].some((d) => Math.abs(hang - d) <= LIST_INDENT_EPS_CM)) out.hanging = hang;
+  const follow = la.getAttributeNS(NS.text, 'label-followed-by');
+  if (follow === 'space' || follow === 'nothing') out.markerSuffix = follow;
+  return out;
 }
 
 // Level's fo:margin-left (cm) from its <style:list-level-label-alignment> (the

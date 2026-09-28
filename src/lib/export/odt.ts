@@ -2649,7 +2649,7 @@ function applyBulletListChars(odtBytes: Uint8Array, chars: (string[] | null)[]):
 // Per-level indent (cm) and label alignment of each top-level list, from the first list
 // at that level. odf-kit uses label-alignment mode (which ignores the paragraph margin),
 // so both go onto the L# list-style's own level definitions.
-type ListLevelProps = { indent: number; right: boolean };
+type ListLevelProps = { indent: number; right: boolean; hanging: number | null; suffix: 'space' | 'nothing' | null };
 
 function collectListLevelProps(node: TiptapNode, result: ListLevelProps[][]): void {
   for (const child of node.content ?? []) {
@@ -2659,7 +2659,7 @@ function collectListLevelProps(node: TiptapNode, result: ListLevelProps[][]): vo
     const visit = (list: TiptapNode, depth: number) => {
       if (levels[depth - 1] === undefined) {
         const eff = effectiveListLevel(list.attrs ?? {}, list.type === 'orderedList', style, depth);
-        levels[depth - 1] = { indent: eff.indent, right: eff.markerAlign === 'right' };
+        levels[depth - 1] = { indent: eff.indent, right: eff.markerAlign === 'right', hanging: eff.hanging, suffix: eff.markerSuffix };
       }
       for (const item of list.content ?? []) {
         for (const block of item.content ?? []) {
@@ -2673,7 +2673,7 @@ function collectListLevelProps(node: TiptapNode, result: ListLevelProps[][]): vo
 }
 
 function applyListLevelProps(odtBytes: Uint8Array, props: ListLevelProps[][]): Uint8Array {
-  const plain = (l: ListLevelProps) => !l?.indent && !l?.right;
+  const plain = (l: ListLevelProps) => !l?.indent && !l?.right && l?.hanging == null && !l?.suffix;
   if (props.every(levels => levels.every(plain))) return odtBytes;
 
   const files = unzipSync(odtBytes);
@@ -2693,9 +2693,13 @@ function applyListLevelProps(odtBytes: Uint8Array, props: ListLevelProps[][]): U
         ? lvl.replace(/(fo:margin-left)="([\d.]+)cm"/g, bump(cm))
              .replace(/(text:list-tab-stop-position)="([\d.]+)cm"/g, bump(cm))
         : lvl;
-      return levels[n - 1]?.right
+      const own = levels[n - 1];
+      let out = own?.right
         ? shifted.replace('<style:list-level-properties ', '<style:list-level-properties fo:text-align="end" ')
         : shifted;
+      if (own?.hanging != null) out = out.replace(/fo:text-indent="[^"]*"/, `fo:text-indent="${-own.hanging}cm"`);
+      if (own?.suffix) out = out.replace(/text:label-followed-by="[^"]*"/, `text:label-followed-by="${own.suffix}"`);
+      return out;
     });
 
   props.forEach((levels, i) => {

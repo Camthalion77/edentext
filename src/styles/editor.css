@@ -739,6 +739,10 @@
 .paper .tiptap li {
   list-style: none;
 }
+/* The level's hanging indent; a list's own `hanging` attr sets it inline (listMarker.ts). */
+.paper .tiptap :is(ol, ul) {
+  --list-hang: 0.635cm;
+}
 
 /* The containing block for the right-aligned marker below, which stays absolute. */
 .paper .tiptap li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10) {
@@ -750,8 +754,8 @@
    the first line right instead of printing under it, as both word processors do. */
 .paper .tiptap li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before {
   float: left;
-  min-width: 0.635cm;
-  margin-left: -0.635cm;
+  min-width: max(0cm, var(--list-hang));
+  margin-left: calc(-1 * var(--list-hang));
   white-space: pre;
   line-height: inherit;
   /* The marker follows the item's first text portion (listMarker.ts sets the custom
@@ -771,7 +775,11 @@
   top: 0;
   min-width: 0;
   margin-left: 0;
-  right: calc(100% + 0.635cm);
+  right: calc(100% + var(--list-hang));
+}
+/* A label followed by a space or nothing has no tab to run to: the text follows it. */
+.paper .tiptap :is(ol, ul)[data-marker-suffix] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before {
+  min-width: 0;
 }
 
 /* Ordered numbering, keyed by data-eff-list-style — the effective numbering

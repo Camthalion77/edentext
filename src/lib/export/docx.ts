@@ -139,6 +139,11 @@ function subtreeHasStart(node: TiptapNode): boolean {
 // List geometry: 0.5in left step per level, 0.25in hanging for the marker (Word defaults).
 const LIST_LEFT_STEP_CM = 1.27;
 const LIST_HANGING_CM = 0.635;
+// A list's hang as Word splits it by sign: a negative one is a first-line indent.
+function listHangIndent(hangingCm: number | null): { hanging?: number; firstLine?: number } {
+  const cm = hangingCm ?? LIST_HANGING_CM;
+  return cm < 0 ? { firstLine: cmToTwip(-cm) } : { hanging: cmToTwip(cm) };
+}
 
 // ODF num-format char → Word numbering format.
 const ORDERED_FORMAT: Record<string, (typeof LevelFormat)[keyof typeof LevelFormat]> = {
@@ -464,13 +469,14 @@ class Numbering {
     if (depth === 0 && effOrderedKey(node, style, 0) === 'multilevel') this.mlRefs.add(reference);
     const levels = this.map.get(reference)!;
     if (levels.some((l) => l.level === depth)) return;
-    const indent: IIndentAttributesProperties = {
-      left: cmToTwip((depth + 1) * LIST_LEFT_STEP_CM + extraIndentCm),
-      hanging: cmToTwip(LIST_HANGING_CM),
-    };
     // w:lvlJc: which end of the hanging indent the label is set against.
     const eff = effectiveListLevel(node.attrs ?? {}, node.type === 'orderedList', style, depth + 1);
     const alignment = eff.markerAlign === 'right' ? AlignmentType.RIGHT : AlignmentType.LEFT;
+    const indent: IIndentAttributesProperties = {
+      left: cmToTwip((depth + 1) * LIST_LEFT_STEP_CM + extraIndentCm),
+      ...listHangIndent(eff.hanging),
+    };
+    const suffix = eff.markerSuffix === 'space' ? LevelSuffix.SPACE : eff.markerSuffix === 'nothing' ? LevelSuffix.NOTHING : undefined;
     if (eff.kind === 'number') {
       const attr = eff.listStyleType;
       const chained = this.mlRefs.has(reference) && (depth === 0 || !attr || attr === 'multilevel');
@@ -484,6 +490,7 @@ class Numbering {
         alignment,
         start: typeof node.attrs?.start === 'number' ? node.attrs.start : eff.startAt ?? 1,
         style: { paragraph: { indent }, run: markerRunProps(node) },
+        ...(suffix ? { suffix } : {}),
       });
     } else {
       levels.push({
@@ -494,6 +501,7 @@ class Numbering {
         text: bulletCharOf(node, depth, style),
         alignment,
         style: { paragraph: { indent }, run: markerRunProps(node) },
+        ...(suffix ? { suffix } : {}),
       });
     }
   }
@@ -1407,11 +1415,13 @@ function txbxLevelXml(node: TiptapNode, depth: number, chained: boolean, cycle: 
       : `%${depth + 1}${def.numSuffix}`;
   const start = ordered && typeof node.attrs?.start === 'number' ? node.attrs.start : 1;
   const jc = node.attrs?.markerAlign === 'right' ? 'right' : 'left';
+  const suff = node.attrs?.markerSuffix === 'space' || node.attrs?.markerSuffix === 'nothing' ? `<w:suff w:val="${node.attrs.markerSuffix}"/>` : '';
+  const hang = listHangIndent(typeof node.attrs?.hanging === 'number' ? node.attrs.hanging : null);
+  const hangXml = hang.firstLine != null ? ` w:firstLine="${hang.firstLine}"` : ` w:hanging="${hang.hanging}"`;
   return (
-    `<w:lvl w:ilvl="${depth}"><w:start w:val="${start}"/><w:numFmt w:val="${fmt}"/>` +
+    `<w:lvl w:ilvl="${depth}"><w:start w:val="${start}"/><w:numFmt w:val="${fmt}"/>${suff}` +
     `<w:lvlText w:val="${escapeXml(text)}"/><w:lvlJc w:val="${jc}"/>` +
-    `<w:pPr><w:ind w:left="${cmToTwip((depth + 1) * LIST_LEFT_STEP_CM)}"` +
-    ` w:hanging="${cmToTwip(LIST_HANGING_CM)}"/></w:pPr></w:lvl>`
+    `<w:pPr><w:ind w:left="${cmToTwip((depth + 1) * LIST_LEFT_STEP_CM)}"${hangXml}/></w:pPr></w:lvl>`
   );
 }
 
