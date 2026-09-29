@@ -71,6 +71,9 @@ export async function openApp(port, opts = {}) {
 // yet and would settle the layout at a page count it leaves again a frame later.
 // `loaded`: the caller knows the file is in (a document may be empty for good).
 export async function settle(page, loaded = false) {
+  // Each call waits out its own quiet period: a key left from the last call would pass at
+  // once, before a change just asked for (an index update) has even landed.
+  await page.evaluate(() => { window.__parityKey = undefined; });
   await page.waitForFunction((loaded) => {
     const el = document.querySelector('.tiptap');
     // Importing a large file takes seconds; an editor still empty is not "settled",
