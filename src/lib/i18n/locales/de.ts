@@ -117,6 +117,7 @@ const de: Messages = {
     alignTo: (label: string) => `${label} ausrichten`,
   },
   toolbar: {
+    glyphs: { bold: 'F', italic: 'K', underline: 'U' },
     bold: 'Fett',
     italic: 'Kursiv',
     underline: 'Unterstrichen',

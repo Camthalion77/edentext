@@ -440,11 +440,11 @@
   </div>
 </RibbonGroup>
 
-{#snippet boldIcon()}<span class="glyph" style="font-weight: 800">B</span>{/snippet}
-{#snippet italicIcon()}<span class="glyph" style="font-style: italic; font-family: serif">I</span>{/snippet}
-{#snippet underlineIcon()}<span class="glyph" style="text-decoration: underline">U</span>{/snippet}
+{#snippet boldIcon()}<span class="glyph" style="font-weight: 800">{t().toolbar.glyphs.bold}</span>{/snippet}
+{#snippet italicIcon()}<span class="glyph" style="font-style: italic; font-family: serif">{t().toolbar.glyphs.italic}</span>{/snippet}
+{#snippet underlineIcon()}<span class="glyph" style="text-decoration: underline">{t().toolbar.glyphs.underline}</span>{/snippet}
 {#snippet emphasisIcon()}<span class="glyph" style="text-emphasis: filled dot; text-emphasis-position: under right">文</span>{/snippet}
-{#snippet strikeIcon()}<span class="glyph" style="text-decoration: line-through">S</span>{/snippet}
+{#snippet strikeIcon()}<span class="glyph" style="text-decoration: line-through">ab</span>{/snippet}
 {#snippet subIcon()}<span class="glyph">X<span class="glyph-script down">2</span></span>{/snippet}
 {#snippet superIcon()}<span class="glyph">X<span class="glyph-script up">2</span></span>{/snippet}
 {#snippet growIcon()}<span class="glyph">A<span class="glyph-sup">▲</span></span>{/snippet}

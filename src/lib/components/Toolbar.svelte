@@ -219,28 +219,28 @@
         }}
         title={`${t().toolbar.bold} (${withShortcut('Ctrl+B')})`}
       >
-        <strong>B</strong>
+        <strong>{t().toolbar.glyphs.bold}</strong>
       </button>
       <button
         class:active={isItalic}
         onclick={() => editor?.chain().focus().toggleItalic().run()}
         title={`${t().toolbar.italic} (${withShortcut('Ctrl+I')})`}
       >
-        <em>I</em>
+        <em>{t().toolbar.glyphs.italic}</em>
       </button>
       <button
         class:active={isUnderline}
         onclick={() => editor?.chain().focus().toggleUnderline().run()}
         title={`${t().toolbar.underline} (${withShortcut('Ctrl+U')})`}
       >
-        <u>U</u>
+        <u>{t().toolbar.glyphs.underline}</u>
       </button>
       <button
         class:active={isStrike}
         onclick={() => editor?.chain().focus().toggleStrike().run()}
         title={`${t().toolbar.strikethrough} (${withShortcut('Ctrl+Shift+S')})`}
       >
-        <s>S</s>
+        <s>ab</s>
       </button>
     </div>
 

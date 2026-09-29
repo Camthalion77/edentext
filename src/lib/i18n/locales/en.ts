@@ -121,6 +121,8 @@ const en = {
     alignTo: (label: string) => `Align ${label.toLowerCase()}`,
   },
   toolbar: {
+    // The letters on the bold, italic and underline buttons, as word processors localize them.
+    glyphs: { bold: 'B', italic: 'I', underline: 'U' },
     bold: 'Bold',
     italic: 'Italic',
     underline: 'Underline',

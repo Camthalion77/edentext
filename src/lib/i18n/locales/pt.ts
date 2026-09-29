@@ -117,6 +117,7 @@ const pt: Messages = {
     alignTo: (label) => `Alinhar ${label.toLowerCase()}`,
   },
   toolbar: {
+    glyphs: { bold: 'N', italic: 'I', underline: 'S' },
     bold: 'Negrito',
     italic: 'Itálico',
     underline: 'Sublinhado',

@@ -120,6 +120,7 @@ const zhHant: Messages = {
     alignTo: (label: string) => label,
   },
   toolbar: {
+    glyphs: { bold: 'B', italic: 'I', underline: 'U' },
     bold: '粗體',
     italic: '斜體',
     underline: '底線',

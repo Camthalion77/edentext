@@ -120,6 +120,7 @@ const ja: Messages = {
     alignTo: (label: string) => label,
   },
   toolbar: {
+    glyphs: { bold: 'B', italic: 'I', underline: 'U' },
     bold: '太字',
     italic: '斜体',
     underline: '下線',

@@ -119,6 +119,7 @@ const zhHans: Messages = {
     alignTo: (label: string) => label,
   },
   toolbar: {
+    glyphs: { bold: 'B', italic: 'I', underline: 'U' },
     bold: '加粗',
     italic: '倾斜',
     underline: '下划线',

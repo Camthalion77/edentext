@@ -118,6 +118,7 @@ const es: Messages = {
     alignTo: (label) => `Alineación: ${label.toLowerCase()}`,
   },
   toolbar: {
+    glyphs: { bold: 'N', italic: 'K', underline: 'S' },
     bold: 'Negrita',
     italic: 'Cursiva',
     underline: 'Subrayado',

@@ -124,6 +124,7 @@ const ru: Messages = {
     alignTo: (label) => `Выровнять ${label.toLowerCase()}`,
   },
   toolbar: {
+    glyphs: { bold: 'Ж', italic: 'К', underline: 'Ч' },
     bold: 'Полужирный',
     italic: 'Курсив',
     underline: 'Подчёркнутый',

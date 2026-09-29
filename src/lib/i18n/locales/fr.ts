@@ -123,6 +123,7 @@ const fr: Messages = {
     },
   },
   toolbar: {
+    glyphs: { bold: 'G', italic: 'I', underline: 'S' },
     bold: 'Gras',
     italic: 'Italique',
     underline: 'Souligné',
