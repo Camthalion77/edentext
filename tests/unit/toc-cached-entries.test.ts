@@ -6,6 +6,7 @@ import { importDocx } from '../../src/lib/import/docx';
 import { importOdt } from '../../src/lib/import/odt';
 import { buildDocx } from '../../src/lib/export/docx';
 import { buildOdt } from '../../src/lib/export/odt';
+import { matchRows } from '../../src/lib/editor/extensions/tableOfContents';
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MARGINS = { top: 2, bottom: 2, left: 2, right: 2 };
@@ -45,5 +46,13 @@ describe('an imported index', () => {
     const doc: any = importDocx(docx).content;
     expect(toc(importOdt(await buildOdt(doc, MARGINS, 'portrait'))).attrs.entries).toEqual(CACHED);
     expect(toc(importDocx(await buildDocx(doc, MARGINS, 'portrait'))).attrs.entries).toEqual(CACHED);
+  });
+});
+
+describe('updating page numbers only', () => {
+  it('finds each saved row\'s source in order, by text or past its number label', () => {
+    const fresh = [{ text: '1 Intro' }, { text: 'Same' }, { text: 'Same' }, { text: '2 Method' }];
+    expect(matchRows([{ text: 'Same' }, { text: '1.\tIntro' }, { text: 'Same' }, { text: 'Gone' }, { text: '2. Method' }], fresh))
+      .toEqual([1, 0, 2, -1, 3]);
   });
 });

@@ -335,7 +335,7 @@ try {
   // An index shows the rows it saved, as both word processors do, until it is updated.
   const heading = (t) => ({ type: 'heading', attrs: { level: 1 }, content: [words(t)] });
   await page.evaluate((d) => localStorage.setItem('edentext-doc', JSON.stringify(d)), { type: 'doc', content: [
-    { type: 'tableOfContents', attrs: { title: '', entries: [{ text: 'Saved', level: 1, page: 9 }] } },
+    { type: 'tableOfContents', attrs: { title: '', entries: [{ text: 'Two', level: 1, page: 9 }, { text: 'Gone', level: 1, page: 7 }] } },
     heading('One'), heading('Two'),
   ] });
   await page.reload({ waitUntil: 'load' });
@@ -344,10 +344,15 @@ try {
   const tocRows = () => page.evaluate(() => Array.from(document.querySelectorAll('.toc-entry'),
     (r) => `${r.querySelector('.toc-text').textContent} ${r.querySelector('.toc-page').textContent}`).join(', '));
   const cachedRows = await tocRows();
+  // Word's other choice: the saved rows stay, their page numbers are renewed.
+  await page.evaluate(() => document.querySelector('.tiptap').editor.commands.updateIndexes('pages'));
+  await settle(page, true);
+  const renumbered = await tocRows();
   await page.evaluate(() => document.querySelector('.tiptap').editor.commands.updateIndexes());
   await settle(page, true);
   const updated = await tocRows();
-  check(cachedRows === 'Saved 9' && updated === 'One 1, Two 1', `an index keeps its saved rows until updated (${cachedRows} → ${updated})`);
+  check(cachedRows === 'Two 9, Gone 7' && renumbered === 'Two 1, Gone 7' && updated === 'One 1, Two 1',
+    `an index keeps its saved rows until updated (${cachedRows} → ${renumbered} → ${updated})`);
 
   // A two-column section over several pages pages in one pass: a continuation is judged
   // with a full page wherever it renders, and the split counts the blocks' margins as the
