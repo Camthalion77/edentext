@@ -23,7 +23,7 @@
   import { styleSheet } from '../../../styles/sheet.svelte';
   import { emphasisCss, type CapsMode, type Emphasis, type LineStyle } from '../../../editor/extensions/textEffects';
   import type { StyleFamily } from '../../../styles/styleSheet';
-  import { t } from '../../../i18n/i18n.svelte';
+  import { styleLabel, t } from '../../../i18n/i18n.svelte';
   import { withShortcut } from '../../../i18n/shortcut';
   import { shortcutHint, type ShortcutId } from '../../../editor/shortcuts';
 
@@ -350,7 +350,7 @@
               <div class="rb-menu-label">{t().styles.listStyles}</div>
               {#each bulletListStyles as s (s.name)}
                 <button class:selected={currentListStyle === s.name} onclick={() => applyListStyle(s, 'bulletList')}>
-                  <span class="marker">{listStylePreview(s)}</span>{s.name}
+                  <span class="marker">{listStylePreview(s)}</span>{styleLabel(s.name)}
                 </button>
               {/each}
             {/if}
@@ -372,7 +372,7 @@
               <div class="rb-menu-label">{t().styles.listStyles}</div>
               {#each orderedListStyles as s (s.name)}
                 <button class:selected={currentListStyle === s.name} onclick={() => applyListStyle(s, 'orderedList')}>
-                  <span class="marker">{listStylePreview(s)}</span>{s.name}
+                  <span class="marker">{listStylePreview(s)}</span>{styleLabel(s.name)}
                 </button>
               {/each}
             {/if}
