@@ -1846,7 +1846,7 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
   // its own header/footer; the block that does it opens that section, and from it on
   // the blocks measure against that master's text width.
   const master = kind === 'body' ? resolver.masterPageOf(styleName) : null;
-  const opensSection = !!master && master !== (ctx.masterPages[ctx.masterPages.length - 1] ?? ctx.leadingMaster);
+  const opensSection = !!master && opensMaster(master, ctx);
   if (opensSection) {
     ctx.masterPages.push(master!);
     // The same paragraph carries the number the section restarts at, if it does.
@@ -3094,13 +3094,22 @@ function unbakeRegionColor(nodes: Node[], color: string): void {
   }
 }
 
+// Naming another master opens a section; naming the current one again does only where
+// that restarts something — its first page hands over, or it demands a side (probed:
+// every chapter reopening LibreOffice's Chapter Intro opens headless on a right page).
+function opensMaster(master: string, ctx: Ctx): boolean {
+  const current = ctx.masterPages[ctx.masterPages.length - 1] ?? ctx.leadingMaster;
+  if (master !== current) return true;
+  return ctx.bodyBlocks > 0 && (!!ctx.resolver.masterPageHF(master).restPage || !!ctx.resolver.pageStartSide(master));
+}
+
 // A block whose style names a master page opens a section, exactly as a paragraph style
 // does (convertParaLike): ODF's only per-section header/footer, and naming one is a page
 // break. Mutates ctx, so it runs before the block is converted against the new width.
 function sectionFlowAttrs(master: string | null, breakBefore: boolean, ctx: Ctx): Record<string, unknown> | null {
   const attrs: Record<string, unknown> = {};
   if (breakBefore && ctx.bodyBlocks) attrs.breakBefore = 'page';
-  if (master && master !== (ctx.masterPages[ctx.masterPages.length - 1] ?? ctx.leadingMaster)) {
+  if (master && opensMaster(master, ctx)) {
     ctx.masterPages.push(master);
     ctx.masterPageStarts.push(null);
     const geo = ctx.resolver.pageGeometry(master);

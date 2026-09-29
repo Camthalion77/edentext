@@ -1572,13 +1572,11 @@ export const PageBreaks = Extension.create({
                 sectionFirstPage = pushed ? page + 1 : page;
                 sectionFirstPages[sectionIndex] = sectionFirstPage;
                 // A section that must open on a right or left page takes the blank page
-                // before it, the way both word processors insert one — never for the
-                // document's own first page, which is a right page whatever it says.
+                // before it — never the document's first page. The sheet decides, not the
+                // printed number: LibreOffice pads a restart at 1 onto an even sheet (probed).
                 const side = i > 0 ? sideAt(sectionIndex) : null;
                 if (side) {
-                  const numberOf = (pg: number) => printedPageNumber(pg, sectionIndex, numStarts,
-                    (j) => (j === sectionIndex ? pg : sectionFirstPages[j] ?? 1));
-                  if ((isLeftPage(numberOf(sectionFirstPage)) ? 'even' : 'odd') !== side) {
+                  if ((sectionFirstPage % 2 === 0 ? 'even' : 'odd') !== side) {
                     sectionFirstPage++;
                     sectionFirstPages[sectionIndex] = sectionFirstPage;
                   }

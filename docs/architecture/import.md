@@ -58,7 +58,9 @@ page breaks apply to list paragraphs but not table-cell paragraphs.
 Master-page changes open document sections. Read page setup, headers, footers, edge distances,
 first-page and left/right variants from the governing master, and calculate content width per
 section. An explicit empty master-page name means no change. A left/right master pair represents
-mirrored layout; distinguish it from a first-page hand-over.
+mirrored layout; distinguish it from a first-page hand-over. Naming the current master again
+opens a new section only where that restarts something — a hand-over to a successor, or a
+`page-usage` side demand — which is how a book reopens Chapter Intro for every chapter.
 
 Header/footer body reach is the rendered zone height plus applicable gap, respecting dynamic
 spacing, wrapped content, and internal paragraph spacing. A trailing zone margin does not add
