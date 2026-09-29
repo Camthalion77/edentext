@@ -694,7 +694,10 @@
    Either half may come from the style rule or, nearer, from the block's own attrs
    (lineHeight.ts / blockFontSize.ts) — multiplying them here is what keeps both.
    A fixed spacing (--line-fixed) replaces the product outright. */
-.paper .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, li, .toc-entry) {
+/* A run in a face of its own sets the same product with that face's natural line, so a
+   taller one raises its line as in both word processors; a fixed spacing stays fixed. */
+.paper .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, li, .toc-entry),
+.paper .tiptap :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, li, .toc-entry) :is([style*='--natural-line'], [data-char-style]) {
   line-height: var(--line-fixed, calc(var(--line-factor) * var(--natural-line)));
 }
 
