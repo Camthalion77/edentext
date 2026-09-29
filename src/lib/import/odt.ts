@@ -1363,6 +1363,15 @@ function convertToc(el: Element, ctx: Ctx, indexKind: IndexKind): Node {
   const entries: TocEntry[] = [];
   const indexBody = el.getElementsByTagNameNS(NS.text, 'index-body')[0];
   for (const p of Array.from(indexBody?.children ?? [])) {
+    // A bibliography converted from a Word table holds one source per row.
+    if (p.namespaceURI === NS.table && p.localName === 'table') {
+      for (const tr of Array.from(p.getElementsByTagNameNS(NS.table, 'table-row'))) {
+        const text = Array.from(tr.getElementsByTagNameNS(NS.text, 'p'))
+          .map((q) => tocEntryTextAndPage(q, false).text).filter(Boolean).join(' ');
+        if (text) entries.push({ text, level: 1, page: 1 });
+      }
+      continue;
+    }
     if (p.namespaceURI !== NS.text || p.localName !== 'p') continue; // skip index-title
     // The rows name automatic styles derived from the level's own (Contents 2, …).
     const style = p.getAttributeNS(NS.text, 'style-name') ?? '';

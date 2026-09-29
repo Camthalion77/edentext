@@ -47,6 +47,20 @@ describe('an imported index', () => {
     expect(toc(importOdt(await buildOdt(doc, MARGINS, 'portrait'))).attrs.entries).toEqual(CACHED);
     expect(toc(importDocx(await buildDocx(doc, MARGINS, 'portrait'))).attrs.entries).toEqual(CACHED);
   });
+
+  it('reads an ODF bibliography whose body is a table, one source per row', () => {
+    const NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+      + 'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+      + 'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"';
+    const cell = (t: string) => `<table:table-cell><text:p>${t}</text:p></table:table-cell>`;
+    const odt = zipSync({ 'content.xml': strToU8(`<?xml version="1.0"?><office:document-content ${NS}>
+      <office:body><office:text><text:bibliography text:name="B"><text:index-body><table:table>
+        <table:table-row>${cell('[1] ')}${cell('A. Author, Title.')}</table:table-row>
+        <table:table-row>${cell('[2]')}${cell('B. Author, Other.')}</table:table-row>
+      </table:table></text:index-body></text:bibliography></office:text></office:body></office:document-content>`) });
+    expect(toc(importOdt(odt)).attrs.entries).toEqual([
+      { text: '[1] A. Author, Title.', level: 1, page: 1 }, { text: '[2] B. Author, Other.', level: 1, page: 1 }]);
+  });
 });
 
 describe('updating page numbers only', () => {
