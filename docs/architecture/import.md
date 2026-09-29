@@ -78,6 +78,10 @@ numbering's `w:numPr` on every heading paragraph; that stays chapter numbering, 
 heading style carries none, the first heading of a level supplies it. Chapter numbering takes
 every list format, the CJK ones included.
 
+A nonzero `w:beforeLines`/`w:afterLines` wins over `w:before`/`w:after`, as in Word, at 12pt a
+line. LibreOffice keeps the twips when both are written, which WPS does (`w:after="0"
+w:afterLines="100"`), so there the editor follows Word, not LibreOffice.
+
 Resolve table borders and conditional table-style areas before baking them into cells, because
 the editor registry does not retain file table styles. Honor compatibility mode when interpreting
 table indentation. A floating table becomes the text-box representation the schema supports.

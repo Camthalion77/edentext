@@ -663,9 +663,12 @@ export function readSpacing(sp: Element): ParaSpacing {
     const n = parseInt(v, 10);
     return Number.isFinite(n) ? n : undefined;
   };
+  // A nonzero *Lines count (hundredths of a line) wins over the twips, as in Word; a line
+  // is 12pt, as LibreOffice converts it.
+  const lines = (name: string) => { const n = num(name + 'Lines'); return n ? n * 240 / 100 : num(name); };
   const out: ParaSpacing = {};
-  const before = num('before'); if (before != null) out.before = before;
-  const after = num('after'); if (after != null) out.after = after;
+  const before = lines('before'); if (before != null) out.before = before;
+  const after = lines('after'); if (after != null) out.after = after;
   const line = num('line'); if (line != null) out.line = line;
   const rule = sp.getAttributeNS(W, 'lineRule'); if (rule) out.lineRule = rule;
   return out;

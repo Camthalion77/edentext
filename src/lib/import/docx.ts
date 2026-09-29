@@ -1,5 +1,5 @@
 import { strFromU8 } from 'fflate';
-import { DocxStyles, parseRunProps, mergeRunProps, readNumPr, readTabStops, toggle as onOff, wVal, W, R, WP, A, B, WPS, WPG, MC, VML, O, PKG_REL, type RunProps, type ParaSpacing } from './docxStyles';
+import { DocxStyles, parseRunProps, mergeRunProps, readNumPr, readSpacing, readTabStops, toggle as onOff, wVal, W, R, WP, A, B, WPS, WPG, MC, VML, O, PKG_REL, type RunProps, type ParaSpacing } from './docxStyles';
 import { mostlyAsian } from '../utils/script';
 import { lengthToPt, WATERMARK_NAME } from './styleResolver';
 import { normalizeColor } from '../export/odt';
@@ -1482,8 +1482,9 @@ function blockAttrs(ppr: Element | null, kind: BlockKind, headingLevel: number |
   }
 
   const sp = ppr ? fc(ppr, 'spacing') : null;
-  const before = (sp ? intAttr(sp, W, 'before') : null) ?? styleSpacing.before ?? null;
-  const after = (sp ? intAttr(sp, W, 'after') : null) ?? styleSpacing.after ?? null;
+  const own: ParaSpacing = sp ? readSpacing(sp) : {};
+  const before = own.before ?? styleSpacing.before ?? null;
+  const after = own.after ?? styleSpacing.after ?? null;
   const line = (sp ? intAttr(sp, W, 'line') : null) ?? styleSpacing.line ?? null;
   const rule = (sp && sp.getAttributeNS(W, 'lineRule')) || styleSpacing.lineRule || null;
   // An attribute no layer sets is Word's implied 0, which is also the editor's paragraph
