@@ -1101,6 +1101,8 @@ const en = {
     likeDocument: 'Like the document',
     citation: 'Citation',
     tocOptions: 'Options',
+    tocUpdate: 'Update',
+    tocUpdateTitle: 'Update all indexes',
     tocMaxLevel: 'Deepest level shown',
     tocPageNumbers: 'Show page numbers',
     noteOptions: 'Options',

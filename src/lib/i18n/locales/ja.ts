@@ -1090,6 +1090,8 @@ const ja: Messages = {
     likeDocument: '文書と同じ',
     citation: '引用文献',
     tocOptions: 'オプション',
+    tocUpdate: '更新',
+    tocUpdateTitle: 'すべての索引と目次を更新',
     tocMaxLevel: '表示する最下位レベル',
     tocPageNumbers: 'ページ番号を表示',
     noteOptions: 'オプション',

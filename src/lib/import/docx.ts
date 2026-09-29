@@ -40,7 +40,7 @@ import { fromWriterFormula } from '../utils/tableFormula';
 import { cellFormatFromCode, type CellFormat } from '../utils/cellFormat';
 import { ODF_SEQ_CATEGORY } from '../editor/extensions/caption';
 import type { CrossRefFormat } from '../editor/extensions/crossReference';
-import type { IndexKind } from '../editor/extensions/tableOfContents';
+import type { IndexKind, TocEntry } from '../editor/extensions/tableOfContents';
 import { bibTypeFromDocx, DOCX_BIB_FIELD, type BibSource } from '../editor/extensions/bibliographyEntry';
 import { normalizePageDecor, type PageDecor } from '../storage/pageDecor';
 import { DEFAULT_LINE_NUMBERING, normalizeLineNumbering, type LineNumbering } from '../storage/lineNumbering';
@@ -542,6 +542,30 @@ function tocHeading(content: Element | null): string | null {
   return text && text.length <= 60 ? text : null;
 }
 
+// One cached row of an index field: its text up to the last tab, the page number after
+// it, the level from its entry style. The index shows these as saved until updated.
+function cachedIndexEntry(p: Element, ctx: Ctx, kind: IndexKind, pages: boolean): TocEntry | null {
+  let text = '';
+  for (const r of Array.from(p.getElementsByTagNameNS(W, 'r'))) {
+    for (const c of Array.from(r.children)) {
+      if (c.namespaceURI === W && c.localName === 't') text += c.textContent ?? '';
+      else if (c.namespaceURI === W && c.localName === 'tab') text += '\t';
+    }
+  }
+  // An INDEX field without \e puts ", " before the numbers instead of a tab.
+  const comma = pages && kind === 'alphabetical' && !text.includes('\t') ? /,\s*(?=\d[\d,;\s]*$)/.exec(text) : null;
+  const cut = comma ? comma.index : pages ? text.lastIndexOf('\t') : -1;
+  const body = (cut < 0 ? text : text.slice(0, cut)).replace(/\t+/g, ' ').trim();
+  const nums = cut < 0 ? [] : text.slice(cut + (comma ? comma[0].length : 1)).split(/[,;]/).map((n) => parseInt(n, 10)).filter((n) => n > 0);
+  // An alphabetical index's letter rows carry no number and are not entries.
+  if (!body || (kind === 'alphabetical' && pages && !nums.length)) return null;
+  // A style the file names but does not define still says its level in its id (TOC2).
+  const id = styleIdOf(fc(p, 'pPr'), ctx) ?? '';
+  const name = ctx.styleNames.get(id);
+  const level = Number((name ? INDEX_LEVEL_STYLES[kind]?.exec(name) : /(\d+)$/.exec(id))?.[1]) || 1;
+  return { text: body, level: Math.min(MAX_HEADING_LEVEL, level), page: nums[0] ?? 1, ...(nums.length > 1 ? { pages: nums } : {}) };
+}
+
 // Word's own cursor bookkeeping, never a reference target.
 const BOOKMARK_SKIP = new Set(['_GoBack']);
 
@@ -611,8 +635,9 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
     }
   };
   // Table-of-contents field tracking (see scanTocField). A TOC node is emitted for the
-  // body only; its cached paragraphs are skipped. The node view regenerates entries live.
+  // body only; its cached paragraphs (a bibliography's table rows) become its entries.
   const tocState: TocFieldState = { fieldDepth: 0, tocDepth: -1, instr: [] };
+  let cachedInto: { entries: TocEntry[]; kind: IndexKind; pages: boolean } | null = null;
   // Floating tables, each with the place in `out` its anchor follows (floatingTableBox).
   const floatBoxes: { box: Node; at: number }[] = [];
 
@@ -642,7 +667,7 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
       if ((/\bINDEX\b/.test(simple) || /\bBIBLIOGRAPHY\b/.test(simple)) && kind === 'body') {
         flush();
         const index = /\bBIBLIOGRAPHY\b/.test(simple) ? 'bibliography' : 'alphabetical';
-        out.push({ type: 'tableOfContents', attrs: { entries: [], title: '', index,
+        out.push({ type: 'tableOfContents', attrs: { entries: null, title: '', index,
           ...(index === 'bibliography' ? { citationStyle: ctx.citationStyle } : {}) } });
         continue;
       }
@@ -656,13 +681,19 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
         // being its own three, as the ODF side reads them off its entry templates.
         const levels = index === 'bibliography' ? null : tocMaxLevel(instr);
         const levelStyles = levels == null ? null : tocLevelStyles(ctx, levels, index);
-        out.push({ type: 'tableOfContents', attrs: { entries: [], title: '', index, ...tocPageNumbers(instr),
+        const pageNumbers = tocPageNumbers(instr);
+        cachedInto = { entries: [], kind: index, pages: pageNumbers.pageNumbers !== false && index !== 'bibliography' };
+        out.push({ type: 'tableOfContents', attrs: { entries: cachedInto.entries, title: '', index, ...pageNumbers,
           ...tocRowTab(el, ctx),
           ...(levels == null ? {} : { maxLevel: levels }),
           ...(levelStyles ? { levelStyles } : {}),
           ...(index === 'bibliography' ? { citationStyle: ctx.citationStyle } : {}) } });
       }
-      if (startedInToc || emit) continue;
+      if (startedInToc || emit) {
+        const entry = cachedInto && kind === 'body' ? cachedIndexEntry(el, ctx, cachedInto.kind, cachedInto.pages) : null;
+        if (entry) cachedInto!.entries.push(entry);
+        continue;
+      }
       const num = paragraphNum(el, ctx);
       if (num) {
         breakPending = false; // a break before a list item can't be modeled; drop it
@@ -695,8 +726,14 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
         breakPending = trailingBreak;
       }
     } else if (tocState.tocDepth >= 0) {
-      // Still inside an open TOC/INDEX/BIBLIOGRAPHY field: whatever carries its cached
-      // result is skipped, the paragraphs above and a bibliography's table alike.
+      // Still inside an open TOC/INDEX/BIBLIOGRAPHY field: a bibliography's table holds
+      // one source per row.
+      if (el.localName === 'tbl' && cachedInto) {
+        for (const tr of fcAll(el, 'tr')) {
+          const text = fcAll(tr, 'tc').map((tc) => (tc.textContent ?? '').trim()).filter(Boolean).join(' ');
+          if (text) cachedInto.entries.push({ text, level: 1, page: 1 });
+        }
+      }
       continue;
     } else if (el.localName === 'tbl') {
       // A page break ending the paragraph above, or Word's own spelling of one: the first
@@ -725,9 +762,12 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
           const maxLevel = tocMaxLevel(instr);
           const sdtKind = tocIndexKind(instr);
           const levelStyles = tocLevelStyles(ctx, maxLevel, sdtKind);
+          const heading = tocHeading(content);
+          const pages = tocPageNumbers(instr).pageNumbers !== false;
+          const rows = content ? fcAll(content, 'p').slice(heading == null ? 0 : 1) : [];
           out.push({ type: 'tableOfContents', attrs: {
-            entries: [],
-            title: tocHeading(content) ?? '',
+            entries: rows.map((p) => cachedIndexEntry(p, ctx, sdtKind, pages && sdtKind !== 'bibliography')).filter((e) => e != null),
+            title: heading ?? '',
             maxLevel,
             index: sdtKind,
             ...tocPageNumbers(instr),

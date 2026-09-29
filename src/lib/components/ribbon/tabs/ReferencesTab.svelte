@@ -30,6 +30,12 @@
     });
     return found;
   });
+  let hasIndex = $derived.by(() => {
+    if (tick < 0 || !editor) return false;
+    let found = false;
+    editor.state.doc.descendants((node) => { if (node.type.name === 'tableOfContents') found = true; return !found; });
+    return found;
+  });
   const LEVELS = HEADING_LEVELS;
   const INDEX_KINDS: IndexKind[] = ['toc', 'figures', 'tables', 'alphabetical', 'bibliography'];
   let captionOpen = $state(false);
@@ -129,6 +135,15 @@
       </div>
     {/if}
   </div>
+  <!-- An index shows what it last listed, as in both word processors, until this. -->
+  <RibbonButton
+    variant="big"
+    icon="update"
+    label={t().ribbon.tocUpdate}
+    title={t().ribbon.tocUpdateTitle}
+    disabled={!hasIndex}
+    onclick={() => editor?.chain().focus().updateIndexes().run()}
+  />
 </RibbonGroup>
 
 <div class="ribbon-sep"></div>

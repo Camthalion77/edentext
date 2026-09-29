@@ -39,7 +39,7 @@ import { clampPageStart, type PageNumbering } from '../storage/pageNumbering';
 import { newCommentId } from '../editor/extensions/comment';
 import { ODF_SEQ_CATEGORY } from '../editor/extensions/caption';
 import { isCrossRefFormat } from '../editor/extensions/crossReference';
-import type { IndexKind } from '../editor/extensions/tableOfContents';
+import type { IndexKind, TocEntry } from '../editor/extensions/tableOfContents';
 import { isBibType } from '../editor/extensions/bibliographyEntry';
 import { citationStyleFromTemplate } from '../utils/citationStyle';
 import type { PageDecor } from '../storage/pageDecor';
@@ -1263,9 +1263,8 @@ function convertBlocks(elements: Element[], ctx: Ctx, kind: BlockKind, boldByDef
   return out;
 }
 
-// A <text:table-of-content> → a tableOfContents node. Entries (text + level + page) are
-// parsed from the cached index-body as a starting cache; the node view recomputes page
-// numbers live after mount, so parse fidelity isn't critical.
+// A <text:table-of-content> → a tableOfContents node. Its entries (text + level + page)
+// are the cached index-body, shown as saved until the index is updated.
 const ODF_INDEX_KIND: Record<string, IndexKind | undefined> = {
   'table-of-content': 'toc', 'illustration-index': 'figures', 'table-index': 'tables',
   'alphabetical-index': 'alphabetical', 'bibliography': 'bibliography',
@@ -1292,21 +1291,6 @@ function convertToc(el: Element, ctx: Ctx, indexKind: IndexKind): Node {
   // Before the rest: a section the index opens may have a text width of its own, which
   // is what the entries' tab stop is measured against.
   const flow = indexSectionFlow(el, ctx);
-  const indexBody = el.getElementsByTagNameNS(NS.text, 'index-body')[0];
-  const entries: { text: string; level: number; page: number }[] = [];
-  if (indexBody) {
-    for (const p of Array.from(indexBody.children)) {
-      if (p.namespaceURI !== NS.text || p.localName !== 'p') continue; // skip index-title
-      const style = p.getAttributeNS(NS.text, 'style-name') ?? '';
-      const m = /Contents_20_(\d+)/.exec(style);
-      const level = m ? Math.min(MAX_HEADING_LEVEL, Math.max(1, parseInt(m[1], 10))) : 1;
-      const { text, page } = tocEntryTextAndPage(p);
-      // An alphabetical row's number cell is a list ("3, 7, 12"); the node view rebuilds
-      // it from the marks, so the cache only has to survive until then.
-      const pages = page.split(/[,;]/).map((n) => Math.max(1, parseInt(n, 10) || 1)).filter(Boolean);
-      if (text) entries.push({ text, level, page: pages[0] ?? 1, ...(pages.length > 1 ? { pages } : {}) });
-    }
-  }
   // The file's own heading ("Inhalt", "Sommaire", …), so a reopened index keeps its name.
   // No <text:index-title> means the index really has none — its heading is an ordinary
   // paragraph above it, and adding ours would double it.
@@ -1353,7 +1337,7 @@ function convertToc(el: Element, ctx: Ctx, indexKind: IndexKind): Node {
   // The attr defaults stay implicit, as everywhere else: '.' is the leader a fresh index
   // has, and a null stop is the end of the column. `leader: null` is not the default — it
   // is an index whose rows deliberately have no fill.
-  const attrs: Record<string, unknown> = { entries, title, maxLevel, index: indexKind, ...flow,
+  const attrs: Record<string, unknown> = { entries: null, title, maxLevel, index: indexKind, ...flow,
     ...(leader === '.' ? {} : { leader }), ...(tabPosCm != null ? { tabPosCm } : {}) };
   // A template that names no page number is an index of text alone (Word's TOC \n). A
   // bibliography row never has one, so its own template says nothing about this.
@@ -1375,26 +1359,45 @@ function convertToc(el: Element, ctx: Ctx, indexKind: IndexKind): Node {
       ? 'numbered'
       : styles.find((st) => st && st !== 'key') ?? 'key';
   }
+  const pages = attrs.pageNumbers !== false && indexKind !== 'bibliography';
+  const entries: TocEntry[] = [];
+  const indexBody = el.getElementsByTagNameNS(NS.text, 'index-body')[0];
+  for (const p of Array.from(indexBody?.children ?? [])) {
+    if (p.namespaceURI !== NS.text || p.localName !== 'p') continue; // skip index-title
+    // The rows name automatic styles derived from the level's own (Contents 2, …).
+    const style = p.getAttributeNS(NS.text, 'style-name') ?? '';
+    const levelOf = (name: string | null) => /(?:_20_| )(\d+)$/.exec(name ?? '');
+    const m = levelOf(style) ?? levelOf(ctx.resolver.namedAncestor(style));
+    const level = m ? Math.min(MAX_HEADING_LEVEL, Math.max(1, parseInt(m[1], 10))) : 1;
+    const { text, page } = tocEntryTextAndPage(p, pages);
+    const nums = page.split(/[,;]/).map((n) => parseInt(n, 10)).filter((n) => n > 0);
+    // An alphabetical index's letter rows carry no number and are not entries.
+    if (!text || (indexKind === 'alphabetical' && pages && !nums.length)) continue;
+    entries.push({ text, level, page: nums[0] ?? 1, ...(nums.length > 1 ? { pages: nums } : {}) });
+  }
+  attrs.entries = entries;
   return { type: 'tableOfContents', attrs };
 }
 
-// Split a TOC entry paragraph around its last <text:tab/>: the text before it is the
-// entry text, the run after it is the page number. Tabs contribute no textContent, so
-// partition the text nodes by their document position relative to the tab element.
-function tocEntryTextAndPage(p: Element): { text: string; page: string } {
-  const FOLLOWING = 0x04; // Node.DOCUMENT_POSITION_FOLLOWING (the DOM Node is shadowed here)
+// A cached row: its text up to the last tab (earlier tabs read as spaces), the page
+// number after it — or, for an index without page numbers, the whole row as text.
+function tocEntryTextAndPage(p: Element, pages: boolean): { text: string; page: string } {
   const tabs = p.getElementsByTagNameNS(NS.text, 'tab');
-  const lastTab = tabs.length ? tabs[tabs.length - 1] : null;
+  const lastTab = pages && tabs.length ? tabs[tabs.length - 1] : null;
   let before = '';
   let after = '';
-  const walker = p.ownerDocument.createTreeWalker(p, NodeFilter.SHOW_TEXT);
-  let n: ChildNode | null;
-  while ((n = walker.nextNode() as ChildNode | null)) {
-    const txt = n.nodeValue ?? '';
-    if (lastTab && lastTab.compareDocumentPosition(n) & FOLLOWING) after += txt;
-    else before += txt;
-  }
-  return { text: before.trim(), page: after.trim() };
+  let past = false;
+  const walk = (el: Element) => {
+    for (const c of Array.from(el.childNodes)) {
+      if (c === lastTab) { past = true; continue; }
+      const e = c.nodeType === 1 ? (c as Element) : null;
+      if (e && !(e.namespaceURI === NS.text && (e.localName === 'tab' || e.localName === 's'))) { walk(e); continue; }
+      const txt = e ? ' ' : c.nodeValue ?? '';
+      if (past) after += txt; else before += txt;
+    }
+  };
+  walk(p);
+  return { text: before.replace(/\s+/g, ' ').trim(), page: after.trim() };
 }
 
 // What a block's named style already gives it — the yardstick for "is this direct

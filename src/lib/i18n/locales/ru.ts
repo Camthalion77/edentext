@@ -1103,6 +1103,8 @@ const ru: Messages = {
     likeDocument: 'Как в документе',
     citation: 'Ссылка на источник',
     tocOptions: 'Параметры',
+    tocUpdate: 'Обновить',
+    tocUpdateTitle: 'Обновить все указатели',
     tocMaxLevel: 'Самый глубокий уровень',
     tocPageNumbers: 'Показывать номера страниц',
     noteOptions: 'Параметры',

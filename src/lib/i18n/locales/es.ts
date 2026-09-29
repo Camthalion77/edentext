@@ -1089,6 +1089,8 @@ const es: Messages = {
     likeDocument: 'Como el documento',
     citation: 'Cita',
     tocOptions: 'Opciones',
+    tocUpdate: 'Actualizar',
+    tocUpdateTitle: 'Actualizar todos los índices',
     tocMaxLevel: 'Nivel más profundo que se muestra',
     tocPageNumbers: 'Mostrar los números de página',
     noteOptions: 'Opciones',

@@ -1093,6 +1093,8 @@ const fr: Messages = {
     likeDocument: 'Comme le document',
     citation: 'Citation',
     tocOptions: 'Options',
+    tocUpdate: 'Mettre à jour',
+    tocUpdateTitle: 'Mettre à jour tous les index',
     tocMaxLevel: 'Niveau le plus profond affiché',
     tocPageNumbers: 'Afficher les numéros de page',
     noteOptions: 'Options',

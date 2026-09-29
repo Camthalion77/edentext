@@ -102,7 +102,9 @@ link-to-previous behavior, while a present empty part deliberately clears the zo
 ## Feature mapping
 
 Map paragraphs, headings, lists, tables, inline content, fields, and frames to their semantic
-editor nodes. Keep fields' cached values where the editor cannot recalculate them. Text boxes,
+editor nodes. Keep fields' cached values where the editor cannot recalculate them. An index
+keeps its cached rows (text, level from the row's entry style, page numbers after the last
+tab) as its entries: both word processors show those until the reader updates it. Text boxes,
 shapes, charts, formulas, bookmarks, cross-references, ruby, bibliography, revisions, notes,
 and placeholders have focused mappings in their architecture documents.
 

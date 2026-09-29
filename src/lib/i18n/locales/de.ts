@@ -1086,6 +1086,8 @@ const de: Messages = {
     },
     toc: 'Inhaltsverzeichnis',
     tocOptions: 'Optionen',
+    tocUpdate: 'Aktualisieren',
+    tocUpdateTitle: 'Alle Verzeichnisse aktualisieren',
     tocMaxLevel: 'Tiefste angezeigte Ebene',
     tocPageNumbers: 'Seitenzahlen anzeigen',
     insertCaption: 'Beschriftung',

@@ -332,6 +332,23 @@ try {
   check(bands === '-/none true/none -/both anchored/none -/none true/none true/none -/both',
     `loaded from the autosave, the block after a band frame clears it, after an anchored one it does not (${bands})`);
 
+  // An index shows the rows it saved, as both word processors do, until it is updated.
+  const heading = (t) => ({ type: 'heading', attrs: { level: 1 }, content: [words(t)] });
+  await page.evaluate((d) => localStorage.setItem('edentext-doc', JSON.stringify(d)), { type: 'doc', content: [
+    { type: 'tableOfContents', attrs: { title: '', entries: [{ text: 'Saved', level: 1, page: 9 }] } },
+    heading('One'), heading('Two'),
+  ] });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForSelector('.toc-entry', { timeout: 15_000 });
+  await settle(page, true);
+  const tocRows = () => page.evaluate(() => Array.from(document.querySelectorAll('.toc-entry'),
+    (r) => `${r.querySelector('.toc-text').textContent} ${r.querySelector('.toc-page').textContent}`).join(', '));
+  const cachedRows = await tocRows();
+  await page.evaluate(() => document.querySelector('.tiptap').editor.commands.updateIndexes());
+  await settle(page, true);
+  const updated = await tocRows();
+  check(cachedRows === 'Saved 9' && updated === 'One 1, Two 1', `an index keeps its saved rows until updated (${cachedRows} → ${updated})`);
+
   // A two-column section over several pages pages in one pass: a continuation is judged
   // with a full page wherever it renders, and the split counts the blocks' margins as the
   // overflow test does — else one block moves down per pass, a pass per block.

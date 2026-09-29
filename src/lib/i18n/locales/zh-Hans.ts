@@ -1088,6 +1088,8 @@ const zhHans: Messages = {
     likeDocument: '与文档相同',
     citation: '引文',
     tocOptions: '选项',
+    tocUpdate: '更新',
+    tocUpdateTitle: '更新所有目录和索引',
     tocMaxLevel: '显示的最低级别',
     tocPageNumbers: '显示页码',
     noteOptions: '选项',

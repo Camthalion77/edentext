@@ -1089,6 +1089,8 @@ const zhHant: Messages = {
     likeDocument: '與文件相同',
     citation: '引文',
     tocOptions: '選項',
+    tocUpdate: '更新',
+    tocUpdateTitle: '更新所有目錄和索引',
     tocMaxLevel: '顯示的最低階層',
     tocPageNumbers: '顯示頁碼',
     noteOptions: '選項',
