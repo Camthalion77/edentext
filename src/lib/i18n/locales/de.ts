@@ -144,6 +144,7 @@ const de: Messages = {
   },
   styles: {
     title: 'Formatvorlagen',
+    sample: 'AaBb',
     manage: 'Vorlagen verwalten…',
     showAll: 'Alle Formatvorlagen anzeigen',
     characterStyles: 'Zeichenvorlagen',

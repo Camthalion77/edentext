@@ -144,6 +144,7 @@ const pt: Messages = {
   },
   styles: {
     title: 'Estilos',
+    sample: 'AaBb',
     manage: 'Gerir estilos…',
     showAll: 'Mostrar todos os estilos',
     characterStyles: 'Estilos de caráter',

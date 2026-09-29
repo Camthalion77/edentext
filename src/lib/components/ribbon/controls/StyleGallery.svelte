@@ -83,7 +83,7 @@
         title={styleShortcut(s.name) ? `${styleLabel(s.name)} (${styleShortcut(s.name)})` : styleLabel(s.name)}
         aria-pressed={current === s.name}
       >
-        <span class="tile-sample" style={tileStyle(s.name, 21)}>AaBb</span>
+        <span class="tile-sample" style={tileStyle(s.name, 21)}>{t().styles.sample}</span>
         <span class="tile-name">{styleLabel(s.name)}</span>
       </button>
     {/each}

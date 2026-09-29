@@ -150,6 +150,8 @@ const en = {
   },
   styles: {
     title: 'Styles',
+    // The gallery tiles' preview text, in the UI's script.
+    sample: 'AaBb',
     manage: 'Manage styles…',
     showAll: 'Show all styles',
     characterStyles: 'Character styles',

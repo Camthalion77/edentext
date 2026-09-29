@@ -147,6 +147,7 @@ const zhHant: Messages = {
   },
   styles: {
     title: '樣式',
+    sample: '漢字',
     manage: '管理樣式…',
     showAll: '顯示所有樣式',
     characterStyles: '字元樣式',

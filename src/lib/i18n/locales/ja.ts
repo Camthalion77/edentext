@@ -147,6 +147,7 @@ const ja: Messages = {
   },
   styles: {
     title: 'スタイル',
+    sample: 'あア亜',
     manage: 'スタイルの管理…',
     showAll: 'すべてのスタイルを表示',
     characterStyles: '文字スタイル',

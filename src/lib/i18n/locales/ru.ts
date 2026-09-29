@@ -153,6 +153,7 @@ const ru: Messages = {
   },
   styles: {
     title: 'Стили',
+    sample: 'АаБб',
     manage: 'Управление стилями…',
     showAll: 'Показать все стили',
     characterStyles: 'Стили символов',

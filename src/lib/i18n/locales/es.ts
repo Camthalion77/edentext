@@ -145,6 +145,7 @@ const es: Messages = {
   },
   styles: {
     title: 'Estilos',
+    sample: 'AaBb',
     manage: 'Gestionar los estilos…',
     showAll: 'Mostrar todos los estilos',
     characterStyles: 'Estilos de carácter',

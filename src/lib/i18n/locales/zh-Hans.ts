@@ -146,6 +146,7 @@ const zhHans: Messages = {
   },
   styles: {
     title: '样式',
+    sample: '汉字',
     manage: '管理样式…',
     showAll: '显示全部样式',
     characterStyles: '字符样式',

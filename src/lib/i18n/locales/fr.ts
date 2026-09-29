@@ -150,6 +150,7 @@ const fr: Messages = {
   },
   styles: {
     title: 'Styles',
+    sample: 'AaBb',
     manage: 'Gérer les styles…',
     showAll: 'Afficher tous les styles',
     characterStyles: 'Styles de caractères',
