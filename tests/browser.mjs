@@ -125,11 +125,14 @@ export function extractLayout() {
     return i;
   };
 
+  // Visibility inherits and a child can turn it back on (a zone's background layer shows
+  // only its frames), so only the node's own element decides it; display does not.
   const skip = (node) => {
+    const own = node.nodeType === 1 ? node : node.parentElement;
+    if (own && getComputedStyle(own).visibility === 'hidden') return true;
     for (let e = node.parentElement; e && e !== paper; e = e.parentElement) {
       if (e.hasAttribute('data-page-break-spacer') || e.classList.contains('band-layer')) return true;
-      const s = getComputedStyle(e);
-      if (s.display === 'none' || s.visibility === 'hidden') return true;
+      if (getComputedStyle(e).display === 'none') return true;
     }
     return false;
   };
@@ -193,7 +196,7 @@ export function extractLayout() {
   const images = [];
   for (const img of paper.querySelectorAll('img')) {
     const r = img.getBoundingClientRect();
-    if (!r.width || !r.height || skip(img) || getComputedStyle(img).visibility === 'hidden') continue;
+    if (!r.width || !r.height || skip(img)) continue;
     const y = r.top - origin.top, page = pageAt(y + r.height / 2), box = boxes[page];
     images.push({ page, x: (r.left - origin.left - box.left) * PX_MM, y: (y - box.top) * PX_MM,
       w: r.width * PX_MM, h: r.height * PX_MM });

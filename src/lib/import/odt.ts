@@ -313,7 +313,9 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   const hpos = gp['style:horizontal-pos'];
   const hrel = gp['style:horizontal-rel'];
   const pageX = hrel === 'page' || hrel === 'page-start-margin' ? leftMarginCm : 0;
-  const rawX = hpos === 'from-left' ? lengthToCm(el.getAttributeNS(NS.svg, 'x')) : null;
+  // Set against the page's left edge is x 0 there: a cover picture filling the sheet.
+  const rawX = hpos === 'from-left' ? lengthToCm(el.getAttributeNS(NS.svg, 'x'))
+    : hpos === 'left' && pageX ? 0 : null;
   const x = rawX == null ? null : rawX - pageX;
   if (x != null && attrs.wrap) attrs.wrapOffset = Math.round(x * 100) / 100;
   // Where the file names no side (parallel/dynamic), the text takes whichever side of
@@ -333,8 +335,9 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   const rel = gp['style:vertical-rel'];
   const fromPage = rel === 'page';
   const fromBody = rel === 'page-content';
-  const y = gp['style:vertical-pos'] === 'from-top' && (!rel || rel.startsWith('paragraph') || rel === 'line' || fromPage || fromBody)
-    ? lengthToCm(el.getAttributeNS(NS.svg, 'y')) : null;
+  const vpos = gp['style:vertical-pos'];
+  const y = vpos === 'from-top' && (!rel || rel.startsWith('paragraph') || rel === 'line' || fromPage || fromBody)
+    ? lengthToCm(el.getAttributeNS(NS.svg, 'y')) : vpos === 'top' && (fromPage || fromBody) ? 0 : null;
   if (y != null && attrs.wrap && (fromPage || fromBody || y > 0 || (attrs.wrap === 'through' && y < 0))) {
     attrs.wrapOffsetY = Math.round(y * 100) / 100;
     if (fromPage) attrs.wrapFromPage = true;

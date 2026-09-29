@@ -84,6 +84,8 @@ w:afterLines="100"`), so there the editor follows Word, not LibreOffice.
 A `wrapNone` picture aligned in the column (`wp:align` against `margin`/`column`), or an ODF
 `run-through` one by `style:horizontal-pos` against its paragraph or `page-content`, becomes
 the x that alignment gives, since nothing floats a run-through frame to a side.
+An ODF frame aligned `left`/`top` against the `page` is offset 0 from the page's corner
+(`wrapFromPage`), how a header carries a cover picture filling the first sheet.
 
 Resolve table borders and conditional table-style areas before baking them into cells, because
 the editor registry does not retain file table styles. Honor compatibility mode when interpreting
