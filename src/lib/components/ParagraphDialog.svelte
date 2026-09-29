@@ -263,7 +263,7 @@
   /* No unit of its own, so it reaches across the field and unit columns. */
   .row select { width: calc(72px + 4.8em); }
   /* The unit column is as wide as the switchable unit, so every field keeps one edge. */
-  .row select.unit { width: 4.8em; padding: 0 2px; }
+  .row select.unit { width: 4.8em; }
   .row input { text-align: right; }
 
   .flow { display: flex; flex-direction: column; gap: 8px; }

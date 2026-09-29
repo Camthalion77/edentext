@@ -61,7 +61,7 @@
     <path d="M2 13l3-8 3 8M3.2 10.5h3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M11 14.5l1.6-1.6 1.6 1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
-  <select
+  <select class="bare"
     aria-label={t().spellPicker.label}
     onchange={(e) => apply((e.currentTarget as HTMLSelectElement).value)}
   >
