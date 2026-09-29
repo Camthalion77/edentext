@@ -2343,9 +2343,9 @@ function convertDrawing(drawing: Element, ctx: Ctx): Node | Node[] | null {
   if (Number.isFinite(rot) && rot) attrs.rotation = ((Math.round(rot / 60000) % 360) + 360) % 360;
 
   if (anchor) {
-    const { wrap, offsetCm, offsetYCm, fromPage, fromBody, alignH, distCm } = anchorWrap(anchor, ctx);
+    const { wrap, offsetCm, offsetYCm, fromPage, fromBody, alignH, distCm, alignXCm } = anchorWrap(anchor, ctx);
     attrs.wrap = wrap;
-    if (offsetCm != null) attrs.wrapOffset = offsetCm;
+    if ((offsetCm ?? alignXCm) != null) attrs.wrapOffset = offsetCm ?? alignXCm;
     if (offsetYCm != null) attrs.wrapOffsetY = offsetYCm;
     if (fromPage) attrs.wrapFromPage = true;
     if (fromBody) attrs.wrapFromBody = true;
@@ -2498,9 +2498,9 @@ function chartImage(drawing: Element, box: { w: number; h: number }, ctx: Ctx): 
 function frameNode(src: string, box: { w: number; h: number }, label: string, anchor: Element | undefined, ctx: Ctx): Node {
   const attrs: Record<string, unknown> = { src, width: box.w, height: box.h, alt: label };
   if (anchor) {
-    const { wrap, offsetCm, offsetYCm, fromPage, fromBody, alignH, distCm } = anchorWrap(anchor, ctx);
+    const { wrap, offsetCm, offsetYCm, fromPage, fromBody, alignH, distCm, alignXCm } = anchorWrap(anchor, ctx);
     attrs.wrap = wrap;
-    if (offsetCm != null) attrs.wrapOffset = offsetCm;
+    if ((offsetCm ?? alignXCm) != null) attrs.wrapOffset = offsetCm ?? alignXCm;
     if (offsetYCm != null) attrs.wrapOffsetY = offsetYCm;
     if (fromPage) attrs.wrapFromPage = true;
     if (fromBody) attrs.wrapFromBody = true;
@@ -2553,7 +2553,7 @@ function anchorOffsetX(anchor: Element, ctx: Ctx): number | null {
 // Wrap mode and place are independent: the mode is what the file's wrap element says,
 // the place its position offsets. Only where neither names a side does the frame's own
 // x decide which half of the column it fills (text flows on one side of a CSS float).
-function anchorWrap(anchor: Element, ctx: Ctx): { wrap: 'left' | 'right' | 'topBottom' | 'through'; offsetCm: number | null; offsetYCm: number | null; fromPage: boolean; fromBody: boolean; alignH: 'left' | 'right' | null; distCm: number | null } {
+function anchorWrap(anchor: Element, ctx: Ctx): { wrap: 'left' | 'right' | 'topBottom' | 'through'; offsetCm: number | null; offsetYCm: number | null; fromPage: boolean; fromBody: boolean; alignH: 'left' | 'right' | null; distCm: number | null; alignXCm: number | null } {
   const { cm: offsetYCm, fromPage, fromBody } = anchorOffsetY(anchor);
   const offsetCm = anchorOffsetX(anchor, ctx);
   const align = anchor.getElementsByTagNameNS(WP, 'positionH')[0]
@@ -2570,10 +2570,19 @@ function anchorWrap(anchor: Element, ctx: Ctx): { wrap: 'left' | 'right' | 'topB
   };
   // A wrapped frame can't start above its paragraph; a run-through one simply overlaps.
   const y = (wrap: string) => (offsetYCm != null && offsetYCm < 0 && wrap !== 'through' && !fromPage && !fromBody ? null : offsetYCm);
-  const at = (wrap: 'left' | 'right' | 'topBottom' | 'through') => ({ wrap, offsetCm, offsetYCm: y(wrap), fromPage, fromBody, alignH, distCm: distOf(wrap) });
+  const at = (wrap: 'left' | 'right' | 'topBottom' | 'through') => ({ wrap, offsetCm, alignXCm: null as number | null, offsetYCm: y(wrap), fromPage, fromBody, alignH, distCm: distOf(wrap) });
+  const cx = intAttr(anchor.getElementsByTagNameNS(WP, 'extent')[0], '', 'cx') ?? 0;
   // wrapNone is Word's in-front-of / behind-text: the text runs through the frame, so it
   // reserves neither width nor height. behindDoc picks the side of the text it lands on.
-  if (anchor.getElementsByTagNameNS(WP, 'wrapNone')[0]) return at('through');
+  // Nothing floats a picture to a side, so its alignment in the column becomes that x
+  // (alignXCm); a text box keeps the alignment itself (wrapAlign).
+  if (anchor.getElementsByTagNameNS(WP, 'wrapNone')[0]) {
+    const from = anchor.getElementsByTagNameNS(WP, 'positionH')[0]?.getAttribute('relativeFrom');
+    const room = cmToEmu(ctx.contentWidthCm) - cx;
+    const x = offsetCm != null || (from !== 'margin' && from !== 'column') ? null
+      : alignH === 'right' ? room : align === 'center' ? room / 2 : alignH === 'left' ? 0 : null;
+    return { ...at('through'), alignXCm: x == null ? null : round2(x / 360000) };
+  }
   if (anchor.getElementsByTagNameNS(WP, 'wrapTopAndBottom')[0]) return at('topBottom');
   const wt = anchor.getElementsByTagNameNS(WP, 'wrapSquare')[0]?.getAttribute('wrapText');
   if (wt === 'right') return at('left'); // text on right ⇒ image on left
@@ -2581,7 +2590,6 @@ function anchorWrap(anchor: Element, ctx: Ctx): { wrap: 'left' | 'right' | 'topB
   if (align === 'right' || align === 'outside') return at('right');
   if (align) return at('left');
   if (offsetCm == null) return at('left');
-  const cx = intAttr(anchor.getElementsByTagNameNS(WP, 'extent')[0], '', 'cx') ?? 0;
   return at(cmToEmu(offsetCm) + cx / 2 > cmToEmu(ctx.contentWidthCm) / 2 ? 'right' : 'left');
 }
 

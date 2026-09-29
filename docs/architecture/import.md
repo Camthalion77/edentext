@@ -81,6 +81,8 @@ every list format, the CJK ones included.
 A nonzero `w:beforeLines`/`w:afterLines` wins over `w:before`/`w:after`, as in Word, at 12pt a
 line. LibreOffice keeps the twips when both are written, which WPS does (`w:after="0"
 w:afterLines="100"`), so there the editor follows Word, not LibreOffice.
+A `wrapNone` picture aligned in the column (`wp:align` against `margin`/`column`) becomes the x
+that alignment gives, since nothing floats a run-through frame to a side.
 
 Resolve table borders and conditional table-style areas before baking them into cells, because
 the editor registry does not retain file table styles. Honor compatibility mode when interpreting
