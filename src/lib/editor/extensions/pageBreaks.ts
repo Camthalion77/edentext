@@ -407,8 +407,29 @@ function columnLeft(view: EditorView, el: HTMLElement): number {
     + (parseFloat(getComputedStyle(block).getPropertyValue('--sec-inset-left')) || 0);
 }
 
+// A side float sunk below its anchor (image.ts) stops short of the next float on its
+// side: floats cannot overlap as LibreOffice lets them, and one pushed aside squeezes its
+// text. The room is known once the lines around both are laid out: every pass re-measures.
+export function sinkSideFloat(view: EditorView, el: HTMLElement): void {
+  const want = Number(el.dataset.sinkGap);
+  if (!el.isConnected || !(want > 0)) return;
+  const top = (e: HTMLElement) => {
+    let y = -(parseFloat(e.style.marginTop) || 0);
+    for (let n: HTMLElement | null = e; n && n !== view.dom; n = n.offsetParent as HTMLElement | null) y += n.offsetTop;
+    return y;
+  };
+  const floats = Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>(`[data-wrap="${el.dataset.wrap}"]`));
+  const next = floats[floats.indexOf(el) + 1];
+  const gap = next ? Math.min(want, Math.max(0, Math.floor(top(next) - top(el) - el.offsetHeight))) : want;
+  el.style.marginTop = `${gap}px`;
+  el.style.shapeOutside = `inset(${gap}px 0 0 0) margin-box`;
+}
+
 // Pagination moves the page grid under those frames, so every pass re-places them.
 export function placePageFrames(view: EditorView, grid: PageGrid): void {
+  for (const el of Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('[data-sink-gap]'))) {
+    sinkSideFloat(view, el);
+  }
   for (const el of Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('[data-page-y]'))) {
     placeFromPage(view, el, grid);
   }

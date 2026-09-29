@@ -7,7 +7,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { dropCursor } from '@tiptap/pm/dropcursor';
 import { cmToPx } from '../../storage/pageMargins';
-import { readVerticalMargins, placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
+import { readVerticalMargins, placeFromPage, placeInColumn, freeDragX, sinkSideFloat } from './pageBreaks';
 
 // Inline, as-character image, or a floating text-wrapped frame (wrap = flow mode);
 // width/height are doc px @96dpi, rotation CW degrees. Export → cm + ODF
@@ -283,8 +283,8 @@ export const Image = Node.create({
         renderHTML: () => ({}),
       },
       // How far below its anchor paragraph the frame sits, in cm (Word's positionV
-      // posOffset, ODF svg:y). Drawn as the float's top margin for `topBottom`, where no
-      // text sits beside the frame; a side float would push away lines Word keeps.
+      // posOffset, ODF svg:y). Drawn as the float's top margin; a side float's lines
+      // still run beside that margin (sinkToOffset).
       wrapOffsetY: {
         default: null,
         parseHTML: el => parseCm((el as HTMLElement).getAttribute('data-wrap-offset-y')),
@@ -667,6 +667,8 @@ class ImageView {
     d.style.display = '';
     d.style.clear = '';
     d.style.margin = '';
+    d.style.shapeOutside = '';
+    delete d.dataset.sinkGap;
     d.style.position = '';
     d.style.zIndex = '';
     d.style.top = '';
@@ -695,6 +697,7 @@ class ImageView {
     if (wrap === 'left' || wrap === 'right') {
       d.style.float = wrap;
       d.style.margin = frameMargins(wrap, a.wrapOffset, this.boxWidth(), null, a.wrapDist);
+      this.sinkToOffset();
     } else if (wrap === 'topBottom' && (a.wrapAlign === 'left' || a.wrapAlign === 'right')) {
       // Sharing its band with the frame set against the other end (the importers only
       // keep wrapAlign for such a pair): each floats to its own side, so both fit.
@@ -738,16 +741,26 @@ class ImageView {
   // The offset counts from the anchor paragraph's top. Where text precedes the frame
   // (the importers sink one behind the text — a full-width float pushes every following
   // line under itself) the lines already cover part of it, so the rest is measured.
+  // The offset counts from the anchor paragraph's top. Where text precedes the frame
+  // (the importers sink one behind the text — a full-width float pushes every following
+  // line under itself) the lines already cover part of it, so the rest is measured.
+  // A side float's lines run beside the offset as Word keeps them (sinkSideFloat).
   private sinkToOffset(): void {
     const y = this.node.attrs.wrapOffsetY;
-    const p = this.dom.parentElement;
-    if (typeof y !== 'number' || y <= 0 || !p || !this.dom.previousSibling) return;
-    this.dom.style.marginTop = '0px';
-    const box = p.getBoundingClientRect();
-    const scale = box.width / p.offsetWidth || 1;
-    const above = (this.dom.getBoundingClientRect().top - box.top) / scale;
-    const gap = clamp(Math.round(cmToPx(y) - above), 6, pageContentHeightPx());
-    this.dom.style.marginTop = `${gap}px`;
+    const d = this.dom, p = d.parentElement;
+    if (typeof y !== 'number' || y <= 0 || !p) return;
+    let gap = Math.round(cmToPx(y));
+    if (d.previousSibling) {
+      d.style.marginTop = '0px';
+      const box = p.getBoundingClientRect();
+      const scale = box.width / p.offsetWidth || 1;
+      gap = clamp(Math.round(cmToPx(y) - (d.getBoundingClientRect().top - box.top) / scale), 6, pageContentHeightPx());
+    }
+    const wrap = this.attrWrap();
+    if (wrap !== 'left' && wrap !== 'right') { d.style.marginTop = `${gap}px`; return; }
+    d.dataset.sinkGap = String(gap);
+    d.style.marginTop = `${gap}px`;
+    sinkSideFloat(this.view, d);
   }
 
   // Drag an image to re-anchor it live to the text position under the cursor (text
