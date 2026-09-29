@@ -54,6 +54,20 @@ function parseCm(value: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// The share of each side a file cuts off the picture (Word's a:srcRect, ODF's fo:clip):
+// the frame shows the rest, scaled to fill it.
+export type Crop = { l: number; t: number; r: number; b: number };
+export function cropOf(v: unknown): Crop | null {
+  const c = v as Crop | null;
+  if (!c || typeof c !== 'object') return null;
+  const ok = [c.l, c.t, c.r, c.b].every((n) => typeof n === 'number' && n >= 0);
+  return ok && c.l + c.r < 0.99 && c.t + c.b < 0.99 && (c.l || c.t || c.r || c.b) ? c : null;
+}
+const parseCrop = (v: string | null): Crop | null => {
+  const [l, t, r, b] = (v ?? '').split(',').map(Number);
+  return cropOf({ l, t, r, b });
+};
+
 export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 // The page text width, live from the vars the editor maintains (margins/orientation).
@@ -306,6 +320,11 @@ export const Image = Node.create({
         parseHTML: el => (el as HTMLElement).getAttribute('data-wrap-align') || null,
         renderHTML: () => ({}),
       },
+      crop: {
+        default: null,
+        parseHTML: el => parseCrop((el as HTMLElement).getAttribute('data-crop')),
+        renderHTML: () => ({}),
+      },
       // Where an as-char frame sits against the line (see inlineVerticalAlign).
       // null = its bottom on the baseline, which is LibreOffice's and Word's default.
       vAlign: {
@@ -353,15 +372,19 @@ export const Image = Node.create({
     const offset = node.attrs.wrapOffset as number | null;
     const offsetY = node.attrs.wrapOffsetY as number | null;
     const va = h ? inlineVerticalAlign(node.attrs.vAlign, h, offsetY) : '';
+    const crop = cropOf(node.attrs.crop);
     const style = [
       w ? `width:${w}px` : '',
       h ? `height:${h}px` : '',
       rot ? `transform:rotate(${rot}deg)` : '',
       va ? `vertical-align:${va}` : '',
+      // ponytail: object-view-box is Chromium's; the node view clips with a box instead.
+      crop ? `object-view-box:inset(${crop.t * 100}% ${crop.r * 100}% ${crop.b * 100}% ${crop.l * 100}%)` : '',
     ].filter(Boolean).join(';');
     return ['img', mergeAttributes(HTMLAttributes, {
       ...(style ? { style } : {}),
       ...(rot ? { 'data-rotation': String(rot) } : {}),
+      ...(crop ? { 'data-crop': [crop.l, crop.t, crop.r, crop.b].join(',') } : {}),
       ...(wrap !== 'inline' ? { 'data-wrap': wrap } : {}),
       ...(offset != null ? { 'data-wrap-offset': String(offset) } : {}),
       ...(offsetY != null ? { 'data-wrap-offset-y': String(offsetY) } : {}),
@@ -554,7 +577,11 @@ class ImageView {
     // Dragging an image live re-anchors it to the text position under the cursor so the
     // surrounding text reflows in real time — inline and floating alike.
     this.img.addEventListener('mousedown', e => this.startReposition(e as MouseEvent));
-    this.rotor.appendChild(this.img);
+    const clip = document.createElement('span');
+    clip.className = 'image-crop';
+    clip.appendChild(this.img);
+    this.rotor.appendChild(clip);
+    this.applyCrop();
 
     for (const cfg of HANDLES) {
       const h = document.createElement('span');
@@ -949,8 +976,23 @@ class ImageView {
     if (this.img.getAttribute('src') !== src) this.img.src = src;
     this.img.alt = (node.attrs.alt as string) ?? '';
     this.applyLayout(this.attrW(), this.attrH(), this.attrRot());
+    this.applyCrop();
     this.applyWrap();
     return true;
+  }
+
+  // The kept part fills the frame: the picture is drawn that much larger and shifted,
+  // and the crop box cuts off the rest (a box, not object-view-box: every engine and
+  // the raster PDF's html2canvas clip an overflow).
+  private applyCrop(): void {
+    const c = cropOf(this.node.attrs.crop);
+    const s = this.img.style;
+    const w = c ? 1 - c.l - c.r : 1, h = c ? 1 - c.t - c.b : 1;
+    s.position = c ? 'relative' : '';
+    s.width = c ? `${100 / w}%` : '';
+    s.height = c ? `${100 / h}%` : '';
+    s.left = c ? `${(-100 * c.l) / w}%` : '';
+    s.top = c ? `${(-100 * c.t) / h}%` : '';
   }
 
   selectNode(): void {

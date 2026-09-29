@@ -9,7 +9,7 @@ import { builtinStyleSheet, DEFAULT_STYLE, type ParaProps, type Style, type Styl
 import { DEFAULT_OUTLINE_LEVEL, MAX_OUTLINE_LEVELS, type OutlineLevel, type OutlineNumbering } from '../styles/outlineNumbering';
 import { LIST_LEVEL_STEP_CM, MAX_LIST_LEVELS, type ListLevelStyle, type ListStyle } from '../styles/listStyles';
 import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
-import { fitInlineImage, framePx } from '../editor/extensions/image';
+import { cropOf, fitInlineImage, framePx, type Crop } from '../editor/extensions/image';
 import { odfChartDataUrl } from './chart';
 import { formatTabStops, normalizeLeader } from '../editor/extensions/tabStops';
 import { isEmphasis, type CapsMode, type LineStyle } from '../editor/extensions/textEffects';
@@ -23,7 +23,7 @@ import { docxPicture, matchFormat, toDateValue, type Token } from '../utils/date
 import {
   shapeFromOdfType, lineKindFor, parseSvgPath, parseOdfPoints, fitPath, type ShapeKind,
 } from '../utils/shapes';
-import { imageDataUrl, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
+import { imageDataUrl, imageSizeCm, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { boundedInt, IMPORT_LIMITS, parseImportXml } from './importLimits';
 import { astToLatex } from '../math/latex';
 import { parseMathml } from '../math/mathml';
@@ -436,9 +436,21 @@ function convertFrame(frame: Element, ctx: Ctx): Node | null {
   if (hCm != null) attrs.height = framePx(cmToPx(hCm));
   const title = frame.getElementsByTagNameNS(NS.svg, 'title')[0]?.textContent;
   if (title) attrs.alt = title;
-  applyFrameRotationAndWrap(frame, attrs, ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name')), ctx.contentWidthCm, ctx.leftMarginCm);
+  const gp = ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name'));
+  const crop = clipCrop(gp['fo:clip'], ctx.files[href]);
+  if (crop) attrs.crop = crop;
+  applyFrameRotationAndWrap(frame, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   if (!attrs.wrap || attrs.wrap === 'inline') fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   return { type: 'image', attrs };
+}
+
+// fo:clip="rect(top, right, bottom, left)" cuts lengths off the picture at its own size.
+function clipCrop(clip: unknown, bytes: Uint8Array | undefined): Crop | null {
+  const m = typeof clip === 'string' ? /rect\(([^)]*)\)/.exec(clip) : null;
+  const size = m && bytes ? imageSizeCm(bytes) : null;
+  if (!m || !size) return null;
+  const [t, r, b, l] = m[1].split(/[\s,]+/).filter(Boolean).map((v) => Math.max(0, lengthToCm(v) ?? 0));
+  return cropOf({ l: l / size.w, t: t / size.h, r: r / size.w, b: b / size.h });
 }
 
 // A shape's fill color; fo:background-color (LibreOffice's per-shape fill) beats draw:fill.

@@ -442,12 +442,17 @@
   top: 50%;
   transform: translate(-50%, -50%);
 }
+.paper .tiptap .image-crop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
 .paper .tiptap .image-rotor img {
   width: 100%;
   height: 100%;
   display: block;
 }
-.paper .tiptap .image-node.image-selected .image-rotor img {
+.paper .tiptap .image-node.image-selected .image-crop {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
 }

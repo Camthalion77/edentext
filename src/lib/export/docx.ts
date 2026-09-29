@@ -19,6 +19,7 @@ import type {
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { isSvgDataUrl, svgToPngDataUrl } from '../import/imageFormats';
 import { TEXTBOX_PADDING_CM, type TextVAlign } from '../editor/extensions/textBox';
+import { cropOf, type Crop } from '../editor/extensions/image';
 import { SHAPES, isShapeKind, isLineKind, drawingMlPath, type ShapeKind } from '../utils/shapes';
 import { cellFormatCode, isCellFormat } from '../utils/cellFormat';
 import { cjkDocFont, isAsianTag, type ExportLanguage } from '../storage/documentLanguage';
@@ -292,6 +293,14 @@ const NOSNAP = '\uE023';
 // Wraps the w:ind character attributes the docx package lacks (leftChars, rightChars, …),
 // which the same pass adds to the paragraph's w:ind.
 const INDC = '\uE025';
+
+// Wraps a picture's crop in its name (docPr); the docx package writes an empty
+// <a:srcRect/>, which a post-pack pass fills from it.
+const CROP = '\uE030';
+let docCrops = false;
+const srcRectXml = (c: Crop | null) => c
+  ? `<a:srcRect l="${Math.round(c.l * 100000)}" t="${Math.round(c.t * 100000)}" r="${Math.round(c.r * 100000)}" b="${Math.round(c.b * 100000)}"/>`
+  : '<a:srcRect/>';
 
 const WP_NS = 'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
 const A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -1054,10 +1063,14 @@ function imageRun(node: TiptapNode): ImageRun | null {
   const offsetCm = typeof node.attrs?.wrapOffset === 'number' ? node.attrs.wrapOffset : null;
   const offsetYCm = typeof node.attrs?.wrapOffsetY === 'number' ? node.attrs.wrapOffsetY : null;
   const distCm = typeof node.attrs?.wrapDist === 'number' ? node.attrs.wrapDist : null;
+  const alt = typeof node.attrs?.alt === 'string' ? node.attrs.alt : '';
+  const crop = cropOf(node.attrs?.crop);
+  docCrops ||= !!crop;
+  const mark = crop ? `${CROP}${[crop.l, crop.t, crop.r, crop.b].join(',')}${CROP}` : '';
   return new ImageRun({
     type: decoded.type,
     data: decoded.bytes,
-    altText: typeof node.attrs?.alt === 'string' && node.attrs.alt ? { name: node.attrs.alt, title: node.attrs.alt, description: node.attrs.alt } : undefined,
+    altText: alt ? { name: alt + mark, title: alt, description: alt } : mark ? { name: mark } : undefined,
     transformation: { width, height, rotation: rotation || undefined },
     floating: floatingFor(wrap, offsetCm, offsetYCm, node.attrs?.wrapAlign as string | null, distCm, node.attrs?.inFront === true, node.attrs?.wrapFromPage === true, node.attrs?.wrapFromBody === true),
   });
@@ -1220,7 +1233,7 @@ function txbxImageXml(node: TiptapNode, parts: TxbxParts): string {
     `<wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${9000 + n}" name="Picture ${n}" descr="${alt}"/>` +
     `<a:graphic xmlns:a="${A_NS}"><a:graphicData uri="${PIC_NS}">` +
     `<pic:pic xmlns:pic="${PIC_NS}"><pic:nvPicPr><pic:cNvPr id="${9000 + n}" name="Picture ${n}"/><pic:cNvPicPr/></pic:nvPicPr>` +
-    `<pic:blipFill><a:blip r:embed="${rid}" xmlns:r="${R_NS}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+    `<pic:blipFill><a:blip r:embed="${rid}" xmlns:r="${R_NS}"/>${srcRectXml(cropOf(node.attrs?.crop))}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
     `<pic:spPr><a:xfrm${typeof node.attrs?.rotation === 'number' && node.attrs.rotation ? ` rot="${Math.round(node.attrs.rotation * 60000)}"` : ''}><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
     `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
     `</a:graphicData></a:graphic></wp:inline></w:drawing>`
@@ -1554,6 +1567,30 @@ const textParts = (files: Record<string, Uint8Array>): string[] =>
   Object.keys(files).filter((p) => /^word\/(document|footnotes|endnotes|header\d*|footer\d*)\.xml$/.test(p));
 const relsOf = (part: string) => part.replace(/^word\/(.*)$/, 'word/_rels/$1.rels');
 const EMPTY_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+
+// Post-pack pass: a picture whose name carries a crop gets it as its a:srcRect, and
+// the name loses the mark.
+function applyCropsDocx(bytes: Uint8Array): Uint8Array {
+  const files = unzipSync(bytes);
+  let hit = false;
+  const mark = new RegExp(`${CROP}([\\d.,e-]+)${CROP}`);
+  for (const part of textParts(files)) {
+    const xml = strFromU8(files[part]);
+    if (!xml.includes(CROP)) continue;
+    hit = true;
+    files[part] = strToU8(xml.replace(/<w:drawing>[\s\S]*?<\/w:drawing>/g, (d) => {
+      const m = mark.exec(d);
+      if (!m) return d;
+      const [l, t, r, b] = m[1].split(',').map(Number);
+      return d.replace('<a:srcRect/>', srcRectXml(cropOf({ l, t, r, b })))
+        .replace(new RegExp(`${CROP}[\\d.,e-]+${CROP}`, 'g'), '');
+    }));
+  }
+  if (!hit) return bytes;
+  const out: Record<string, [Uint8Array, { level: 6 }]> = {};
+  for (const [path, data] of Object.entries(files)) out[path] = [data, { level: 6 }];
+  return zipSync(out);
+}
 
 // Post-pack pass: swap each marker paragraph in a text part for its drawing.
 // The tempered pattern keeps the match inside one paragraph. A box's pictures and
@@ -3195,6 +3232,7 @@ export async function buildDocx(
   nextBookmarkId = 0;
   docxBookmarkNames = new Map();
   docRubies = [];
+  docCrops = false;
   docPlaceholders = [];
   docSources = [];
   const num = new Numbering();
@@ -3436,7 +3474,8 @@ export async function buildDocx(
     ...num.styleLinks().map((l) => numberingStyleXml(l.name)),
   ]);
   const linked = applyOutlineNumberingDocx(applyListStylesDocx(styled, num.styleLinks()), outlineIndex);
-  const packed = applyFormulasDocx(applyTextBoxesDocx(linked, docTextBoxes), docFormulas);
+  const formulas = applyFormulasDocx(applyTextBoxesDocx(linked, docTextBoxes), docFormulas);
+  const packed = docCrops ? applyCropsDocx(formulas) : formulas;
   const cited = applyBibliographyDocx(applyPlaceholdersDocx(applyRubyDocx(packed, docRubies), docPlaceholders), docSources, docCitationStyle(docJson));
   // The note configuration goes out whether or not a note exists yet, as Word keeps its
   // own in settings.xml — a document numbering its first footnote from 3 must still say so.

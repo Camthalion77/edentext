@@ -11,7 +11,7 @@ import { builtinStyleSheet, DEFAULT_STYLE, type ParaProps, type Style, type Styl
 import { DEFAULT_OUTLINE_LEVEL, MAX_OUTLINE_LEVELS, type OutlineNumbering } from '../styles/outlineNumbering';
 import { MAX_LIST_LEVELS, type ListLevelStyle, type ListStyle } from '../styles/listStyles';
 import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
-import { fitInlineImage, framePx } from '../editor/extensions/image';
+import { cropOf, fitInlineImage, framePx } from '../editor/extensions/image';
 import { TEXTBOX_PADDING_CM } from '../editor/extensions/textBox';
 import { formatTabStops } from '../editor/extensions/tabStops';
 import type { CapsMode, LineStyle } from '../editor/extensions/textEffects';
@@ -2341,6 +2341,11 @@ function convertDrawing(drawing: Element, ctx: Ctx): Node | Node[] | null {
   const xfrm = drawing.getElementsByTagNameNS(A, 'xfrm')[0];
   const rot = xfrm ? parseInt(xfrm.getAttribute('rot') ?? '', 10) : NaN;
   if (Number.isFinite(rot) && rot) attrs.rotation = ((Math.round(rot / 60000) % 360) + 360) % 360;
+  // a:srcRect in thousandths of a percent; a negative side pads instead, which is not kept.
+  const rect = drawing.getElementsByTagNameNS(A, 'srcRect')[0];
+  const side = (k: string) => Math.max(0, intAttr(rect ?? null, '', k) ?? 0) / 100000;
+  const crop = rect && cropOf({ l: side('l'), t: side('t'), r: side('r'), b: side('b') });
+  if (crop) attrs.crop = crop;
 
   if (anchor) {
     const { wrap, offsetCm, offsetYCm, fromPage, fromBody, alignH, distCm, alignXCm } = anchorWrap(anchor, ctx);
