@@ -41,7 +41,6 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   import Ruler from './Ruler.svelte';
   import { saveDocument, loadDocument, markDocumentLoaded } from '../storage/autosave';
   import { IDB_SRC } from '../storage/imageStore';
-  import { fitInlineImage } from '../editor/extensions/image';
   import { applyMarginVars, cmToPx, PX_PER_CM, DEFAULT_MARGINS, type PageMargins } from '../storage/pageMargins';
   import { DEFAULT_TAB_INTERVAL_CM } from '../storage/tabInterval';
   import { type Orientation } from '../storage/pageOrientation';

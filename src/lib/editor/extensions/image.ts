@@ -74,18 +74,12 @@ export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.mi
 const COLUMN_WIDTH_CSS =
   'calc(var(--user-page-width) - var(--user-margin-left) - var(--user-margin-right))';
 
-// An as-character image wider than the text column takes a line of its own and leaves an
-// empty one above it. Fitting it to the column is where an image the file sizes to the
-// column lands anyway. Fractional px throughout: whole ones cost a big frame 0.3mm.
+// An as-character image the file sizes to the column can land under a pixel over it once
+// its cm/EMU width is in px: trim the width so the line holds it, keep the height. A truly
+// wider one keeps its size and overhangs the margin, as LibreOffice draws it.
 export function fitInlineImage(attrs: Record<string, unknown>, maxWidthPx: number): void {
   const w = attrs.width;
-  if (typeof w !== 'number' || w <= maxWidthPx) return;
-  // Under a pixel over is our cm arithmetic disagreeing with the rendered column, not an
-  // oversized picture: trim the width so the line still holds it, and keep the height —
-  // LibreOffice lets that much overhang stand and draws the frame at its stated size.
-  if (typeof attrs.height === 'number' && w - maxWidthPx > 1) {
-    attrs.height = framePx(Math.max(1, (attrs.height * maxWidthPx) / w));
-  }
+  if (typeof w !== 'number' || w <= maxWidthPx || w - maxWidthPx > 1) return;
   attrs.width = framePx(maxWidthPx);
 }
 
