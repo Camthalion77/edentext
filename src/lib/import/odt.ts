@@ -380,14 +380,14 @@ export function applyUniformRunFont(attrs: Record<string, unknown>, content: { t
 }
 
 // A top-and-bottom frame set below its paragraph's top sinks behind the paragraph's
-// text: a full-width float pushes every following line under itself, so where there is
-// text the offset can only be drawn as the lines standing above the frame.
+// text: a full-width float pushes every following line under itself, so the offset can
+// only be drawn as what stands above the frame — which is why frames go top to bottom.
 export function sinkOffsetFrames(content: { type: string; text?: string; attrs?: Record<string, unknown> }[]): void {
   const sinks = (n: { type: string; attrs?: Record<string, unknown> }) =>
     (n.type === 'image' || n.type === 'textBox')
     && n.attrs?.wrap === 'topBottom' && (n.attrs.wrapOffsetY as number) > 0;
-  if (!content.some(sinks) || !content.some(n => n.type === 'text' && n.text?.trim())) return;
-  const frames = content.filter(sinks);
+  if (!content.some(sinks)) return;
+  const frames = content.filter(sinks).sort((a, b) => (a.attrs!.wrapOffsetY as number) - (b.attrs!.wrapOffsetY as number));
   for (const f of frames) content.splice(content.indexOf(f), 1);
   content.push(...frames);
 }

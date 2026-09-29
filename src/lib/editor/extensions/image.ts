@@ -219,6 +219,23 @@ export function inlineVerticalAlign(vAlign: unknown, boxHeightPx: number, offset
   }
 }
 
+// The offset counts from the anchor paragraph's top. Where text or an earlier frame
+// precedes this one (the importers sink frames behind the text: a full-width float pushes
+// every following line under itself) that part is already covered, so the rest is measured.
+export function sinkToOffset(d: HTMLElement, y: unknown): number | null {
+  const p = d.parentElement;
+  if (typeof y !== 'number' || y <= 0 || !p) return null;
+  let gap = Math.round(cmToPx(y));
+  if (d.previousSibling) {
+    d.style.marginTop = '0px';
+    const box = p.getBoundingClientRect();
+    const scale = box.width / p.offsetWidth || 1;
+    gap = clamp(Math.round(cmToPx(y) - (d.getBoundingClientRect().top - box.top) / scale), 6, pageContentHeightPx());
+  }
+  d.style.marginTop = `${gap}px`;
+  return gap;
+}
+
 // The page text height in px, capping how tall an image can be stretched. Read live
 // from the :root vars the editor maintains (orientation/margins change them). A frame in
 // a header or footer may reach over the whole page.
@@ -738,29 +755,13 @@ class ImageView {
     d.style.top = `${grid.topOf(page) + px(this.offY())}px`;
   }
 
-  // The offset counts from the anchor paragraph's top. Where text precedes the frame
-  // (the importers sink one behind the text — a full-width float pushes every following
-  // line under itself) the lines already cover part of it, so the rest is measured.
-  // The offset counts from the anchor paragraph's top. Where text precedes the frame
-  // (the importers sink one behind the text — a full-width float pushes every following
-  // line under itself) the lines already cover part of it, so the rest is measured.
   // A side float's lines run beside the offset as Word keeps them (sinkSideFloat).
   private sinkToOffset(): void {
-    const y = this.node.attrs.wrapOffsetY;
-    const d = this.dom, p = d.parentElement;
-    if (typeof y !== 'number' || y <= 0 || !p) return;
-    let gap = Math.round(cmToPx(y));
-    if (d.previousSibling) {
-      d.style.marginTop = '0px';
-      const box = p.getBoundingClientRect();
-      const scale = box.width / p.offsetWidth || 1;
-      gap = clamp(Math.round(cmToPx(y) - (d.getBoundingClientRect().top - box.top) / scale), 6, pageContentHeightPx());
-    }
+    const gap = sinkToOffset(this.dom, this.node.attrs.wrapOffsetY);
     const wrap = this.attrWrap();
-    if (wrap !== 'left' && wrap !== 'right') { d.style.marginTop = `${gap}px`; return; }
-    d.dataset.sinkGap = String(gap);
-    d.style.marginTop = `${gap}px`;
-    sinkSideFloat(this.view, d);
+    if (gap === null || (wrap !== 'left' && wrap !== 'right')) return;
+    this.dom.dataset.sinkGap = String(gap);
+    sinkSideFloat(this.view, this.dom);
   }
 
   // Drag an image to re-anchor it live to the text position under the cursor (text

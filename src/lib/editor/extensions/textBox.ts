@@ -10,7 +10,7 @@ import type { EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
-import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
+import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, sinkToOffset, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
 import { SHAPES, shapePath, linePaths, arrowHeadPx, isShapeKind, isLineKind, type ShapeKind } from '../../utils/shapes';
 import { cmToPx } from '../../storage/pageMargins';
 import { normalizeColor } from '../../utils/color';
@@ -638,6 +638,8 @@ class TextBoxView {
     this.applyWrap();
     this.applyShapeInset();
     this.fitWrapper();
+    // As on an image: a sunk frame measures what stands above it once it is in the document.
+    if (a.wrap === 'topBottom') requestAnimationFrame(() => sinkToOffset(this.dom, this.attrs().wrapOffsetY));
   }
 
   // A line is drawn in real pixels, not the 0…100 box a polygon is stretched into: an
@@ -806,6 +808,7 @@ class TextBoxView {
       d.style.clear = 'both';
       d.style.width = '100%';
       d.style.margin = frameMargins('topBottom', null, 0, a.wrapOffsetY);
+      sinkToOffset(d, a.wrapOffsetY);
       this.placeInBand(a);
     } else {
       // In the line: a box is a character. inline-block keeps ProseMirror's inline view
