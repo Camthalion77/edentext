@@ -1320,7 +1320,11 @@ function convertParagraph(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault:
     attrs.widowControl = false;
   }
   const directKn = fc(ppr, 'keepNext');
-  if (!level && (directKn ? onOff(directKn) : ctx.styles.paragraphKeepNext(styleId))) attrs.keepNext = true;
+  const kn = directKn ? onOff(directKn) : ctx.styles.paragraphKeepNext(styleId);
+  if (!level && kn) attrs.keepNext = true;
+  // A heading style the file defines without it (or a plain style given an outline level)
+  // lets the heading end a page; one the file only names is Word's built-in, which keeps.
+  if (level && !kn && (directKn || !styleId || ctx.styles.definesParagraphStyle(styleId))) attrs.keepNext = false;
   const directKl = fc(ppr, 'keepLines');
   if (!level && (directKl ? onOff(directKl) : ctx.styles.paragraphKeepLines(styleId))) attrs.keepLines = true;
   // "Don't hyphenate this paragraph" — only formatting where the document hyphenates

@@ -322,7 +322,7 @@ function hasCustomAttrs(attrs: TiptapNode['attrs']): boolean {
   if (typeof attrs.tabStops === 'string' && attrs.tabStops) return true;
   if (typeof attrs.backgroundColor === 'string' && attrs.backgroundColor) return true;
   if (attrs.widowControl === false) return true;
-  if (attrs.keepNext === true) return true;
+  if (typeof attrs.keepNext === 'boolean') return true;
   if (attrs.keepLines === true) return true;
   if (attrs.noHyphenation === true) return true;
   if (attrs.snapToGrid === false) return true;
@@ -1990,7 +1990,7 @@ function applyEmptyLineFontSizes(odtBytes: Uint8Array): Uint8Array {
 function paraBoxSpec(attrs: TiptapNode['attrs']): string {
   const s = paraStyleFromAttrs(attrs);
   const noWidow = attrs?.widowControl === false;
-  const keepNext = attrs?.keepNext === true;
+  const keepNext = typeof attrs?.keepNext === 'boolean';
   const keepLines = attrs?.keepLines === true;
   const noHyphen = attrs?.noHyphenation === true;
   const noSnap = attrs?.snapToGrid === false;
@@ -2006,7 +2006,7 @@ function paraBoxSpec(attrs: TiptapNode['attrs']): string {
   if (!s.background && !s.borderTop && !s.borderRight && !s.borderBottom && !s.borderLeft && !noWidow && !right && !keepNext && !keepLines && !wm && !noHyphen && !lang && !langAsian && !noSnap && !chars && !leftChars) return '';
   return [s.background, s.borderTop, s.borderRight, s.borderBottom, s.borderLeft]
     .map((v) => v ?? '')
-    .concat(noWidow ? 'w0' : '', right, keepNext ? 'k1' : '', keepLines ? 'g1' : '', wm ?? '', noHyphen ? 'h0' : '', lang, langAsian, noSnap ? 's0' : '', chars ? `${chars}ic` : '', leftChars ? `${leftChars}ic` : '').join('|');
+    .concat(noWidow ? 'w0' : '', right, keepNext ? (attrs?.keepNext ? 'k1' : 'k0') : '', keepLines ? 'g1' : '', wm ?? '', noHyphen ? 'h0' : '', lang, langAsian, noSnap ? 's0' : '', chars ? `${chars}ic` : '', leftChars ? `${leftChars}ic` : '').join('|');
 }
 
 function boxSpecToProps(spec: string): string {
@@ -2021,6 +2021,7 @@ function boxSpecToProps(spec: string): string {
   if (widow === 'w0') props.push('fo:orphans="0"', 'fo:widows="0"');
   if (marginRight) props.push(`${marginRight.endsWith('ic') ? 'loext' : 'fo'}:margin-right="${marginRight}"`);
   if (keepNext === 'k1') props.push('fo:keep-with-next="always"');
+  if (keepNext === 'k0') props.push('fo:keep-with-next="auto"');
   if (keepLines === 'g1') props.push('fo:keep-together="always"');
   if (writingMode) props.push(`style:writing-mode="${writingMode}"`);
   if (snap === 's0') props.push('style:snap-to-layout-grid="false"');

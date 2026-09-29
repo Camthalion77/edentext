@@ -2519,7 +2519,7 @@ function paragraphToDocx(node: TiptapNode, opts: ParaOpts = {}): Paragraph {
     // a style of its own ("Appendix 1") has nothing else that says what level it is.
     outlineLevel: node.type === 'heading' ? ((attrs.level as number) ?? 1) - 1 : undefined,
     widowControl: attrs.widowControl === false ? false : undefined,
-    keepNext: attrs.keepNext === true || undefined,
+    keepNext: typeof attrs.keepNext === 'boolean' ? attrs.keepNext : undefined,
     keepLines: attrs.keepLines === true || undefined,
     // w:bidi — the block's own base direction (textDirection.ts).
     bidirectional: attrs.dir === 'rtl' ? true : attrs.dir === 'ltr' ? false : undefined,

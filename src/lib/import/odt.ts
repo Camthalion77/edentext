@@ -1895,6 +1895,8 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
   // Keep with next: a heading does that anyway (pageBreaks.ts), and what the block's
   // own style supplies (Title keeps with next) is not direct formatting either.
   if (!isHeading && !defaults.keepNext && paraProps['fo:keep-with-next'] === 'always') attrs.keepNext = true;
+  // Unless a heading style the file defines drops it; an undefined one is the built-in.
+  if (isHeading && paraProps['fo:keep-with-next'] !== 'always' && resolver.namedAncestor(styleName)) attrs.keepNext = false;
   if (!isHeading && !defaults.keepLines && paraProps['fo:keep-together'] === 'always') attrs.keepLines = true;
   // "Don't hyphenate this paragraph" — only meaningful where the document hyphenates at
   // all; below that switch it is the default and no formatting.

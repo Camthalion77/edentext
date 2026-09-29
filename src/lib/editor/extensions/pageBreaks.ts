@@ -1396,9 +1396,9 @@ export const PageBreaks = Extension.create({
                   // a table cell, where the table breaks atomically between rows).
                   forceBreakBefore: !inTableCell && child.dataset?.pageBreakBefore === 'page',
                   // A heading keeps with the next block in both Word and LibreOffice,
-                  // so their styles carry it and the attr only marks the other blocks.
-                  keepNext: !inTableCell
-                    && (child.dataset?.keepNext === 'true' || /^H[1-5]$/.test(child.tagName)),
+                  // unless the file's own heading style drops it (`false`).
+                  keepNext: !inTableCell && (child.dataset?.keepNext === 'true'
+                    || (/^H[1-5]$/.test(child.tagName) && child.dataset?.keepNext !== 'false')),
                   sectionStart: !inTableCell && child.dataset?.sectionBreak === 'true',
                   refs: refsWithin(child),
                 });

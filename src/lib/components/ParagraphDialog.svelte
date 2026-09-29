@@ -64,7 +64,9 @@
   let breakBefore = $derived(read<string | null>('breakBefore', null) === 'page');
   // widowControl is on unless a paragraph turned it off; the other two are off unless set.
   let widowControl = $derived(read<boolean | null>('widowControl', null) !== false);
-  let keepNext = $derived(read<boolean | null>('keepNext', null) === true);
+  // A heading keeps with next unless it opted out, so there the stored value is `false`.
+  let inHeading = $derived(tick >= 0 && !!editor?.isActive('heading'));
+  let keepNext = $derived(inHeading ? read<boolean | null>('keepNext', null) !== false : read<boolean | null>('keepNext', null) === true);
   let keepLines = $derived(read<boolean | null>('keepLines', null) === true);
   // LibreOffice's Hyphenation checkbox: on unless this paragraph opted out.
   let hyphenate = $derived(read<boolean | null>('noHyphenation', null) !== true);
@@ -75,11 +77,11 @@
   }
 
   // Every block in the selection takes the value, whichever node type it is.
-  function setAttr(attr: string, value: unknown) {
+  function setAttr(attr: string, value: unknown, headingValue = value) {
     if (!editor) return;
     const chain = editor.chain().focus();
     for (const type of ['paragraph', 'heading']) {
-      if (editor.schema.nodes[type]) chain.updateAttributes(type, { [attr]: value });
+      if (editor.schema.nodes[type]) chain.updateAttributes(type, { [attr]: type === 'heading' ? headingValue : value });
     }
     chain.run();
   }
@@ -113,7 +115,7 @@
 
   const FLOW: { attr: string; on: () => boolean; label: () => string; set: (v: boolean) => void }[] = [
     { attr: 'widowControl', on: () => widowControl, label: () => t().paragraphDialog.widowControl, set: (v) => setAttr('widowControl', v ? null : false) },
-    { attr: 'keepNext', on: () => keepNext, label: () => t().paragraphDialog.keepNext, set: (v) => setAttr('keepNext', v || null) },
+    { attr: 'keepNext', on: () => keepNext, label: () => t().paragraphDialog.keepNext, set: (v) => setAttr('keepNext', v || null, v ? null : false) },
     { attr: 'keepLines', on: () => keepLines, label: () => t().paragraphDialog.keepLines, set: (v) => setAttr('keepLines', v || null) },
     { attr: 'noHyphenation', on: () => hyphenate, label: () => t().paragraphDialog.hyphenate, set: (v) => setAttr('noHyphenation', v ? null : true) },
     { attr: 'breakBefore', on: () => breakBefore, label: () => t().paragraphDialog.pageBreakBefore, set: (v) => setAttr('breakBefore', v ? 'page' : null) },

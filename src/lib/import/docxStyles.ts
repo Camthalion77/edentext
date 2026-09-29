@@ -497,6 +497,10 @@ export class DocxStyles {
     return this.paragraphContextualSpacing(this.basedOn.get(styleId) ?? null, seen);
   }
 
+  definesParagraphStyle(styleId: string): boolean {
+    return this.paraStyleNames.has(styleId);
+  }
+
   // w:keepNext along the w:basedOn chain — Word's heading styles all carry it.
   paragraphKeepNext(styleId: string | null | undefined, seen = new Set<string>()): boolean {
     if (!styleId || seen.has(styleId)) return false;
