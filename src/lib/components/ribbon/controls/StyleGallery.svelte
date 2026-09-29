@@ -4,7 +4,7 @@
   import { anchored, clickOutside, isMenuOpen, toggleMenu, closeMenu } from '../menu.svelte';
   import { blockStyleName } from '../../../editor/extensions/paragraphStyle';
   import { activeCharacterStyle } from '../../../editor/extensions/characterStyle';
-  import { DEFAULT_STYLE, headingStyleName, resolveStyle, visibleStyles, type StyleFamily } from '../../../styles/styleSheet';
+  import { DEFAULT_STYLE, fontPairDeclarations, headingStyleName, resolveStyle, visibleStyles, type StyleFamily } from '../../../styles/styleSheet';
   import { MAX_HEADING_LEVEL } from '../../../styles/headings';
   import { showAllStyles, styleSheet, toggleAllStyles } from '../../../styles/sheet.svelte';
   import { styleLabel, t } from '../../../i18n/i18n.svelte';
@@ -50,7 +50,8 @@
     return `font-size: ${Math.min(max, Math.max(Math.min(13, max), pt))}px;`
       + `font-weight: ${s.text.bold ? 700 : 400};`
       + `font-style: ${s.text.italic ? 'italic' : 'normal'};`
-      + `font-family: ${s.text.fontFamily ?? 'inherit'};`
+      // The editor's own stack, so a missing family shows the substitute the page renders.
+      + fontPairDeclarations(s.text.fontFamily, s.text.fontFamilyAsian).map((d) => `${d};`).join('')
       + (s.text.color ? `color: ${s.text.color};` : '');
   }
 
