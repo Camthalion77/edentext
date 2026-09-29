@@ -53,3 +53,13 @@ describe('a run-through picture aligned in the column', () => {
     expect(frameX(importOdt(zipSync({ ...files, 'content.xml': strToU8(xml) })).content)).toBeCloseTo(17 - 2.54, 2);
   });
 });
+
+// A run-through picture with no x of its own sits at its anchor character, in DOCX too.
+describe('a run-through picture without an x', () => {
+  it('keeps no x through DOCX', async () => {
+    const doc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ab' }, { type: 'image', attrs: { src: `data:image/png;base64,${PNG}`, width: 96, height: 96, wrap: 'through' } }] }] };
+    const xml = strFromU8(unzipSync(await buildDocx(doc as any, DEFAULT_MARGINS))['word/document.xml']);
+    expect(xml).toMatch(/<wp:positionH relativeFrom="character"><wp:posOffset>0</);
+    expect(frameX(importDocx(await buildDocx(doc as any, DEFAULT_MARGINS)).content)).toBeUndefined();
+  });
+});

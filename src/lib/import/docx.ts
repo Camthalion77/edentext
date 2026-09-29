@@ -2594,6 +2594,8 @@ function anchorOffsetX(anchor: Element, ctx: Ctx): number | null {
   const off = parseInt(posH?.getElementsByTagNameNS(WP, 'posOffset')[0]?.textContent ?? '', 10);
   if (!Number.isFinite(off)) return null;
   const from = posH?.getAttribute('relativeFrom');
+  // At its anchor character is where a frame without an x of its own sits.
+  if (from === 'character' && off === 0) return null;
   const base = from === 'page' || from === 'leftMargin' ? -cmToEmu(ctx.leftMarginCm)
     : from === 'rightMargin' ? cmToEmu(ctx.contentWidthCm) : 0;
   return round2((off + base) / 360000);

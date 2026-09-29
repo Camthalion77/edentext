@@ -989,13 +989,15 @@ function floatingFor(wrap: string, offsetCm: number | null, offsetYCm: number | 
     // Word's in-front-of / behind-text: no wrap at all, and behindDoc names which side
     // of the text the frame lands on. It overlaps by definition, so allowOverlap holds.
     // Where it sits across the text column is its own, as it is for a wrapped frame:
-    // a full-width figure behind the text is centred, not flush left.
+    // a full-width figure behind the text is centred, not flush left. One with neither
+    // sits at its anchor character.
     const through = alignH === 'right' ? HorizontalPositionAlign.RIGHT
-      : alignH === 'center' ? HorizontalPositionAlign.CENTER : HorizontalPositionAlign.LEFT;
+      : alignH === 'center' ? HorizontalPositionAlign.CENTER : alignH === 'left' ? HorizontalPositionAlign.LEFT : null;
     return {
       horizontalPosition: offsetCm != null
         ? { relative: HorizontalPositionRelativeFrom.MARGIN, offset: Math.round(offsetCm * 360000) }
-        : { relative: HorizontalPositionRelativeFrom.MARGIN, align: through },
+        : through ? { relative: HorizontalPositionRelativeFrom.MARGIN, align: through }
+          : { relative: HorizontalPositionRelativeFrom.CHARACTER, offset: 0 },
       verticalPosition,
       wrap: { type: TextWrappingType.NONE },
       behindDocument: !inFront,
