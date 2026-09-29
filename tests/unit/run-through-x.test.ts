@@ -42,3 +42,14 @@ describe('a run-through frame in an indented paragraph', () => {
     expect(frame(importDocx(await buildDocx(doc as any, DEFAULT_MARGINS)).content).wrapOffsetY).toBe(-1);
   });
 });
+
+// ODF names the alignment (style:horizontal-pos) rather than an x: a run-through picture
+// right-aligned in the column sits at the column's right edge.
+describe('a run-through picture aligned in the column', () => {
+  it('takes the x its ODF alignment gives', async () => {
+    const doc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'image', attrs: { src: `data:image/png;base64,${PNG}`, width: 96, height: 96, wrap: 'through' } }] }] };
+    const files = unzipSync(await buildOdt(doc as any, DEFAULT_MARGINS));
+    const xml = strFromU8(files['content.xml']).replace('style:horizontal-rel="paragraph-content" style:horizontal-pos="left"', 'style:horizontal-rel="page-content" style:horizontal-pos="right"');
+    expect(frameX(importOdt(zipSync({ ...files, 'content.xml': strToU8(xml) })).content)).toBeCloseTo(17 - 2.54, 2);
+  });
+});

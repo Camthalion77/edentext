@@ -276,6 +276,17 @@ function boxTextFlow(el: Element, ctx: Ctx, attrs: Record<string, unknown>): voi
   if (anchor === 'middle' || anchor === 'bottom') attrs.textVAlign = anchor;
 }
 
+// Nothing floats a run-through picture to a side, so its alignment in the column
+// becomes the x that alignment gives, as the DOCX leg does for wrapNone.
+function pictureAlignX(frame: Element, attrs: Record<string, unknown>, gp: PropMap, contentCm: number): void {
+  const hpos = gp['style:horizontal-pos'], rel = gp['style:horizontal-rel'];
+  const w = lengthToCm(frame.getAttributeNS(NS.svg, 'width'));
+  if (attrs.wrap !== 'through' || attrs.wrapOffset != null || w == null || !contentCm) return;
+  if (rel && rel !== 'paragraph' && rel !== 'paragraph-content' && rel !== 'page-content') return;
+  const x = hpos === 'right' ? contentCm - w : hpos === 'center' ? (contentCm - w) / 2 : null;
+  if (x != null) attrs.wrapOffset = Math.round(x * 100) / 100;
+}
+
 function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, gp: PropMap, contentCm = 0, leftMarginCm = 0): void {
   const deg = frameRotationDeg(el);
   if (deg) attrs.rotation = deg;
@@ -440,6 +451,7 @@ function convertFrame(frame: Element, ctx: Ctx): Node | null {
   const crop = clipCrop(gp['fo:clip'], ctx.files[href]);
   if (crop) attrs.crop = crop;
   applyFrameRotationAndWrap(frame, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
+  pictureAlignX(frame, attrs, gp, ctx.contentWidthCm);
   if (!attrs.wrap || attrs.wrap === 'inline') fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   return { type: 'image', attrs };
 }
@@ -596,7 +608,9 @@ function convertChartFrame(frame: Element, ctx: Ctx): Node | null {
   const src = doc && odfChartDataUrl(doc, cmToPx(wCm), cmToPx(hCm));
   if (!src) return null;
   const attrs: Record<string, unknown> = { src, width: framePx(cmToPx(wCm)), height: framePx(cmToPx(hCm)), alt: 'Chart' };
-  applyFrameRotationAndWrap(frame, attrs, ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name')), ctx.contentWidthCm, ctx.leftMarginCm);
+  const gp = ctx.resolver.graphicProps(frame.getAttributeNS(NS.draw, 'style-name'));
+  applyFrameRotationAndWrap(frame, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
+  pictureAlignX(frame, attrs, gp, ctx.contentWidthCm);
   if (!attrs.wrap || attrs.wrap === 'inline') fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   return { type: 'image', attrs };
 }
