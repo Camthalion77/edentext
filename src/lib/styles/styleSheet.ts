@@ -271,6 +271,7 @@ const SANS = { stack: "'Arial', 'Liberation Sans'", sans: true };
 // SimSun where the font is missing, and LibreOffice's fallback measures 1.34.
 const SONG = { singleLine: 1.3, noBold: true, wideQuotes: true };
 const CJK_NO_BOLD = { noBold: true, wideQuotes: true };
+const SEGOE = { singleLine: 1.33 };
 const FONT_PROFILES: Record<string, FontProfile> = {
   'Liberation Serif': { stack: "'Liberation Serif', 'Times New Roman'" },
   'Liberation Sans': SANS,
@@ -278,6 +279,9 @@ const FONT_PROFILES: Record<string, FontProfile> = {
   Calibri: { singleLine: 1.2208 },
   'Calibri Light': { singleLine: 1.2208 },
   Carlito: { singleLine: 1.2208 },
+  // Word sets Segoe UI's win metrics, (2210 + 514) / 2048; Selawik, its open stand-in, shares them.
+  'Segoe UI': SEGOE, 'Segoe UI Semibold': SEGOE, 'Segoe UI Semilight': SEGOE, 'Segoe UI Light': SEGOE,
+  'Segoe UI Black': SEGOE, Selawik: SEGOE,
   'Courier New': { singleLine: 1.1333 },
   'Liberation Mono': { singleLine: 1.1333 },
   SimSun: SONG, 宋体: SONG, NSimSun: SONG, 新宋体: SONG, FangSong: SONG, 仿宋: SONG, 仿宋_GB2312: SONG,
