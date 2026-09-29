@@ -82,7 +82,8 @@ editor's nearest one, page first, where one of about its size counts two pages n
 A pair off by more than `POS_TOL_MM`, sized differently by more than 1.5mm or on another
 page is an `image` report; a picture left unpaired is an `imageCount` one. A picture that
 moves with drifting text is reported beside that text. pdftohtml sees only raster images:
-a vector drawing is a picture only on the editor's side. Counts recorded before
+a vector drawing is a picture only on the editor's side, and a cropped one (`a:srcRect`,
+`fo:clip`) is its uncropped box there, larger than the frame the editor draws. Counts recorded before
 2026-09-28 leave pictures out. Counts recorded before 2026-09-03 came from the index-wise
 comparison, which stopped at the first divergence per page: they are not comparable to
 what a run prints now.
