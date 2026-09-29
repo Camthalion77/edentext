@@ -1692,6 +1692,7 @@
   />
   <div class="editor-row">
   <EditorComponent
+    onDocumentLost={resetDocumentState}
     {documentEpoch}
     {pageRtl}
     bind:editor
