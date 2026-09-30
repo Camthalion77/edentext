@@ -66,7 +66,7 @@ view, user dictionary, number recognition) stay unscoped.
 - **Chrome:** `edentext-chrome` — `'modern' | 'ribbon'` ('classic' read as the modern island's legacy stored name); absent = ribbon.
 - **Ribbon collapsed:** `edentext-ribbon-collapsed` — boolean string; absent = expanded.
 - **Formatting marks:** `edentext-formatting-marks` — boolean string.
-- **Ruler:** `edentext-ruler` — boolean string; absent = on.
+- **Ruler:** `edentext-ruler` — boolean string; absent = on, off at ≤600px width.
 - **Split view:** `edentext-split` — boolean string; absent = off. The divider's position is not kept, as neither word processor restores one.
 - **Pages side by side:** `edentext-page-columns` — how many, 1–`MAX_PAGE_COLUMNS`; absent = 1. Only one pane layout at a time, so turning this on ends the split.
 - **Zoom:** `edentext-zoom` — integer percent.
