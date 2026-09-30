@@ -24,6 +24,7 @@ export const RIBBON_COMMANDS: RibbonCommand[] = [
   c(null, 'newDocument', (m) => m.app.newDocument),
   c(null, 'newFromTemplate', (m) => m.templates.title),
   c(null, 'open', (m) => m.app.open),
+  c(null, 'browserDocuments', (m) => m.browserDocs.title),
   c(null, 'save', (m) => m.app.save),
   c(null, 'saveAsOdt', (m) => `${m.ribbon.saveAs} (.odt)`),
   c(null, 'saveAsDocx', (m) => `${m.ribbon.saveAs} (.docx)`),

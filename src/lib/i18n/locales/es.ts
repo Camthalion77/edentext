@@ -13,6 +13,15 @@ const es: Messages = {
     add: 'Añadir',
     remove: 'Quitar',
   },
+  browserDocs: {
+    title: 'Documentos recientes',
+    intro: 'Estos documentos se guardan automáticamente, pero solo en este navegador. Guarde un documento como archivo para conservarlo de forma permanente.',
+    thisTab: 'Esta pestaña',
+    otherTab: 'Abierto en otra pestaña',
+    open: 'Abrir',
+    delete: 'Eliminar',
+    confirmDelete: '¿Eliminar este documento del navegador? No se podrá recuperar.',
+  },
   docProps: {
     title: 'Propiedades del documento',
     docTitle: 'Título',

@@ -88,7 +88,7 @@
     onSelectTheme,
     pdfBusy = false,
     hasPassword = false,
-    onNew, onNewFromTemplate, onOpen, onSave, onSaveAs, onSaveTemplate, onExportPdf, onPrintPdf, onPrint, onAbout, onDocProperties, onProtect, onAutoCorrect, onAutoText, onNewComment,
+    onNew, onNewFromTemplate, onOpen, onSave, onSaveAs, onSaveTemplate, onExportPdf, onPrintPdf, onPrint, onAbout, onDocProperties, onBrowserDocuments, onProtect, onAutoCorrect, onAutoText, onNewComment,
     navigatorOpen = false, onToggleNavigator,
     recentFiles = [], onOpenRecent, onForgetRecent,
   }: {
@@ -146,6 +146,7 @@
     onPrint?: () => void;
     onAbout?: () => void;
     onDocProperties?: () => void;
+    onBrowserDocuments?: () => void;
     onProtect?: () => void;
     hasPassword?: boolean;
     onAutoCorrect?: () => void;
@@ -361,6 +362,9 @@
           <button data-cmd="open" onclick={() => run(onOpen)} disabled={!editor}>
             <Icon name="folder" size={16} />{t().app.open}
             <span class="menu-key">{shortcutHint('open')}</span>
+          </button>
+          <button data-cmd="browserDocuments" onclick={() => run(onBrowserDocuments)}>
+            <Icon name="folder" size={16} />{t().browserDocs.title}
           </button>
           <hr />
           <button data-cmd="save" onclick={() => run(onSave)} disabled={!editor || pdfBusy}>

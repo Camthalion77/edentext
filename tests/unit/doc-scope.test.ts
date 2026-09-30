@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { pickSlot } from '../../src/lib/storage/docScope';
 
 const NOW = 1_700_000_000_000;
@@ -23,5 +23,30 @@ describe('pickSlot', () => {
 
   it('counts a marker nobody has refreshed in ten minutes as abandoned', () => {
     expect(pickSlot({ '': NOW - 11 * MIN, d2: NOW - 1 * MIN }, NOW)).toBe('');
+  });
+});
+
+describe('deleteDocument', () => {
+  it('drops the first document by its registered names and another by its suffix', async () => {
+    localStorage.clear();
+    sessionStorage.setItem('edentext-tab-doc', 'd9');
+    vi.resetModules();
+    const scope = await import('../../src/lib/storage/docScope');
+    scope.docKey('edentext-doc');
+    const released = String(-(Date.now() - MIN));
+    localStorage.setItem('edentext-live@', released);
+    localStorage.setItem('edentext-doc', '{"content":[{"text":"Erstes"}]}');
+    localStorage.setItem('edentext-live@d1', released);
+    localStorage.setItem('edentext-doc@d1', '{"content":[{"text":"Hallo"}]}');
+    localStorage.setItem('edentext-theme', 'dark');
+
+    expect(scope.listDocuments().map((d) => [d.id, d.mine, d.label])).toEqual([
+      ['d9', true, ''], ['', false, 'Erstes'], ['d1', false, 'Hallo'],
+    ]);
+    scope.deleteDocument('');
+    scope.deleteDocument('d1');
+    scope.deleteDocument('d9'); // the open one stays
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+    expect(keys.sort()).toEqual(['edentext-live@d9', 'edentext-theme']);
   });
 });

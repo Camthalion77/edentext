@@ -15,6 +15,15 @@ const ja: Messages = {
     add: '追加',
     remove: '削除',
   },
+  browserDocs: {
+    title: '最近使った文書',
+    intro: 'これらの文書は自動保存されますが、保存先はこのブラウザーだけです。確実に残すには、文書をファイルとして保存してください。',
+    thisTab: 'このタブ',
+    otherTab: '別のタブで開いています',
+    open: '開く',
+    delete: '削除',
+    confirmDelete: 'この文書をブラウザーから削除しますか? 元に戻すことはできません。',
+  },
   docProps: {
     title: '文書プロパティ',
     docTitle: 'タイトル',

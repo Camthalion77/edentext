@@ -63,6 +63,7 @@
   import TemplateGalleryDialog from './lib/components/TemplateGalleryDialog.svelte';
   import type { TemplateEntry } from './lib/templates/types';
   import DocPropertiesDialog from './lib/components/DocPropertiesDialog.svelte';
+  import BrowserDocumentsDialog from './lib/components/BrowserDocumentsDialog.svelte';
   import PasswordDialog from './lib/components/PasswordDialog.svelte';
   import CommentsPane from './lib/components/CommentsPane.svelte';
   import RevisionsPane from './lib/components/RevisionsPane.svelte';
@@ -275,6 +276,7 @@
   let documentFormat: DocumentFormat = $state(loadDocFormat());
   let docProps: DocProperties = $state(loadDocProperties());
   let docPropsOpen = $state(false);
+  let browserDocsOpen = $state(false);
   let hyphenate = $state(loadHyphenation());
   let pageNumbering: PageNumbering = $state(loadPageNumbering());
   let pageDecor: PageDecor = $state(loadPageDecor());
@@ -1397,6 +1399,7 @@
       onPrint={handlePrint}
       onAbout={() => (aboutOpen = true)}
       onDocProperties={() => (docPropsOpen = true)}
+      onBrowserDocuments={() => (browserDocsOpen = true)}
       onProtect={() => (passwordSetOpen = true)}
       hasPassword={docProtected}
       onAutoCorrect={() => (autoCorrectOpen = true)}
@@ -1511,6 +1514,9 @@
               <button class="theme-option" onclick={handlePrintPdf} role="menuitem">
                 <span>{t().app.vectorPdf}</span>
                 <span class="theme-option-hint">{t().app.vectorHint}</span>
+              </button>
+              <button class="theme-option" onclick={() => { exportMenuOpen = false; browserDocsOpen = true; }} role="menuitem">
+                <span>{t().browserDocs.title}</span>
               </button>
               <button class="theme-option" onclick={handleSaveTemplate} role="menuitem">
                 <span>{t().app.template}</span>
@@ -1821,6 +1827,7 @@
   <AutoCorrectDialog bind:open={autoCorrectOpen} />
   <AutoTextDialog bind:open={autoTextOpen} editor={activeEditor} />
   <ThesaurusDialog bind:open={thesaurusOpen} editor={activeEditor} />
+  <BrowserDocumentsDialog bind:open={browserDocsOpen} />
   <DocPropertiesDialog bind:open={docPropsOpen} props={docProps} onApply={(p) => { docProps = p; saveDocProperties(p); }} />
   <PasswordDialog
     bind:open={passwordSetOpen}

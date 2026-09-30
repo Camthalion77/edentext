@@ -52,7 +52,11 @@ epoch ms while held, negated on `pagehide`, refreshed every 60 s and abandoned a
 Only the holding tab ever writes its own marker, so no two tabs race over one key.
 `pruneOldDocuments()` (from `main.ts`) drops all but the newest ten, never one a tab
 still holds and never the first. Duplicating a tab copies its `sessionStorage`, so the
-copy lands on the same document — the one case still shared. The app's own keys (theme,
+copy lands on the same document — the one case still shared. File ▸ *Recent documents*
+(`BrowserDocumentsDialog.svelte`) lists every marker: opening one points this tab's
+`sessionStorage` at it and reloads, deleting one drops its keys — the first document's by
+the names `docKey()` has registered, since its keys carry no id. Neither touches a held
+one. The app's own keys (theme,
 zoom, chrome, AutoCorrect, AutoText, word completion, recent files/fonts/chars, markup
 view, user dictionary, number recognition) stay unscoped.
 

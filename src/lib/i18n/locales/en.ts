@@ -14,6 +14,15 @@ const en = {
     add: 'Add',
     remove: 'Remove',
   },
+  browserDocs: {
+    title: 'Recent documents',
+    intro: 'These documents are saved automatically, but only in this browser. Save a document as a file to keep it permanently.',
+    thisTab: 'This tab',
+    otherTab: 'Open in another tab',
+    open: 'Open',
+    delete: 'Delete',
+    confirmDelete: 'Delete this document from the browser? It cannot be restored.',
+  },
   docProps: {
     title: 'Document properties',
     docTitle: 'Title',

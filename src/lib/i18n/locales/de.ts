@@ -13,6 +13,15 @@ const de: Messages = {
     add: 'Hinzufügen',
     remove: 'Entfernen',
   },
+  browserDocs: {
+    title: 'Zuletzt benutzte Dokumente',
+    intro: 'Diese Dokumente werden automatisch gespeichert, aber nur in diesem Browser. Speichern Sie ein Dokument als Datei, damit es dauerhaft erhalten bleibt.',
+    thisTab: 'Dieser Tab',
+    otherTab: 'In einem anderen Tab geöffnet',
+    open: 'Öffnen',
+    delete: 'Löschen',
+    confirmDelete: 'Dieses Dokument aus dem Browser löschen? Es lässt sich nicht wiederherstellen.',
+  },
   docProps: {
     title: 'Dokumenteigenschaften',
     docTitle: 'Titel',

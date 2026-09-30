@@ -15,6 +15,15 @@ const zhHant: Messages = {
     add: '新增',
     remove: '移除',
   },
+  browserDocs: {
+    title: '最近使用的文件',
+    intro: '這些文件會自動儲存，但僅儲存在此瀏覽器中。請將文件另存為檔案，以便永久保留。',
+    thisTab: '此索引標籤',
+    otherTab: '已在其他索引標籤中開啟',
+    open: '開啟',
+    delete: '刪除',
+    confirmDelete: '要從瀏覽器中刪除此文件嗎？刪除後無法復原。',
+  },
   docProps: {
     title: '文件屬性',
     docTitle: '標題',

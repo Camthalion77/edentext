@@ -14,6 +14,15 @@ const zhHans: Messages = {
     add: '添加',
     remove: '移除',
   },
+  browserDocs: {
+    title: '最近使用的文档',
+    intro: '这些文档会自动保存，但仅保存在此浏览器中。请将文档另存为文件，以便永久保留。',
+    thisTab: '此标签页',
+    otherTab: '已在其他标签页中打开',
+    open: '打开',
+    delete: '删除',
+    confirmDelete: '要从浏览器中删除此文档吗？删除后无法恢复。',
+  },
   docProps: {
     title: '文档属性',
     docTitle: '标题',

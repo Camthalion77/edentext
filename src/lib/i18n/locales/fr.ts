@@ -13,6 +13,15 @@ const fr: Messages = {
     add: 'Ajouter',
     remove: 'Supprimer',
   },
+  browserDocs: {
+    title: 'Documents récents',
+    intro: 'Ces documents sont enregistrés automatiquement, mais uniquement dans ce navigateur. Enregistrez un document comme fichier pour le conserver durablement.',
+    thisTab: 'Cet onglet',
+    otherTab: 'Ouvert dans un autre onglet',
+    open: 'Ouvrir',
+    delete: 'Supprimer',
+    confirmDelete: 'Supprimer ce document du navigateur ? Il ne pourra pas être restauré.',
+  },
   docProps: {
     title: 'Propriétés du document',
     docTitle: 'Titre',
