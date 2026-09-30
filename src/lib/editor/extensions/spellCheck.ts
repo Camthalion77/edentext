@@ -114,6 +114,8 @@ export const HIGHLIGHTS = typeof CSS !== 'undefined' && 'highlights' in CSS;
 // Paints `setOf`'s ranges into the highlight `name` (styled as ::highlight(name)) once a
 // frame after any view update. A textblock whose node, squiggle offsets and DOM are all
 // unchanged keeps its ranges: domAtPos walks from the root and costs ~15 ms per 1000 squiggles.
+// Only top-level blocks from a screen above to two below the viewport are painted, repainted
+// on scroll: Chromium re-reads every range of a highlight on a change (~50 ms a key at 60 000).
 export function paintHighlight(view: EditorView, name: string, setOf: (state: EditorState) => DecorationSet | undefined) {
   if (!HIGHLIGHTS) return { update() {}, destroy() {} };
   const highlight = CSS.highlights.get(name) ?? new Highlight();
@@ -127,12 +129,31 @@ export function paintHighlight(view: EditorView, name: string, setOf: (state: Ed
     for (const r of loose) highlight.delete(r);
     for (const b of blocks.values()) for (const r of b.ranges) highlight.delete(r);
   };
+  // The document span of the top-level blocks near the viewport, found by bisecting their rects.
+  const nearView = (doc: PmNode): [number, number] => {
+    const starts: number[] = [];
+    doc.forEach((_, offset) => starts.push(offset));
+    const h = window.innerHeight;
+    const rect = (i: number) => (view.nodeDOM(starts[i]) as Element | null)?.getBoundingClientRect?.();
+    const bisect = (lo: number, before: (r: DOMRect) => boolean) => {
+      for (let hi = starts.length; lo < hi;) {
+        const mid = (lo + hi) >> 1, r = rect(mid);
+        if (!r) return -1;
+        if (before(r)) lo = mid + 1; else hi = mid;
+      }
+      return lo;
+    };
+    const first = bisect(0, (r) => r.bottom < -h);
+    const last = first < 0 ? -1 : bisect(first, (r) => r.top <= 2 * h);
+    if (last < 0) return [0, doc.content.size];
+    return [starts[first] ?? doc.content.size, starts[last] ?? doc.content.size];
+  };
   const paint = () => {
     frame = 0;
     const next = new Map<PmNode, Block>();
     const nextLoose: StaticRange[] = [];
     const { doc } = view.state;
-    const decos = view.isDestroyed ? [] : setOf(view.state)?.find() ?? [];
+    const decos = view.isDestroyed ? [] : setOf(view.state)?.find(...nearView(doc)) ?? [];
     for (let i = 0; i < decos.length;) {
       const $from = doc.resolve(decos[i].from);
       const node = $from.parent, start = $from.start(), end = $from.end();
@@ -163,10 +184,14 @@ export function paintHighlight(view: EditorView, name: string, setOf: (state: Ed
     loose = nextLoose;
   };
   const update = () => { frame ||= requestAnimationFrame(paint); };
+  window.addEventListener('scroll', update, { capture: true, passive: true });
+  window.addEventListener('resize', update);
   update();
   return {
     update,
     destroy() {
+      window.removeEventListener('scroll', update, { capture: true });
+      window.removeEventListener('resize', update);
       cancelAnimationFrame(frame);
       drop();
     },
