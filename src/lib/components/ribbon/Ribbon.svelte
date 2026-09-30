@@ -305,7 +305,7 @@
 </script>
 
 <div class="ribbon">
-  <div class="ribbon-tabs" class:strip-only={collapsed}>
+  <div class="ribbon-tabs" class:strip-only={collapsed} use:pinPanels>
     <div class="file-tab-wrap" use:clickOutside={'file'}>
       <button
         class="ribbon-tab-file"
@@ -577,20 +577,24 @@
 
   .ribbon :global(.bp-trigger) { height: 30px; }
 
-  /* Wraps once the tabs, the name and the chrome buttons stop fitting. It cannot
-     scroll like the band does: the File and appearance menus drop from inside it,
-     and a scroll container would clip them. */
+  /* Scrolls sideways once the tabs, the name and the chrome buttons stop fitting.
+     Its menus are pinned `position: fixed` (`anchored`, `pinPanels`), so the scroll
+     container does not clip them. */
   .ribbon-tabs {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 2px;
-    padding: 3px 10px 0;
+    padding: 3px 10px 2.5px;
+    margin-bottom: -2.5px;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+  .ribbon-tabs > :global(*) { flex-shrink: 0; }
 
-  /* The active tab's underline hangs below its box, onto the band. Collapsed there
-     is no band, so the strip lends it the room instead of the bottom border. */
-  .ribbon-tabs.strip-only { padding-bottom: 5px; }
+  /* The active tab's underline hangs below its box, onto the band: the padding keeps
+     it inside the scroller, the negative margin lays it over the band's top edge.
+     Collapsed there is no band, so the strip keeps the room. */
+  .ribbon-tabs.strip-only { padding-bottom: 5px; margin-bottom: 0; }
 
   .ribbon-tab {
     position: relative;
