@@ -154,7 +154,7 @@ and feedback:
 
 ## License
 
-Copyright © 2026 Steffen Becker.
+Copyright © 2026 Steffen Becker · Made in Germany
 
 [AGPL-3.0](LICENSE). A [commercial license](LICENSE.commercial.md) is available
 for use cases the AGPL does not fit. Bundled fonts and language data keep their
