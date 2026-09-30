@@ -1,6 +1,6 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { spellController } from '../../spell/controller';
@@ -106,6 +106,73 @@ export function changedRanges(tr: Transaction): Range[] {
   return out;
 }
 
+// Squiggles are painted as CSS highlights, not inline decorations: Chromium's hyphenating
+// line breaker pulls back one word too many where a word ends an element and its space
+// sits outside it, and a decoration span around every flagged word is exactly that.
+export const HIGHLIGHTS = typeof CSS !== 'undefined' && 'highlights' in CSS;
+
+// Paints `setOf`'s ranges into the highlight `name` (styled as ::highlight(name)) once a
+// frame after any view update. A textblock whose node, squiggle offsets and DOM are all
+// unchanged keeps its ranges: domAtPos walks from the root and costs ~15 ms per 1000 squiggles.
+export function paintHighlight(view: EditorView, name: string, setOf: (state: EditorState) => DecorationSet | undefined) {
+  if (!HIGHLIGHTS) return { update() {}, destroy() {} };
+  const highlight = CSS.highlights.get(name) ?? new Highlight();
+  CSS.highlights.set(name, highlight);
+  type Block = { offsets: number[]; ranges: StaticRange[] };
+  let blocks = new Map<PmNode, Block>();
+  // A node twice in the document (shared on paste) is painted afresh each time, never cached.
+  let loose: StaticRange[] = [];
+  let frame = 0;
+  const drop = () => {
+    for (const r of loose) highlight.delete(r);
+    for (const b of blocks.values()) for (const r of b.ranges) highlight.delete(r);
+  };
+  const paint = () => {
+    frame = 0;
+    const next = new Map<PmNode, Block>();
+    const nextLoose: StaticRange[] = [];
+    const { doc } = view.state;
+    const decos = view.isDestroyed ? [] : setOf(view.state)?.find() ?? [];
+    for (let i = 0; i < decos.length;) {
+      const $from = doc.resolve(decos[i].from);
+      const node = $from.parent, start = $from.start(), end = $from.end();
+      const offsets: number[] = [];
+      const inBlock: Decoration[] = [];
+      for (; i < decos.length && decos[i].from <= end; i++) {
+        inBlock.push(decos[i]);
+        offsets.push(decos[i].from - start, decos[i].to - start);
+      }
+      const old = blocks.get(node);
+      if (old && !next.has(node) && old.offsets.join() === offsets.join()
+        && old.ranges.every((r) => r.startContainer.isConnected && r.endContainer.isConnected)) {
+        next.set(node, old);
+        blocks.delete(node);
+        continue;
+      }
+      const ranges = inBlock.map((d) => {
+        const from = view.domAtPos(d.from), to = view.domAtPos(d.to);
+        const r = new StaticRange({ startContainer: from.node, startOffset: from.offset, endContainer: to.node, endOffset: to.offset });
+        highlight.add(r);
+        return r;
+      });
+      if (next.has(node)) nextLoose.push(...ranges);
+      else next.set(node, { offsets, ranges });
+    }
+    drop();
+    blocks = next;
+    loose = nextLoose;
+  };
+  const update = () => { frame ||= requestAnimationFrame(paint); };
+  update();
+  return {
+    update,
+    destroy() {
+      cancelAnimationFrame(frame);
+      drop();
+    },
+  };
+}
+
 // The misspelled-word range covering `pos`, if any — used by the context menu.
 export function spellErrorAt(state: EditorState, pos: number): { from: number; to: number } | null {
   const set = spellCheckKey.getState(state)?.set;
@@ -167,7 +234,7 @@ export const SpellCheck = Extension.create({
         },
         props: {
           decorations(state) {
-            return spellCheckKey.getState(state)?.set;
+            return HIGHLIGHTS ? null : spellCheckKey.getState(state)?.set;
           },
         },
         view(editorView) {
@@ -206,12 +273,15 @@ export const SpellCheck = Extension.create({
           const unsubscribe = spellController.subscribe(recheckAll);
           // Initial pass in case the checker is already loaded at mount.
           recheckAll();
+          const painter = paintHighlight(editorView, 'spell-error', (s) => spellCheckKey.getState(s)?.set);
 
           return {
             update(view, prevState) {
               if (!view.state.doc.eq(prevState.doc)) scheduleRecheck();
+              painter.update();
             },
             destroy() {
+              painter.destroy();
               if (timer !== undefined) clearTimeout(timer);
               unsubscribe();
             },

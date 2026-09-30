@@ -1163,15 +1163,17 @@
   user-select: none;
 }
 
-/* Spell-check: red wavy underline under misspelled words (drawn by spellCheck.ts).
+/* Spell-check: red wavy underline under misspelled words (painted by spellCheck.ts).
    skip-ink:none keeps the wave continuous under descenders. */
-.tiptap .pm-spell-error {
+.tiptap .pm-spell-error,
+::highlight(spell-error) {
   text-decoration: red wavy underline;
   text-decoration-skip-ink: none;
 }
 
 /* Grammar check: a blue wave, so a grammar finding reads apart from a spelling one. */
-.tiptap .pm-grammar-error {
+.tiptap .pm-grammar-error,
+::highlight(grammar-error) {
   text-decoration: #2b6cb0 wavy underline;
   text-decoration-skip-ink: none;
 }
@@ -1306,7 +1308,9 @@
 
   /* Squiggles are an editing aid, never printed. */
   .tiptap .pm-spell-error,
-  .tiptap .pm-grammar-error {
+  .tiptap .pm-grammar-error,
+  ::highlight(spell-error),
+  ::highlight(grammar-error) {
     text-decoration: none;
   }
 

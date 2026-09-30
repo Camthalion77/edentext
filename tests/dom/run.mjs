@@ -575,7 +575,8 @@ try {
   await settle(page, true);
   await page.selectOption('.statusbar .lang-picker select', 'doc:en');
   await page.check('.statusbar .gr-toggle input');
-  const squiggle = await page.waitForSelector('.tiptap .pm-grammar-error', { timeout: 60_000 })
+  // The waves are CSS highlight ranges (grammarCheck.ts), not elements.
+  const squiggle = await page.waitForFunction(() => CSS.highlights.get('grammar-error')?.size > 0, null, { timeout: 60_000 })
     .then(() => true).catch(() => false);
   check(squiggle, 'the grammar check flags a wrong sentence in the browser');
 
@@ -583,7 +584,7 @@ try {
   // what the hyphenation and the browser's own spell check read.
   await page.evaluate(() => document.querySelector('.tiptap').editor.commands.setContent(
     '<p>He go to the store.</p><p>Er geht zum Laden zum Laden.</p>'));
-  await page.waitForFunction(() => document.querySelectorAll('.tiptap .pm-grammar-error').length > 0,
+  await page.waitForFunction(() => CSS.highlights.get('grammar-error')?.size > 0,
     null, { timeout: 30_000 }).catch(() => {});
   await page.evaluate(() => {
     const ed = document.querySelector('.tiptap').editor;
@@ -598,10 +599,10 @@ try {
   }, null, { timeout: 5_000 }).then(() => true).catch(() => false);
   check(paragraphToggleOff, 'a non-English paragraph disables and clears the grammar toggle');
   // Harper reads German as broken English; the block language is what keeps it out.
-  await page.waitForFunction(() => document.querySelectorAll('.tiptap .pm-grammar-error').length > 0,
+  await page.waitForFunction(() => CSS.highlights.get('grammar-error')?.size > 0,
     null, { timeout: 30_000 }).catch(() => {});
-  const perPara = await page.evaluate(() =>
-    [...document.querySelectorAll('.tiptap-host .tiptap > p')].map((p) => p.querySelectorAll('.pm-grammar-error').length));
+  const perPara = await page.evaluate(() => [...document.querySelectorAll('.tiptap-host .tiptap > p')].map((p) =>
+    [...CSS.highlights.get('grammar-error') ?? []].filter((r) => p.contains(r.startContainer)).length));
   check(perPara[0] > 0 && perPara[1] === 0, `only the English paragraph is grammar-checked (${JSON.stringify(perPara)})`);
 
   // The default can be Portuguese while an English paragraph still gets grammar checks.
@@ -621,7 +622,8 @@ try {
     return !input?.disabled && input?.checked;
   }, null, { timeout: 5_000 }).then(() => true).catch(() => false);
   check(englishToggleOn, 'an English paragraph restores the grammar toggle');
-  await page.waitForFunction(() => document.querySelector('.tiptap-host .tiptap > p .pm-grammar-error'), null, { timeout: 30_000 })
+  await page.waitForFunction(() => [...CSS.highlights.get('grammar-error') ?? []].some((r) =>
+    r.startContainer.isConnected && r.startContainer.parentElement?.closest('.tiptap-host .tiptap > p')), null, { timeout: 30_000 })
     .then(() => check(true, 'an English paragraph in a Portuguese document is grammar-checked'))
     .catch(() => check(false, 'an English paragraph in a Portuguese document is grammar-checked'));
 
