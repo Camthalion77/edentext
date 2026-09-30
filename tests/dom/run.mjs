@@ -97,11 +97,20 @@ try {
     .selectAll().updateAttributes('paragraph', { keepLines: true }).setTextSelection(1).run());
   const breaksLabelled = await relabel(() => document.querySelector('.tiptap').editor.chain()
     .selectAll().setBlockLanguage('fr-FR').setTextSelection(1).run());
+  // The caret stays at the top, and the view scrolled away from it stays where it is.
+  const scrolled = () => page.evaluate(() => Math.round(document.querySelector('.editor').scrollTop));
+  await page.evaluate(() => { const ed = document.querySelector('.editor'); ed.scrollTop = ed.scrollHeight; });
+  const scrollBefore = await scrolled();
   await page.locator('.statusbar .lang-picker select').selectOption('doc:de');
+  await page.waitForTimeout(300);
+  const scrollAfter = await scrolled();
+  await page.evaluate(() => { document.querySelector('.editor').scrollTop = 0; });
   const breaksCleared = await relabel(() => {});
   const breaksUndone = await relabel(undo);
   check(breaksKept.includes(',') && [breaksLabelled, breaksCleared, breaksUndone].every((b) => b === breaksKept),
     `a language for all text keeps the page breaks (${breaksKept} → ${breaksLabelled} → ${breaksCleared} → ${breaksUndone})`);
+  check(scrollBefore > 0 && scrollAfter === scrollBefore,
+    `a language for all text leaves the view where it was (scrollTop ${scrollBefore} → ${scrollAfter})`);
   await page.evaluate(undo);
   await page.evaluate(undo);
   await settled(opened);
