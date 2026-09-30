@@ -10,8 +10,10 @@ const TAB_KEY = 'edentext-tab-doc';
 // the tab lets go. Only ever written by the tab that holds it, so no two tabs race over
 // one key, and the stamp doubles as "when was this document last used".
 const LIVE = 'edentext-live@';
-// A hidden tab's timers are throttled to about a minute, so a marker is only abandoned
-// well past that.
+// Which tabs are open comes from a Web Lock each one holds on its document, which the
+// browser drops with the tab however it ends. Without Web Locks (an insecure origin) a
+// marker is taken as abandoned well past the minute a hidden tab's timers are throttled to.
+const LOCK = 'edentext-doc@';
 const BEAT_MS = 60_000;
 const STALE_MS = 10 * 60_000;
 const MAX_DOCS = 10;
@@ -75,6 +77,7 @@ export function docKey(name: string): string {
 
 /** Keep this tab's marker fresh, and sign it off when the tab goes away. */
 export function startTabPresence(): void {
+  navigator.locks?.request(LOCK + docId, () => new Promise<never>(() => {})).catch(() => {});
   setInterval(() => mark(docId, Date.now()), BEAT_MS);
   addEventListener('pagehide', () => mark(docId, -Date.now()));
   // A page revived from the back/forward cache is holding its document again.
@@ -95,20 +98,27 @@ function dropDocument(id: string): void {
   indexedDB.deleteDatabase(`edentext-fonts${suffix}`);
 }
 
-const isHeld = (at: number, now: number) => at > 0 && now - at <= STALE_MS;
+// Whether another tab holds `id`: its lock where the browser has them, else its marker.
+async function heldBy(): Promise<(id: string, at: number) => boolean> {
+  const now = Date.now();
+  if (typeof navigator === 'undefined' || !navigator.locks) return (_, at) => at > 0 && now - at <= STALE_MS;
+  const { held = [] } = await navigator.locks.query();
+  const ids = new Set(held.map((l) => l.name?.startsWith(LOCK) && l.name.slice(LOCK.length)));
+  return (id) => ids.has(id);
+}
 
 /**
  * Drop every empty document no tab holds — each fresh tab mints one — then keep the
  * newest MAX_DOCS. A held document is never dropped, however old; neither is the
  * first one for its age.
  */
-export function pruneOldDocuments(): void {
-  const now = Date.now();
+export async function pruneOldDocuments(): Promise<void> {
+  const isHeld = await heldBy();
   let docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   const drop = (id: string) => { dropDocument(id); localStorage.removeItem(LIVE + id); };
-  for (const [id, at] of docs) if (id !== docId && !isHeld(at, now) && isEmpty(id)) drop(id);
+  for (const [id, at] of docs) if (id !== docId && !isHeld(id, at) && isEmpty(id)) drop(id);
   docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-  for (const [id, at] of docs.slice(MAX_DOCS)) if (id !== '' && !isHeld(at, now)) drop(id);
+  for (const [id, at] of docs.slice(MAX_DOCS)) if (id !== '' && id !== docId && !isHeld(id, at)) drop(id);
 }
 
 export interface BrowserDocument {
@@ -161,15 +171,15 @@ function labelOf(id: string): string {
 }
 
 /** Every document this browser keeps, most recently used first; an empty one only while open. */
-export function listDocuments(): BrowserDocument[] {
-  const now = Date.now();
+export async function listDocuments(): Promise<BrowserDocument[]> {
+  const isHeld = await heldBy();
   return Object.entries(markers())
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .map(([id, at]) => ({
       id,
       at: Math.abs(at),
       mine: id === docId,
-      held: id !== docId && isHeld(at, now),
+      held: id !== docId && isHeld(id, at),
       label: labelOf(id),
     }))
     .filter((d) => d.mine || d.held || !isEmpty(d.id));
@@ -182,8 +192,8 @@ export function openDocument(id: string): void {
 }
 
 /** Delete a document no tab holds, the first one included. */
-export function deleteDocument(id: string): void {
-  const doc = listDocuments().find((d) => d.id === id);
+export async function deleteDocument(id: string): Promise<void> {
+  const doc = (await listDocuments()).find((d) => d.id === id);
   if (!doc || doc.mine || doc.held) return;
   dropDocument(id);
   localStorage.removeItem(LIVE + id);

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listDocuments, openDocument } from '../storage/docScope';
+  import { listDocuments, openDocument, type BrowserDocument } from '../storage/docScope';
   import { t } from '../i18n/i18n.svelte';
 
   // A fresh tab starts on an empty page; while it stays empty this card offers the
@@ -7,7 +7,8 @@
   let { show, onShowAll }: { show: boolean; onShowAll: () => void } = $props();
 
   const RECENT = 3;
-  const docs = listDocuments().filter((d) => !d.mine && !d.held);
+  let docs = $state<BrowserDocument[]>([]);
+  void listDocuments().then((all) => (docs = all.filter((d) => !d.mine && !d.held)));
   let dismissed = $state(false);
 </script>
 

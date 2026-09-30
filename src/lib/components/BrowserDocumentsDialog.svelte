@@ -13,17 +13,17 @@
   $effect(() => {
     const el = dialogEl;
     if (!el) return;
-    if (open && !el.open) { docs = listDocuments(); el.showModal(); }
+    if (open && !el.open) { void listDocuments().then((d) => (docs = d)); el.showModal(); }
     else if (!open && el.open) el.close();
   });
 
   const when = (at: number) =>
     new Intl.DateTimeFormat(localeTag(locale()), { dateStyle: 'medium', timeStyle: 'short' }).format(at);
 
-  function remove(id: string) {
+  async function remove(id: string) {
     if (!confirm(t().browserDocs.confirmDelete)) return;
-    deleteDocument(id);
-    docs = listDocuments();
+    await deleteDocument(id);
+    docs = await listDocuments();
   }
 </script>
 

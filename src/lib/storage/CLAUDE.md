@@ -47,9 +47,12 @@ written through `docKey()`, which appends `@<id>` — that is how two tabs edit 
 documents. The **first document keeps the empty id**, so its keys read exactly as this
 list spells them and no earlier version needs migrating. The id comes out of
 `sessionStorage` (per tab, survives its reloads); a fresh tab always gets a new, empty
-document, as a word processor starts on an empty page. `edentext-live@<id>` is the marker —
-epoch ms while held, negated on `pagehide`, refreshed every 60 s and abandoned after 10.
-Only the holding tab ever writes its own marker, so no two tabs race over one key.
+document, as a word processor starts on an empty page. A tab **holds** its document by the
+Web Lock `edentext-doc@<id>`, which the browser releases however the tab ends — a crash or
+a quit fires no `pagehide`. `edentext-live@<id>` is the marker — epoch ms while held,
+negated on `pagehide`, refreshed every 60 s: the last use, and where Web Locks are missing
+(an insecure origin) the hold itself, abandoned after 10 min. Only the holding tab ever
+writes its own marker, so no two tabs race over one key.
 `pruneOldDocuments()` (from `main.ts`) drops every empty document no tab holds, then all
 but the newest ten — never a held one, and the first never for its age. While the page
 is empty, `ResumeCard.svelte` offers the three used last. Duplicating a tab copies its

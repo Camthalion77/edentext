@@ -56,8 +56,14 @@ try {
   }
   check((await text(a)).includes('Alpha') && (await text(b)).includes('Beta'), 'both tabs keep their document across a reload');
 
-  // A fresh tab starts empty; the document a closed tab signed off is offered, not opened.
+  // An open tab holds its document's lock, and its end releases it however it came: the
+  // marker is set back to held, as a tab that ended with no pagehide leaves it.
+  const bId = await b.evaluate(() => sessionStorage.getItem('edentext-tab-doc'));
+  const locks = await a.evaluate(async () => (await navigator.locks.query()).held.map((l) => l.name));
+  check(locks.includes(`edentext-doc@${bId}`), `an open tab holds its document's lock (${locks.join(', ')})`);
+  // A fresh tab starts empty; the document a closed tab held is offered, not opened.
   await b.close();
+  await a.evaluate((id) => localStorage.setItem(`edentext-live@${id}`, String(Date.now())), bId);
   const c = await openTab();
   await settle(c, true);
   check(!(await text(c)).trim(), 'a new tab starts on an empty document');

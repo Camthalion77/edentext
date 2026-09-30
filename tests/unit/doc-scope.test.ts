@@ -36,12 +36,12 @@ describe('deleteDocument', () => {
     localStorage.setItem('edentext-doc@d1', '{"content":[{"text":"Hallo"}]}');
     localStorage.setItem('edentext-theme', 'dark');
 
-    expect(scope.listDocuments().map((d) => [d.id, d.mine, d.label])).toEqual([
+    expect((await scope.listDocuments()).map((d) => [d.id, d.mine, d.label])).toEqual([
       ['d9', true, ''], ['', false, 'Erstes'], ['d1', false, 'Hallo'],
     ]);
-    scope.deleteDocument('');
-    scope.deleteDocument('d1');
-    scope.deleteDocument('d9'); // the open one stays
+    await scope.deleteDocument('');
+    await scope.deleteDocument('d1');
+    await scope.deleteDocument('d9'); // the open one stays
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
     expect(keys.sort()).toEqual(['edentext-live@d9', 'edentext-theme']);
   });
@@ -60,8 +60,8 @@ describe('deleteDocument', () => {
     localStorage.setItem('edentext-live@d3', String(Date.now()));
     localStorage.setItem('edentext-live@d4', released);
     localStorage.setItem('edentext-doc@d4', '{"content":[{"type":"paragraph","content":[{"text":"x"}]}]}');
-    expect(scope.listDocuments().map((d) => d.id).sort()).toEqual(['d3', 'd4', 'd5', 'd9']);
-    scope.pruneOldDocuments();
+    expect((await scope.listDocuments()).map((d) => d.id).sort()).toEqual(['d3', 'd4', 'd5', 'd9']);
+    await scope.pruneOldDocuments();
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
     expect(keys.sort()).toEqual(['edentext-doc@d4', 'edentext-footer@d5', 'edentext-live@d3', 'edentext-live@d4', 'edentext-live@d5', 'edentext-live@d9']);
   });
