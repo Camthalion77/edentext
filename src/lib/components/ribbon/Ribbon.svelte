@@ -417,8 +417,8 @@
       />
       <span class="doc-name-ext">.{documentFormat}</span>
     </div>
-    <!-- Beside the name, not inside it: the name box is capped at 30% of the strip,
-         and the label would take that width off the name itself. -->
+    <!-- Beside the name, not inside it: the name box is capped at 16rem, and the
+         label would take that width off the name itself. -->
     {#if dirty}<span class="doc-dirty">• {t().app.unsavedChanges}</span>{/if}
 
     <!-- Word puts this chevron in the band's corner. It rides the strip so the band
@@ -708,7 +708,6 @@
   .doc-name {
     display: inline-flex;
     align-items: center;
-    max-width: 30%;
     color: var(--w-text-dim);
     font-size: 12px;
   }
@@ -732,6 +731,7 @@
     font: inherit;
     font-size: 12px;
     text-align: right;
+    text-overflow: ellipsis;
   }
 
   .doc-name-input:hover { border-color: var(--w-border-strong); }
