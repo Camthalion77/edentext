@@ -7,6 +7,8 @@
      by App.svelte); extra bottom padding clears the fixed status bar. */
   padding: calc(var(--toolbar-overlay-h, 0px) + 1.25rem) 1rem 3rem;
   overflow: auto;
+  /* Pinch over the document is Editor.svelte's zoom, not the browser's. */
+  touch-action: pan-x pan-y;
   /* A flex item's automatic minimum is its content: without this a canvas wider than
      the window — a page grid, or a page beside the balloon strip — widens the whole app
      instead of scrolling here, and the toolbar above ends short of it. */

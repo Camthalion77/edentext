@@ -975,6 +975,25 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
     onZoom(zoom * wheelZoomFactor(e.deltaY, e.deltaMode));
   }
 
+  // A two-finger pinch over the document zooms the document, not the whole app:
+  // `touch-action` on `.editor` keeps the browser's own pinch-zoom off this area.
+  // Scaled from the gesture's start, so rounding in clampZoom never accumulates.
+  let pinchStart: { dist: number; zoom: number } | null = null;
+  function onPinch(e: TouchEvent, pane: number) {
+    if (e.touches.length !== 2 || !onZoom) {
+      pinchStart = null;
+      return;
+    }
+    const [a, b] = [e.touches[0], e.touches[1]];
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (!pinchStart || e.type === 'touchstart') {
+      pinchStart = { dist, zoom };
+      return;
+    }
+    pendingAnchor = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, pane };
+    onZoom(pinchStart.zoom * dist / pinchStart.dist);
+  }
+
   // The point held fixed across a zoom change: the pointer for a wheel zoom, else
   // (slider, buttons, keyboard) the top of the viewport. One per pane — a split view
   // zooms both, and the pane the pointer is not in keeps its own top in place.
@@ -1568,14 +1587,19 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
   function paneEvents(node: HTMLElement, pane: number) {
     const scroll = () => onEditorScroll(pane);
     const over = (e: MouseEvent) => onEditorPointerOver(e, pane);
+    const pinch = (e: TouchEvent) => onPinch(e, pane);
     node.addEventListener('scroll', scroll);
     node.addEventListener('mouseover', over);
     node.addEventListener('mouseout', onEditorPointerOut);
+    node.addEventListener('touchstart', pinch, { passive: true });
+    node.addEventListener('touchmove', pinch, { passive: true });
     return {
       destroy() {
         node.removeEventListener('scroll', scroll);
         node.removeEventListener('mouseover', over);
         node.removeEventListener('mouseout', onEditorPointerOut);
+        node.removeEventListener('touchstart', pinch);
+        node.removeEventListener('touchmove', pinch);
       },
     };
   }
