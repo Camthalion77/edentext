@@ -522,6 +522,9 @@
 /* A picker standing alone in a group is a labelled button, so its own compact
    trigger grows to the big variant's box and icon size. The stroke is pinned to
    the same 1.5px the ribbon's own icons paint at 28px. */
+/* Marks a reused control for the command search without adding a box around it. */
+.rb-cmd { display: contents; }
+
 .rb-captioned {
   display: flex;
   flex-direction: column;

@@ -1000,6 +1000,8 @@ const es: Messages = {
     saveAsHint: 'Active esto en las opciones de descarga del navegador: «Preguntar dónde guardar cada archivo antes de descargarlo».',
     collapse: 'Contraer la cinta',
     expand: 'Expandir la cinta',
+    search: 'Buscar',
+    searchNoResults: 'Ningún comando coincide',
     export: 'Exportar',
     find: 'Buscar',
     replace: 'Reemplazar',

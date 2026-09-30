@@ -998,6 +998,8 @@ const pt: Messages = {
     saveAsHint: 'Ative esta opção nas definições de transferência do navegador: “Perguntar sempre onde guardar os ficheiros”.',
     collapse: 'Minimizar o friso',
     expand: 'Expandir o friso',
+    search: 'Pesquisar',
+    searchNoResults: 'Nenhum comando correspondente',
     export: 'Exportar',
     find: 'Pesquisar',
     replace: 'Substituir',

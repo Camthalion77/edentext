@@ -88,6 +88,7 @@
   import { registerEmbeddedFonts, clearEmbeddedFonts, embeddedFonts } from './lib/fonts/embeddedFonts';
   import { saveEmbeddedFonts, loadEmbeddedFonts, clearEmbeddedFontStore } from './lib/storage/embeddedFontStore';
   import { noteEmbeddedFonts } from './lib/components/ribbon/fontList.svelte';
+  import { OPEN_COMMAND_SEARCH_EVENT } from './lib/components/ribbon/commands';
 
   // launchQueue is not in lib.dom yet; reach it through this shape.
   type WithLaunchQueue = Window & {
@@ -1259,6 +1260,7 @@
       [DEFAULT_SHORTCUTS.zoomIn, () => setZoom(zoom + 10)],
       [DEFAULT_SHORTCUTS.zoomOut, () => setZoom(zoom - 10)],
       [DEFAULT_SHORTCUTS.zoomReset, () => setZoom(100)],
+      [DEFAULT_SHORTCUTS.commandSearch, () => window.dispatchEvent(new Event(OPEN_COMMAND_SEARCH_EVENT))],
     ];
 
     function onKeydown(e: KeyboardEvent) {

@@ -13,6 +13,7 @@ const FIELD_SHADING_KEY = 'edentext-field-shading';
 const RULER_KEY = 'edentext-ruler';
 const SPLIT_KEY = 'edentext-split';
 const PAGE_COLUMNS_KEY = 'edentext-page-columns';
+const RECENT_COMMANDS_KEY = 'edentext-recent-commands';
 
 // Pages side by side. Each column is a live view of the whole document, so the
 // count is capped — LibreOffice's own spinner goes further.
@@ -52,6 +53,20 @@ export function loadRibbonCollapsed(): boolean {
 
 export function saveRibbonCollapsed(collapsed: boolean): void {
     localStorage.setItem(RIBBON_COLLAPSED_KEY, String(collapsed));
+}
+
+// The command search's ids, most recent first.
+export function loadRecentCommands(): string[] {
+    try {
+        const ids = JSON.parse(localStorage.getItem(RECENT_COMMANDS_KEY) ?? '[]');
+        return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+    } catch {
+        return [];
+    }
+}
+
+export function saveRecentCommands(ids: string[]): void {
+    localStorage.setItem(RECENT_COMMANDS_KEY, JSON.stringify(ids));
 }
 
 export function loadFormattingMarks(): boolean {

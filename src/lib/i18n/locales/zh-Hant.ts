@@ -1000,6 +1000,8 @@ const zhHant: Messages = {
     saveAsHint: '請在瀏覽器的下載設定中開啟「下載每個檔案前先詢問儲存位置」。',
     collapse: '摺疊功能區',
     expand: '展開功能區',
+    search: '搜尋',
+    searchNoResults: '沒有相符的命令',
     export: '匯出',
     find: '尋找',
     replace: '取代',

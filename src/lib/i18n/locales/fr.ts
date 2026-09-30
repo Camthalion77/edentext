@@ -1004,6 +1004,8 @@ const fr: Messages = {
     saveAsHint: 'Activez cette option dans les paramètres de téléchargement du navigateur : « Toujours demander où enregistrer les fichiers ».',
     collapse: 'Réduire le ruban',
     expand: 'Développer le ruban',
+    search: 'Rechercher',
+    searchNoResults: 'Aucune commande correspondante',
     export: 'Exporter',
     find: 'Rechercher',
     replace: 'Remplacer',

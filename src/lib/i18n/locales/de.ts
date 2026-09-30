@@ -1005,6 +1005,8 @@ const de: Messages = {
     saveAsHint: 'In den Download-Einstellungen des Browsers aktivieren: „Immer nachfragen, wo Dateien gespeichert werden sollen“.',
     collapse: 'Menüband minimieren',
     expand: 'Menüband erweitern',
+    search: 'Suchen',
+    searchNoResults: 'Kein passender Befehl',
     export: 'Exportieren',
     find: 'Suchen',
     replace: 'Ersetzen',

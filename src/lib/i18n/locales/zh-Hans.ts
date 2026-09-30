@@ -999,6 +999,8 @@ const zhHans: Messages = {
     saveAsHint: '请在浏览器的下载设置中打开“下载前询问每个文件的保存位置”。',
     collapse: '折叠功能区',
     expand: '展开功能区',
+    search: '搜索',
+    searchNoResults: '没有匹配的命令',
     export: '导出',
     find: '查找',
     replace: '替换',

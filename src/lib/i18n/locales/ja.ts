@@ -1001,6 +1001,8 @@ const ja: Messages = {
     saveAsHint: 'ブラウザーのダウンロード設定で「ダウンロード前に各ファイルの保存場所を確認する」をオンにしてください。',
     collapse: 'リボンを折りたたむ',
     expand: 'リボンを展開する',
+    search: '検索',
+    searchNoResults: '一致するコマンドはありません',
     export: 'エクスポート',
     find: '検索',
     replace: '置換',

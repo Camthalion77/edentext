@@ -1014,6 +1014,8 @@ const en = {
     saveAsHint: 'Turn this on in the browser\'s download settings: "Always ask you where to save files".',
     collapse: 'Collapse the ribbon',
     expand: 'Expand the ribbon',
+    search: 'Search',
+    searchNoResults: 'No matching command',
     export: 'Export',
     find: 'Find',
     replace: 'Replace',
