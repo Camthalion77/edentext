@@ -705,7 +705,10 @@
 
   /* The name field grows with its text: the sizer mirrors the value and lends the
      input its width. */
+  /* Anchors the hidden sizer here: placed against the page, it widened a phone's
+     layout viewport and pushed centred dialogs off screen. */
   .doc-name {
+    position: relative;
     display: inline-flex;
     align-items: center;
     color: var(--w-text-dim);

@@ -255,6 +255,12 @@
   .row > span { flex: 1; white-space: nowrap; color: var(--color-text-muted); }
   .row em { width: 4.8em; font-style: normal; color: var(--color-text-muted); }
 
+  /* A phone has room for one column, and a long label wraps there instead. */
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+    .row > span { white-space: normal; }
+  }
+
   .row input, .row select {
     width: 64px;
     height: 26px;

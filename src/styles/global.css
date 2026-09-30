@@ -727,3 +727,9 @@ select:not([multiple], [size], .bare) {
 
 /* A modal dialog moves by its title (utils/dragWindow.ts). */
 dialog h2 { cursor: move; user-select: none; touch-action: none; }
+
+/* On a phone every dialog's fixed desktop width gives way to the screen's; the
+   dialog itself is capped there already and scrolls when taller. */
+@media (max-width: 600px) {
+  dialog > * { width: auto !important; min-width: 0 !important; max-width: calc(100vw - 2em) !important; }
+}
