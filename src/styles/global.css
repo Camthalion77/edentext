@@ -421,6 +421,8 @@
      inherit the page font size and dwarf the button rows. */
   font-size: 13px;
   color: var(--w-text);
+  /* `anchored` keeps 8px to either window edge; a phone is narrower than a menu. */
+  max-width: calc(100vw - 16px);
 }
 
 .ribbon-menu.right { left: auto; right: 0; }
@@ -442,6 +444,7 @@
   cursor: pointer;
 }
 
+.ribbon-menu button svg { flex-shrink: 0; }
 .ribbon-menu button:hover:not(:disabled) { background: var(--w-hover); }
 .ribbon-menu button:disabled { color: var(--w-text-tertiary); cursor: default; }
 .ribbon-menu button.selected { background: var(--w-active); }
@@ -458,7 +461,8 @@
   width: 14px;
   color: var(--w-accent);
 }
-.ribbon-menu .menu-sub { font-size: 11px; }
+/* Wraps only when the menu hits its max-width; otherwise it sizes to the unwrapped text. */
+.ribbon-menu .menu-sub { font-size: 11px; white-space: normal; text-align: right; }
 
 /* Section label above a run of rows, and the sticky action row below the list. */
 .ribbon-menu .rb-menu-label {
