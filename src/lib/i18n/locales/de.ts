@@ -21,6 +21,8 @@ const de: Messages = {
     open: 'Öffnen',
     delete: 'Löschen',
     confirmDelete: 'Dieses Dokument aus dem Browser löschen? Es lässt sich nicht wiederherstellen.',
+    resume: 'Weiterarbeiten an',
+    showAll: 'Alle Dokumente…',
   },
   docProps: {
     title: 'Dokumenteigenschaften',

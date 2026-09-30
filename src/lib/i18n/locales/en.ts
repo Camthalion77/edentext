@@ -22,6 +22,8 @@ const en = {
     open: 'Open',
     delete: 'Delete',
     confirmDelete: 'Delete this document from the browser? It cannot be restored.',
+    resume: 'Continue where you left off',
+    showAll: 'All documents…',
   },
   docProps: {
     title: 'Document properties',

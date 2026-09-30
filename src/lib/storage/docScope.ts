@@ -28,15 +28,11 @@ function markers(): Record<string, number> {
 }
 
 /**
- * The document a fresh tab opens: the one used last that no live tab holds, else a new
- * one. The empty id is the first document — a browser that has never run this editor
- * has no marker at all, and so does one that ran every earlier version.
+ * The document a fresh tab opens: a new one, as a word processor starts on an empty
+ * page; the earlier ones are offered, not opened. The empty id is the first document —
+ * a browser that has never run this editor has no marker at all.
  */
 export function pickSlot(marks: Record<string, number>, now: number): string {
-  const free = Object.entries(marks)
-    .filter(([, at]) => at < 0 || now - at > STALE_MS)
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
-  if (free) return free[0];
   if (!Object.keys(marks).length) return '';
   let id: string;
   do id = `d${now.toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`; while (id in marks);
@@ -99,20 +95,20 @@ function dropDocument(id: string): void {
   indexedDB.deleteDatabase(`edentext-fonts${suffix}`);
 }
 
+const isHeld = (at: number, now: number) => at > 0 && now - at <= STALE_MS;
+
 /**
- * Keep the newest MAX_DOCS documents. A document a tab still holds is never dropped,
- * however old it is, and neither is the first one: its keys carry no id to sweep by.
+ * Drop every empty document no tab holds — each fresh tab mints one — then keep the
+ * newest MAX_DOCS. A held document is never dropped, however old; neither is the
+ * first one for its age.
  */
 export function pruneOldDocuments(): void {
   const now = Date.now();
-  const old = Object.entries(markers())
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-    .slice(MAX_DOCS);
-  for (const [id, at] of old) {
-    if (id === '' || (at > 0 && now - at <= STALE_MS)) continue;
-    dropDocument(id);
-    localStorage.removeItem(LIVE + id);
-  }
+  let docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const drop = (id: string) => { dropDocument(id); localStorage.removeItem(LIVE + id); };
+  for (const [id, at] of docs) if (id !== docId && !isHeld(at, now) && isEmpty(id)) drop(id);
+  docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  for (const [id, at] of docs.slice(MAX_DOCS)) if (id !== '' && !isHeld(at, now)) drop(id);
 }
 
 export interface BrowserDocument {
@@ -136,18 +132,35 @@ function firstText(node: { text?: string; content?: unknown[] }): string {
   return '';
 }
 
-function labelOf(id: string): string {
-  const key = (name: string) => (id === '' ? name : `${name}@${id}`);
-  const name = localStorage.getItem(key('edentext-doc-name'))?.trim();
-  if (name) return name;
+const keyOf = (id: string, name: string) => (id === '' ? name : `${name}@${id}`);
+
+type Json = { type?: string; content?: Json[] };
+
+function storedDoc(id: string): Json | null {
   try {
-    return firstText(JSON.parse(localStorage.getItem(key('edentext-doc')) ?? '{}')).slice(0, 80);
+    return JSON.parse(localStorage.getItem(keyOf(id, 'edentext-doc')) ?? 'null');
   } catch {
-    return '';
+    return null;
   }
 }
 
-/** Every document this browser keeps, most recently used first. */
+// `saveHfDoc` removes an empty zone's key, so any zone key left is content.
+const ZONE_KEYS = ['header', 'header-first', 'header-even', 'footer', 'footer-first', 'footer-even', 'hf-sections']
+  .map((z) => `edentext-${z}`);
+
+// Nothing in the body but the lone empty paragraph a new document is, and no zone.
+function isEmpty(id: string): boolean {
+  const c = storedDoc(id)?.content ?? [];
+  const bodyEmpty = c.length === 0 || (c.length === 1 && c[0].type === 'paragraph' && !c[0].content?.length);
+  return bodyEmpty && ZONE_KEYS.every((k) => localStorage.getItem(keyOf(id, k)) === null);
+}
+
+function labelOf(id: string): string {
+  const name = localStorage.getItem(keyOf(id, 'edentext-doc-name'))?.trim();
+  return name || firstText(storedDoc(id) ?? {}).slice(0, 80);
+}
+
+/** Every document this browser keeps, most recently used first; an empty one only while open. */
 export function listDocuments(): BrowserDocument[] {
   const now = Date.now();
   return Object.entries(markers())
@@ -156,9 +169,10 @@ export function listDocuments(): BrowserDocument[] {
       id,
       at: Math.abs(at),
       mine: id === docId,
-      held: id !== docId && at > 0 && now - at <= STALE_MS,
+      held: id !== docId && isHeld(at, now),
       label: labelOf(id),
-    }));
+    }))
+    .filter((d) => d.mine || d.held || !isEmpty(d.id));
 }
 
 /** Switch this tab to another document; the reload's pagehide saves and releases this one. */

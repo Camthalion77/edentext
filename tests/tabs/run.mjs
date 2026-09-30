@@ -56,11 +56,14 @@ try {
   }
   check((await text(a)).includes('Alpha') && (await text(b)).includes('Beta'), 'both tabs keep their document across a reload');
 
-  // A closed tab signs its document off, so the next fresh tab takes it up again.
+  // A fresh tab starts empty; the document a closed tab signed off is offered, not opened.
   await b.close();
   const c = await openTab();
-  await settle(c);
-  check((await text(c)).includes('Beta'), 'a new tab takes up the document the closed tab held');
+  await settle(c, true);
+  check(!(await text(c)).trim(), 'a new tab starts on an empty document');
+  await c.getByRole('button', { name: 'Beta' }).click();
+  await c.waitForFunction(() => document.querySelector('.tiptap')?.textContent.includes('Beta'));
+  check(true, 'the resume card reopens the document the closed tab held');
 } catch (err) {
   check(false, `tabs run threw: ${err.message ?? err}`);
 } finally {

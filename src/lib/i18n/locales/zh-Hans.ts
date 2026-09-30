@@ -22,6 +22,8 @@ const zhHans: Messages = {
     open: '打开',
     delete: '删除',
     confirmDelete: '要从浏览器中删除此文档吗？删除后无法恢复。',
+    resume: '继续处理',
+    showAll: '所有文档…',
   },
   docProps: {
     title: '文档属性',

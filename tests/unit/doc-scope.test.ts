@@ -16,13 +16,9 @@ describe('pickSlot', () => {
     for (let i = 0; i < 2e4; i++) expect(pickSlot({ '': NOW - 1000, [id]: NOW }, NOW)).not.toBe(id);
   });
 
-  it('takes up the most recent document no tab holds', () => {
-    // Negative = a tab signed off; the stamp still says how recently it was used.
-    expect(pickSlot({ '': -(NOW - 9 * MIN), d2: -(NOW - 2 * MIN) }, NOW)).toBe('d2');
-  });
-
-  it('counts a marker nobody has refreshed in ten minutes as abandoned', () => {
-    expect(pickSlot({ '': NOW - 11 * MIN, d2: NOW - 1 * MIN }, NOW)).toBe('');
+  it('starts every later fresh tab on a new document, free ones or not', () => {
+    const id = pickSlot({ '': -(NOW - 9 * MIN), d2: NOW - 11 * MIN }, NOW);
+    expect(['', 'd2']).not.toContain(id);
   });
 });
 
@@ -48,5 +44,25 @@ describe('deleteDocument', () => {
     scope.deleteDocument('d9'); // the open one stays
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
     expect(keys.sort()).toEqual(['edentext-live@d9', 'edentext-theme']);
+  });
+
+  it('prunes the empty documents no tab holds, and lists none of them', async () => {
+    localStorage.clear();
+    sessionStorage.setItem('edentext-tab-doc', 'd9');
+    vi.resetModules();
+    const scope = await import('../../src/lib/storage/docScope');
+    const released = String(-(Date.now() - MIN));
+    localStorage.setItem('edentext-live@d1', released);
+    localStorage.setItem('edentext-doc@d1', '{"content":[{"type":"paragraph"}]}');
+    localStorage.setItem('edentext-live@d2', released);
+    localStorage.setItem('edentext-live@d5', released);
+    localStorage.setItem('edentext-footer@d5', '{"type":"doc"}');
+    localStorage.setItem('edentext-live@d3', String(Date.now()));
+    localStorage.setItem('edentext-live@d4', released);
+    localStorage.setItem('edentext-doc@d4', '{"content":[{"type":"paragraph","content":[{"text":"x"}]}]}');
+    expect(scope.listDocuments().map((d) => d.id).sort()).toEqual(['d3', 'd4', 'd5', 'd9']);
+    scope.pruneOldDocuments();
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+    expect(keys.sort()).toEqual(['edentext-doc@d4', 'edentext-footer@d5', 'edentext-live@d3', 'edentext-live@d4', 'edentext-live@d5', 'edentext-live@d9']);
   });
 });

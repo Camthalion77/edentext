@@ -64,6 +64,7 @@
   import type { TemplateEntry } from './lib/templates/types';
   import DocPropertiesDialog from './lib/components/DocPropertiesDialog.svelte';
   import BrowserDocumentsDialog from './lib/components/BrowserDocumentsDialog.svelte';
+  import ResumeCard from './lib/components/ResumeCard.svelte';
   import PasswordDialog from './lib/components/PasswordDialog.svelte';
   import CommentsPane from './lib/components/CommentsPane.svelte';
   import RevisionsPane from './lib/components/RevisionsPane.svelte';
@@ -1828,6 +1829,7 @@
   <AutoTextDialog bind:open={autoTextOpen} editor={activeEditor} />
   <ThesaurusDialog bind:open={thesaurusOpen} editor={activeEditor} />
   <BrowserDocumentsDialog bind:open={browserDocsOpen} />
+  <ResumeCard show={tick >= 0 && !!editor && !isDocNonEmpty()} onShowAll={() => (browserDocsOpen = true)} />
   <DocPropertiesDialog bind:open={docPropsOpen} props={docProps} onApply={(p) => { docProps = p; saveDocProperties(p); }} />
   <PasswordDialog
     bind:open={passwordSetOpen}

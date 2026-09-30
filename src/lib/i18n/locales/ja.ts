@@ -23,6 +23,8 @@ const ja: Messages = {
     open: '開く',
     delete: '削除',
     confirmDelete: 'この文書をブラウザーから削除しますか? 元に戻すことはできません。',
+    resume: '作業を再開',
+    showAll: 'すべての文書…',
   },
   docProps: {
     title: '文書プロパティ',

@@ -46,17 +46,18 @@ All keys share the `edentext-` prefix — a namespace, not a description: on Git
 written through `docKey()`, which appends `@<id>` — that is how two tabs edit two
 documents. The **first document keeps the empty id**, so its keys read exactly as this
 list spells them and no earlier version needs migrating. The id comes out of
-`sessionStorage` (per tab, survives its reloads) or, for a fresh tab, from the most
-recently used document that no live tab holds; `edentext-live@<id>` is that marker —
+`sessionStorage` (per tab, survives its reloads); a fresh tab always gets a new, empty
+document, as a word processor starts on an empty page. `edentext-live@<id>` is the marker —
 epoch ms while held, negated on `pagehide`, refreshed every 60 s and abandoned after 10.
 Only the holding tab ever writes its own marker, so no two tabs race over one key.
-`pruneOldDocuments()` (from `main.ts`) drops all but the newest ten, never one a tab
-still holds and never the first. Duplicating a tab copies its `sessionStorage`, so the
-copy lands on the same document — the one case still shared. File ▸ *Recent documents*
-(`BrowserDocumentsDialog.svelte`) lists every marker: opening one points this tab's
-`sessionStorage` at it and reloads, deleting one drops its keys — the first document's by
-the names `docKey()` has registered, since its keys carry no id. Neither touches a held
-one. The app's own keys (theme,
+`pruneOldDocuments()` (from `main.ts`) drops every empty document no tab holds, then all
+but the newest ten — never a held one, and the first never for its age. While the page
+is empty, `ResumeCard.svelte` offers the three used last. Duplicating a tab copies its
+`sessionStorage`, so the copy lands on the same document — the one case still shared.
+File ▸ *Recent documents* (`BrowserDocumentsDialog.svelte`) lists every marker: opening
+one points this tab's `sessionStorage` at it and reloads, deleting one drops its keys —
+the first document's by the names `docKey()` has registered, since its keys carry no id.
+Neither touches a held one. The app's own keys (theme,
 zoom, chrome, AutoCorrect, AutoText, word completion, recent files/fonts/chars, markup
 view, user dictionary, number recognition) stay unscoped.
 

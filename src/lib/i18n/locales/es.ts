@@ -21,6 +21,8 @@ const es: Messages = {
     open: 'Abrir',
     delete: 'Eliminar',
     confirmDelete: '¿Eliminar este documento del navegador? No se podrá recuperar.',
+    resume: 'Seguir trabajando en',
+    showAll: 'Todos los documentos…',
   },
   docProps: {
     title: 'Propiedades del documento',

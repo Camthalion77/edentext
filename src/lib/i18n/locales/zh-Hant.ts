@@ -23,6 +23,8 @@ const zhHant: Messages = {
     open: '開啟',
     delete: '刪除',
     confirmDelete: '要從瀏覽器中刪除此文件嗎？刪除後無法復原。',
+    resume: '繼續處理',
+    showAll: '所有文件…',
   },
   docProps: {
     title: '文件屬性',
