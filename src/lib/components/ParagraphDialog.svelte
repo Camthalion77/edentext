@@ -138,8 +138,8 @@
       <button role="tab" class:active={pane === 'breaks'} aria-selected={pane === 'breaks'} onclick={() => (pane = 'breaks')}>{t().paragraphDialog.breaksTab}</button>
     </div>
 
-    {#if pane === 'indents'}
-      <div class="grid">
+    <div class="panes">
+      <div class="grid" class:off={pane !== 'indents'}>
         <label class="row">
           <span>{t().align.section}</span>
           <select value={align} onchange={(e) => editor?.chain().focus().setTextAlign((e.currentTarget as HTMLSelectElement).value as never).run()}>
@@ -174,17 +174,16 @@
           <label class="row"><span></span><input type="text" inputmode="decimal" value={num(parseFloat(String(lineHeight)))} onchange={(e) => { const v = parseFloat((e.currentTarget as HTMLInputElement).value.replace(',', '.')); if (v > 0) editor?.chain().focus().setLineHeight(`${v}pt`).run(); }} /><em>pt</em></label>
         {/if}
       </div>
-    {:else}
-      <div class="flow">
+      <div class="flow" class:off={pane !== 'breaks'}>
         {#each FLOW as f}
           <label class="check">
             <input type="checkbox" checked={f.on()} onchange={(e) => f.set((e.currentTarget as HTMLInputElement).checked)} />
             <span>{f.label()}</span>
           </label>
         {/each}
+        <p class="hint">{t().paragraphDialog.flowHint}</p>
       </div>
-      <p class="hint">{t().paragraphDialog.flowHint}</p>
-    {/if}
+    </div>
 
     <div class="actions">
       <button class="secondary" onclick={() => { open = false; onTabs?.(); }}>{t().paragraphDialog.tabsButton}</button>
@@ -213,7 +212,9 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    width: 560px;
+    /* Grows with the longest localized label instead of scrolling. */
+    width: max-content;
+    min-width: 560px;
     padding: 18px 20px 16px;
     font-family: var(--font-sans);
     font-size: 0.85rem;
@@ -238,6 +239,11 @@
   }
 
   .tabs button.active { color: var(--color-text); border-bottom-color: var(--color-primary); }
+
+  /* Both panes share one cell, so switching tabs never resizes the dialog. */
+  .panes { display: grid; }
+  .panes > * { grid-area: 1 / 1; }
+  .off { visibility: hidden; }
 
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
 
@@ -269,7 +275,8 @@
   .flow { display: flex; flex-direction: column; gap: 8px; }
   .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
-  .hint { color: var(--color-text-muted); font-size: 0.78rem; }
+  /* Wraps at the dialog width rather than widening it. */
+  .hint { width: 0; min-width: 100%; color: var(--color-text-muted); font-size: 0.78rem; }
 
   .actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
   .spacer { flex: 1; }
