@@ -728,6 +728,13 @@ select:not([multiple], [size], .bare) {
   background-position: right 7px center !important;
 }
 
+/* Some systems draw the open list in their own scheme (dark under a dark GTK theme),
+   so a select that leaves its colours transparent or system-picked turns illegible. */
+optgroup, option {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
 /* A modal dialog moves by its title (utils/dragWindow.ts). */
 dialog h2 { cursor: move; user-select: none; touch-action: none; }
 

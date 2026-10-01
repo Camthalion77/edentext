@@ -118,9 +118,4 @@
   select:hover {
     background: var(--color-btn-hover);
   }
-
-  /* The option list is OS-drawn; keep its text legible in dark themes. */
-  option {
-    color: initial;
-  }
 </style>
