@@ -226,7 +226,7 @@ const de: Messages = {
   toolbarExpanded: {
     fontName: 'Schriftart',
     recent: 'Zuletzt',
-    webSafe: 'Web-sicher',
+    webSafe: 'Standardschriften',
     allFonts: 'Alle Schriften',
     loadAllFonts: 'Alle installierten Schriften laden',
     fontSize: 'Schriftgröße',

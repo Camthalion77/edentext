@@ -234,7 +234,7 @@ const en = {
   toolbarExpanded: {
     fontName: 'Font Name',
     recent: 'Recent',
-    webSafe: 'Web-safe',
+    webSafe: 'Standard fonts',
     allFonts: 'All fonts',
     loadAllFonts: 'Load all installed fonts',
     fontSize: 'Font size',

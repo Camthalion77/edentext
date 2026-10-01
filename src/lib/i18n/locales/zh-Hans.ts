@@ -225,7 +225,7 @@ const zhHans: Messages = {
   toolbarExpanded: {
     fontName: '字体',
     recent: '最近使用',
-    webSafe: '网页安全字体',
+    webSafe: '标准字体',
     allFonts: '全部字体',
     loadAllFonts: '载入系统已安装的全部字体',
     fontSize: '字号',

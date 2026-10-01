@@ -235,7 +235,7 @@ const ru: Messages = {
   toolbarExpanded: {
     fontName: 'Шрифт',
     recent: 'Недавние',
-    webSafe: 'Веб-безопасные',
+    webSafe: 'Стандартные шрифты',
     allFonts: 'Все шрифты',
     loadAllFonts: 'Загрузить все установленные шрифты',
     fontSize: 'Размер шрифта',

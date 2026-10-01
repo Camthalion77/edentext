@@ -224,7 +224,7 @@ const pt: Messages = {
   toolbarExpanded: {
     fontName: 'Nome do tipo de letra',
     recent: 'Recentes',
-    webSafe: 'Compatíveis com a Web',
+    webSafe: 'Fontes padrão',
     allFonts: 'Todos os tipos de letra',
     loadAllFonts: 'Carregar todos os tipos de letra instalados',
     fontSize: 'Tamanho do tipo de letra',

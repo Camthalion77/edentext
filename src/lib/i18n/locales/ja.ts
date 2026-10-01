@@ -227,7 +227,7 @@ const ja: Messages = {
   toolbarExpanded: {
     fontName: 'フォント名',
     recent: '最近使用したフォント',
-    webSafe: 'Web セーフ',
+    webSafe: '標準フォント',
     allFonts: 'すべてのフォント',
     loadAllFonts: 'インストール済みのフォントをすべて読み込む',
     fontSize: 'フォント サイズ',

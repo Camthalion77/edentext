@@ -226,7 +226,7 @@ const zhHant: Messages = {
   toolbarExpanded: {
     fontName: '字型',
     recent: '最近使用',
-    webSafe: '網頁安全字型',
+    webSafe: '標準字型',
     allFonts: '所有字型',
     loadAllFonts: '載入系統已安裝的所有字型',
     fontSize: '字型大小',

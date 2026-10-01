@@ -230,7 +230,7 @@ const fr: Messages = {
   toolbarExpanded: {
     fontName: 'Nom de la police',
     recent: 'Récentes',
-    webSafe: 'Compatibles avec le Web',
+    webSafe: 'Polices standard',
     allFonts: 'Toutes les polices',
     loadAllFonts: 'Charger toutes les polices installées',
     fontSize: 'Taille de police',
