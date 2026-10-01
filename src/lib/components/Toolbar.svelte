@@ -672,6 +672,9 @@
     padding: 2px;
     display: flex;
     flex-direction: column;
+    /* The toolbar sits at the top of the window; a long menu scrolls inside the rest. */
+    max-height: calc(100vh - 7rem);
+    overflow-y: auto;
   }
 
   .ol-section-label {
