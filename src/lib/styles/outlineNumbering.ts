@@ -46,12 +46,15 @@ export function outlineIsEmpty(outline: OutlineNumbering | null | undefined): bo
   return !outline?.some((l) => l.format !== 'none');
 }
 
-// The CJK counter styles are the ones the lists use (editor.css).
+// The lists' counter styles (editor.css), plus capitals for upper Cyrillic chapters.
 const CSS_STYLE: Record<OutlineFormat, string> = {
   '1': 'decimal', a: 'lower-alpha', A: 'upper-alpha', i: 'lower-roman', I: 'upper-roman',
   '一, 二, 三, ...': 'simp-chinese-informal', '壹, 贰, 叁, ...': 'simp-chinese-formal',
   '甲, 乙, 丙, ...': 'edt-stem', '①, ②, ③, ...': 'edt-circled',
   'ア, イ, ウ, ...': 'edt-aiueo', 'イ, ロ, ハ, ...': 'edt-iroha',
+  aa: 'edt-alpha-sync', AA: 'edt-upper-alpha-sync',
+  'а, б, .., аа, аб, ... (ru)': 'edt-cyrillic', 'А, Б, .., Аа, Аб, ... (ru)': 'edt-upper-cyrillic',
+  'а, б, .., аа, бб, ... (ru)': 'edt-cyrillic-sync', 'А, Б, .., Аа, Бб, ... (ru)': 'edt-upper-cyrillic-sync',
 };
 
 const COUNTER = (level: number) => `edt-outline-${level}`;

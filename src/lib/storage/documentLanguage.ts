@@ -62,6 +62,16 @@ export function isAsianTag(tag: string): boolean {
   return /^(zh|ja|ko)\b/i.test(tag.trim());
 }
 
+export function isCyrillicTag(tag: string): boolean {
+  return /^(ru|uk|be|bg|sr|mk)\b/i.test(tag.trim());
+}
+
+// The scripts whose list numbering the menus offer: the UI's and the document's.
+export function numberingScripts(main: DocumentLanguage, other: string | null, uiLocale: string): { cjk: boolean; cyrillic: boolean } {
+  const tags = [tagForLanguage(main) ?? '', other ?? '', uiLocale];
+  return { cjk: tags.some(isAsianTag), cyrillic: tags.some(isCyrillicTag) };
+}
+
 // A tag's slot: a paragraph or a run carries a western and an asian language, and a tag
 // in the wrong one (an older document's asian `lang`) counts for its own script.
 export const westLang = (tag: unknown): string | null =>

@@ -14,7 +14,7 @@
 
   import { clipboardCommand, readClipboard } from '../../../editor/contextMenuItems';
   import { BULLET_TYPES } from '../../../utils/bulletListTypes';
-  import { formatOrdinal, orderedTypeDef, ORDERED_LIST_TYPES, type OrderedListType } from '../../../utils/orderedListTypes';
+  import { formatOrdinal, orderedTypeDef, orderedTypesFor, type OrderedListType } from '../../../utils/orderedListTypes';
   import { effectiveOrderedTypeAt } from '../../../editor/extensions/orderedList';
   import { listStyleNameAt } from '../../../editor/extensions/listStyle';
   import type { ListStyle } from '../../../styles/listStyles';
@@ -27,10 +27,11 @@
   import { withShortcut } from '../../../i18n/shortcut';
   import { shortcutHint, type ShortcutId } from '../../../editor/shortcuts';
 
-  let { editor, tick, showFormattingMarks = $bindable(false), onManageStyles, onFind, onParagraphDialog, asianDocument = false }: {
+  let { editor, tick, showFormattingMarks = $bindable(false), onManageStyles, onFind, onParagraphDialog, asianDocument = false, scripts = { cjk: false, cyrillic: false } }: {
     editor: Editor | null;
     tick: number;
     asianDocument?: boolean;
+    scripts?: { cjk: boolean; cyrillic: boolean };
     showFormattingMarks?: boolean;
     onManageStyles?: (family: StyleFamily) => void;
     onFind?: (mode: 'find' | 'replace') => void;
@@ -364,7 +365,7 @@
         {#if isMenuOpen('numbering')}
           <div class="ribbon-menu" use:anchored role="menu">
             <div class="rb-menu-label">{t().toolbar.numbering}</div>
-            {#each ORDERED_LIST_TYPES as o}
+            {#each orderedTypesFor(scripts, currentOrderedType) as o}
               <button class:selected={currentOrderedType === o.key} onclick={() => applyOrderedType(o.key)}>
                 <span class="marker">{o.preview}</span>{o.label}
               </button>

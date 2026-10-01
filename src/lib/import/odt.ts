@@ -17,7 +17,7 @@ import {
   TABLE_REGIONS, builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr,
   type TableLook, type TableRegion,
 } from '../styles/tableStyles';
-import { knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
+import { knownNumFormat, odfNumFormatOf, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromOdf } from '../utils/bulletListTypes';
 import { docxPicture, matchFormat, toDateValue, type Token } from '../utils/dateTime';
 import {
@@ -1836,7 +1836,7 @@ function outlineFromOdf(el: Element | null, ctx: Ctx): OutlineNumbering | null {
   for (let level = 1; level <= MAX_OUTLINE_LEVELS; level++) {
     const def = Array.from(el.children).find(
       (c) => c.localName === 'outline-level-style' && c.getAttributeNS(NS.text, 'level') === String(level));
-    const format = def ? knownNumFormat(def.getAttributeNS(NS.style, 'num-format')) : null;
+    const format = def ? knownNumFormat(odfNumFormatOf(def)) : null;
     if (!def || !format) {
       out.push({ ...DEFAULT_OUTLINE_LEVEL });
       continue;
@@ -1910,7 +1910,7 @@ function listStyleFromOdf(name: string, el: Element, builtin?: boolean): ListSty
     if (listLevelRightAligned(def)) level.markerAlign = 'right';
     if (ordered) {
       if (parseInt(def.getAttributeNS(NS.text, 'display-levels') ?? '1', 10) > 1) multilevel = true;
-      const key = orderedTypeFromFormat(def.getAttributeNS(NS.style, 'num-format'), def.getAttributeNS(NS.style, 'num-suffix'));
+      const key = orderedTypeFromFormat(odfNumFormatOf(def), def.getAttributeNS(NS.style, 'num-suffix'));
       level.numType = key === 'multilevel' ? 'decimal' : key;
       const sv = parseInt(def.getAttributeNS(NS.text, 'start-value') ?? '', 10);
       if (Number.isFinite(sv) && sv > 1) level.startAt = sv;
@@ -3023,7 +3023,7 @@ function convertList(el: Element, ctx: Ctx, inheritedStyleName: string | null, d
   const inChain = ordered && (isMultilevelTop || displayLevels > 1);
   // This list's rendered numbering re-anchors its children's default cycle (slot + suffix).
   const renderedKey = ordered && !inChain
-    ? orderedTypeFromFormat(levelDef!.getAttributeNS(NS.style, 'num-format'), levelDef!.getAttributeNS(NS.style, 'num-suffix'))
+    ? orderedTypeFromFormat(odfNumFormatOf(levelDef!), levelDef!.getAttributeNS(NS.style, 'num-suffix'))
     : null;
   const childBaseCycle = childCycle(baseCycle, inChain ? 'multilevel' : renderedKey, ordered);
 

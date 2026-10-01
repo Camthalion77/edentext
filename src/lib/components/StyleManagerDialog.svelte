@@ -12,7 +12,7 @@
   } from '../styles/sheet.svelte';
   import { listStyleMarginCm, MAX_LIST_LEVELS, type ListLevelStyle, type ListStyle } from '../styles/listStyles';
   import { listStyleNameAt } from '../editor/extensions/listStyle';
-  import { formatOrdinal, orderedTypeDef, ORDERED_LIST_TYPES } from '../utils/orderedListTypes';
+  import { formatOrdinal, orderedTypeDef, orderedTypesFor } from '../utils/orderedListTypes';
   import { BULLET_TYPES } from '../utils/bulletListTypes';
   import {
     TABLE_REGIONS, previewCellCss, previewTextCss,
@@ -29,8 +29,8 @@
 
   // LibreOffice's style manager: pick a style, edit its properties, or make a new one
   // from the cursor's formatting. Edits apply live — every block using the style follows.
-  let { open = $bindable(false), editor, family: openFamily = 'paragraph', asianDocument = false }:
-    { open?: boolean; editor: Editor | null; family?: StyleFamily; asianDocument?: boolean } = $props();
+  let { open = $bindable(false), editor, family: openFamily = 'paragraph', asianDocument = false, scripts = { cjk: false, cyrillic: false } }:
+    { open?: boolean; editor: Editor | null; family?: StyleFamily; asianDocument?: boolean; scripts?: { cjk: boolean; cyrillic: boolean } } = $props();
 
   const ALIGNMENTS: AlignValue[] = ['left', 'center', 'right', 'justify'];
   // Beyond this the indent would push the name out of the 14rem pane, so deeper
@@ -588,7 +588,7 @@
                   disabled={!!lStyle.multilevel}
                   onchange={(e) => editLevel({ numType: e.currentTarget.value as ListLevelStyle['numType'] })}
                 >
-                  {#each ORDERED_LIST_TYPES.filter((o) => !o.multilevel) as o}
+                  {#each orderedTypesFor(scripts, lLevel.numType, true).filter((o) => !o.multilevel) as o}
                     <option value={o.key}>{o.preview} — {o.label}</option>
                   {/each}
                 </select>

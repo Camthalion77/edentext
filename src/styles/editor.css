@@ -846,6 +846,63 @@
   suffix: "";
 }
 
+/* Letters that repeat past the last one (z, aa, bb; я, аа, бб), as LibreOffice's
+   num-letter-sync and its "аа, бб" formats count, and the Russian alphabet LibreOffice
+   counts with: ы is in, ё, й, ъ and ь are not. Upper Cyrillic capitalises the first
+   letter only (Аа, Бб), so the lists draw the lower style capitalised. */
+.paper .tiptap :is(ol, ul)[data-eff-list-style="lower-alpha-sync"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-alpha-sync) ". "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="lower-alpha-sync-paren"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-alpha-sync) ") "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="upper-alpha-sync"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-upper-alpha-sync) ". "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="upper-alpha-sync-paren"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-upper-alpha-sync) ") "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="lower-cyrillic"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic) ". "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="lower-cyrillic-paren"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic) ") "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="upper-cyrillic"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic) ". "; text-transform: capitalize; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="upper-cyrillic-paren"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic) ") "; text-transform: capitalize; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="lower-cyrillic-sync"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic-sync) ". "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="lower-cyrillic-sync-paren"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic-sync) ") "; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="upper-cyrillic-sync"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic-sync) ". "; text-transform: capitalize; }
+.paper .tiptap :is(ol, ul)[data-eff-list-style="upper-cyrillic-sync-paren"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before { content: counter(list-item, edt-cyrillic-sync) ") "; text-transform: capitalize; }
+
+@counter-style edt-alpha-sync {
+  system: symbolic;
+  symbols: "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q" "r" "s" "t" "u" "v" "w" "x" "y" "z";
+  suffix: "";
+}
+
+@counter-style edt-upper-alpha-sync {
+  system: symbolic;
+  symbols: "A" "B" "C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z";
+  suffix: "";
+}
+
+@counter-style edt-cyrillic {
+  system: alphabetic;
+  symbols: "а" "б" "в" "г" "д" "е" "ж" "з" "и" "к" "л" "м" "н" "о" "п" "р" "с" "т" "у" "ф" "х" "ц" "ч" "ш" "щ" "ы" "э" "ю" "я";
+  suffix: "";
+}
+
+@counter-style edt-cyrillic-sync {
+  system: symbolic;
+  symbols: "а" "б" "в" "г" "д" "е" "ж" "з" "и" "к" "л" "м" "н" "о" "п" "р" "с" "т" "у" "ф" "х" "ц" "ч" "ш" "щ" "ы" "э" "ю" "я";
+  suffix: "";
+}
+
+/* Chapter labels cannot be capitalised part by part, so they take the capitals as
+   symbols; past я they fall back to lower case. */
+@counter-style edt-upper-cyrillic {
+  system: fixed 1;
+  symbols: "А" "Б" "В" "Г" "Д" "Е" "Ж" "З" "И" "К" "Л" "М" "Н" "О" "П" "Р" "С" "Т" "У" "Ф" "Х" "Ц" "Ч" "Ш" "Щ" "Ы" "Э" "Ю" "Я";
+  fallback: edt-cyrillic;
+  suffix: "";
+}
+
+@counter-style edt-upper-cyrillic-sync {
+  system: fixed 1;
+  symbols: "А" "Б" "В" "Г" "Д" "Е" "Ж" "З" "И" "К" "Л" "М" "Н" "О" "П" "Р" "С" "Т" "У" "Ф" "Х" "Ц" "Ч" "Ш" "Щ" "Ы" "Э" "Ю" "Я";
+  fallback: edt-cyrillic-sync;
+  suffix: "";
+}
+
 /* Legal/outline numbering (1., 1.1., 1.2.1. …): the plugin tags the multilevel list and
    every attr-less member of its chain with data-eff-list-style="multilevel". */
 .paper .tiptap :is(ol, ul)[data-eff-list-style="multilevel"] > li > :is(p, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10)::before {

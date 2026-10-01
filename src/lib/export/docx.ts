@@ -153,6 +153,14 @@ const ORDERED_FORMAT: Record<string, (typeof LevelFormat)[keyof typeof LevelForm
   A: LevelFormat.UPPER_LETTER,
   i: LevelFormat.LOWER_ROMAN,
   I: LevelFormat.UPPER_ROMAN,
+  // Word has one letter format per alphabet and repeats the letter past the last one;
+  // LibreOffice writes both of its counting modes to it.
+  aa: LevelFormat.LOWER_LETTER,
+  AA: LevelFormat.UPPER_LETTER,
+  'а, б, .., аа, аб, ... (ru)': LevelFormat.RUSSIAN_LOWER,
+  'а, б, .., аа, бб, ... (ru)': LevelFormat.RUSSIAN_LOWER,
+  'А, Б, .., Аа, Аб, ... (ru)': LevelFormat.RUSSIAN_UPPER,
+  'А, Б, .., Аа, Бб, ... (ru)': LevelFormat.RUSSIAN_UPPER,
   // Probed: LibreOffice writes chineseCountingThousand for 一、二、三 and reads
   // chineseCounting as the same thing.
   '一, 二, 三, ...': LevelFormat.CHINESE_COUNTING_THOUSAND,

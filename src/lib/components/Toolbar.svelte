@@ -2,7 +2,7 @@
   import type { Editor } from '@tiptap/core';
   import HistoryButton from './HistoryButton.svelte';
   import AlignButton from './AlignButton.svelte';
-  import { ORDERED_LIST_TYPES, type OrderedListType } from '../utils/orderedListTypes';
+  import { orderedTypesFor, type OrderedListType } from '../utils/orderedListTypes';
   import { BULLET_TYPES } from '../utils/bulletListTypes';
   import { effectiveOrderedTypeAt } from '../editor/extensions/orderedList';
   import { listStyleNameAt } from '../editor/extensions/listStyle';
@@ -25,10 +25,11 @@
   }
 
   // The style manager is mounted once in App.svelte; the gallery only asks for it.
-  let { editor, tick, onManageStyles }: {
+  let { editor, tick, onManageStyles, scripts = { cjk: false, cyrillic: false } }: {
     editor: Editor | null;
     tick: number;
     onManageStyles?: (family: StyleFamily) => void;
+    scripts?: { cjk: boolean; cyrillic: boolean };
   } = $props();
 
   // The document's named paragraph styles (LibreOffice model): the gallery lists the
@@ -429,7 +430,7 @@
         {#if olMenuOpen}
           <div class="ol-dropdown" role="menu">
             <div class="ol-section-label">{t().toolbar.numbering}</div>
-            {#each ORDERED_LIST_TYPES as o}
+            {#each orderedTypesFor(scripts, currentOrderedType) as o}
               <button
                 class="ol-option"
                 class:active={currentOrderedType === o.key}

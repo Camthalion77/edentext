@@ -38,7 +38,7 @@ import { presetOdfGeometry } from '../utils/shapePresets';
 import { SHAPES, arrowHeadCm, boxHeads, isShapeKind, isLineKind, odfEnhancedGeometry, odfEnhancedPath, asShapePreset, asTextArea, type PathHeads, type ShapeKind, type DrawingMlPreset, type TextArea } from '../utils/shapes';
 import { normalizeLeader, parseTabStops } from '../editor/extensions/tabStops';
 import { charStyleProps, listMarkerFormat, type MarkerFormat } from '../editor/extensions/listMarker';
-import { orderedTypeDef, effectiveOrderedDef, effectiveOrderedDefAt, childCycle, formatOrdinal, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
+import { orderedTypeDef, effectiveOrderedDef, odfNumFormatAttrs, effectiveOrderedDefAt, childCycle, formatOrdinal, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { ODF_SEQ_NAME, seqCategoryOf, type SeqCategory } from '../editor/extensions/caption';
 import { isCrossRefFormat, isCrossRefKind, type CrossRefFormat, type CrossRefKind } from '../editor/extensions/crossReference';
 import { indexKindOf, INDEX_TITLES, type IndexKind } from '../editor/extensions/tableOfContents';
@@ -2223,6 +2223,10 @@ function outlineStyleXml(outline: OutlineNumbering | null | undefined): string {
       'style:num-format': level.format,
       'style:num-suffix': level.suffix,
     };
+    if (level.format === 'aa' || level.format === 'AA') {
+      attrs['style:num-format'] = level.format[0];
+      attrs['style:num-letter-sync'] = 'true';
+    }
     if (level.prefix) attrs['style:num-prefix'] = level.prefix;
     if (level.displayLevels > 1) attrs['text:display-levels'] = String(level.displayLevels);
     if (level.start !== 1) attrs['text:start-value'] = String(level.start);
@@ -2502,7 +2506,7 @@ function applyListLevelKinds(odtBytes: Uint8Array, kinds: (LevelKindFix | null)[
           if (!fix) return m;
           if (fix.kind === 'number') {
             const disp = fix.displayLevels > 1 ? ` text:display-levels="${fix.displayLevels}"` : '';
-            return `<text:list-level-style-number${lvlAttr} style:num-format="${fix.fmt.numFormat}" style:num-suffix="${escapeXml(fix.fmt.numSuffix)}"${disp}>${inner}</text:list-level-style-number>`;
+            return `<text:list-level-style-number${lvlAttr} ${odfNumFormatAttrs(fix.fmt.numFormat)} style:num-suffix="${escapeXml(fix.fmt.numSuffix)}"${disp}>${inner}</text:list-level-style-number>`;
           }
           return `<text:list-level-style-bullet${lvlAttr} text:bullet-char="${escapeXml(fix.char)}">${inner}</text:list-level-style-bullet>`;
         },
@@ -2548,10 +2552,10 @@ function applyOrderedListFormats(odtBytes: Uint8Array, formats: (OlStyleFix | nu
       open +
       body.replace(
         /(<text:list-level-style-number text:level=")(\d)(" style:num-format=")[^"]*(" style:num-suffix=")[^"]*(")/g,
-        (_mm, a: string, lvl: string, b: string, c: string, d: string) => {
+        (_mm, a: string, lvl: string) => {
           const f = fix.fmts[+lvl - 1] ?? DEFAULT_ORDERED_FMTS[+lvl - 1];
           const disp = fix.multilevel && +lvl > 1 ? ` text:display-levels="${lvl}"` : '';
-          return a + lvl + b + f.numFormat + c + f.numSuffix + d + disp;
+          return `${a}${lvl}" ${odfNumFormatAttrs(f.numFormat)} style:num-suffix="${f.numSuffix}"${disp}`;
         },
       ) +
       close,
@@ -2980,7 +2984,7 @@ function buildNamedListStyleXml(style: ListStyle): string {
       const t = orderedTypeDef(style.multilevel ? 'decimal' : def?.numType ?? 'decimal');
       const disp = style.multilevel && level > 1 ? ` text:display-levels="${level}"` : '';
       const start = def?.startAt && def.startAt !== 1 ? ` text:start-value="${def.startAt}"` : '';
-      levels += `<text:list-level-style-number text:level="${level}" style:num-format="${t.numFormat}" style:num-suffix="${t.numSuffix}"${disp}${start}>${labelAlign}</text:list-level-style-number>`;
+      levels += `<text:list-level-style-number text:level="${level}" ${odfNumFormatAttrs(t.numFormat)} style:num-suffix="${t.numSuffix}"${disp}${start}>${labelAlign}</text:list-level-style-number>`;
     }
   }
   return `<text:list-style style:name="${escapeXml(odfStyleName(style.name))}" style:display-name="${escapeXml(style.name)}">${levels}</text:list-style>`;
@@ -3005,7 +3009,7 @@ function buildCellListStyle(
     if (opts.kinds ? opts.kinds[(level - 1) % opts.kinds.length] === 'number' : ordered) {
       const f = fmts[(level - 1) % fmts.length];
       const disp = opts.multilevel && level > 1 ? ` text:display-levels="${level}"` : '';
-      levels += `<text:list-level-style-number text:level="${level}" style:num-format="${f.numFormat}" style:num-suffix="${f.numSuffix}"${disp}>${labelAlign}</text:list-level-style-number>`;
+      levels += `<text:list-level-style-number text:level="${level}" ${odfNumFormatAttrs(f.numFormat)} style:num-suffix="${f.numSuffix}"${disp}>${labelAlign}</text:list-level-style-number>`;
     } else {
       const ch = bulletChars[(level - 1) % bulletChars.length];
       levels += `<text:list-level-style-bullet text:level="${level}" text:bullet-char="${ch}">${labelAlign}</text:list-level-style-bullet>`;

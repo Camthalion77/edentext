@@ -920,6 +920,9 @@ function wordFmtChar(fmt: string | undefined): string {
     case 'upperLetter': return 'A';
     case 'lowerRoman': return 'i';
     case 'upperRoman': return 'I';
+    // LibreOffice reads these as the "аа, аб" kind; the letter-repeating kind writes them too.
+    case 'russianLower': return 'а, б, .., аа, аб, ... (ru)';
+    case 'russianUpper': return 'А, Б, .., Аа, Аб, ... (ru)';
     // Several Word formats render as 一、二、三; LibreOffice folds them together too.
     case 'chineseCounting': case 'chineseCountingThousand':
     case 'ideographDigital': case 'japaneseCounting': case 'taiwaneseCounting':

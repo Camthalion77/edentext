@@ -52,7 +52,7 @@
   import { loadFoldMarks, saveFoldMarks } from './lib/storage/foldMarks';
   import { printMarkup } from './lib/storage/printMarkup.svelte';
   import { commentsInPane, changesInPane, markupAttrs, setShowChanges, setShowComments } from './lib/storage/markup.svelte';
-  import { isAsianTag, loadDocumentLanguage, loadDocumentLanguageOther, pickDocumentLanguage, saveDocumentLanguage, saveDocumentLanguageOther, odfFromLanguage, tagForLanguage, westernCode, type DocumentLanguage } from './lib/storage/documentLanguage';
+  import { isAsianTag, loadDocumentLanguage, numberingScripts, loadDocumentLanguageOther, pickDocumentLanguage, saveDocumentLanguage, saveDocumentLanguageOther, odfFromLanguage, tagForLanguage, westernCode, type DocumentLanguage } from './lib/storage/documentLanguage';
   import { setTableLanguage } from './lib/storage/tableOptions.svelte';
   import { spellController } from './lib/spell/controller';
   import { setGrammarLanguage } from './lib/spell/grammar.svelte';
@@ -1422,7 +1422,7 @@
     <button class="logo-btn" onclick={() => (aboutOpen = true)} aria-label={t().about.label} title={t().about.label}>
       <img src="EdenText.png" alt="EdenText" class="app-logo" />
     </button>
-    <Toolbar editor={activeEditor} tick={activeTick} onManageStyles={openStyleManager} />
+    <Toolbar editor={activeEditor} tick={activeTick} onManageStyles={openStyleManager} scripts={numberingScripts(documentLanguage, documentLanguageOther, locale())} />
     <div class="header-actions">
       {#snippet saveIcon()}
         <!-- Floppy disk -->
@@ -1852,7 +1852,7 @@
   />
   <!-- One instance for every entry point (styles gallery, insert-table menu): the
        callers only say which family to land on. -->
-  <StyleManagerDialog bind:open={styleManagerOpen} family={styleManagerFamily} editor={activeEditor} asianDocument={isAsianTag(tagForLanguage(documentLanguage) ?? '')} />
+  <StyleManagerDialog bind:open={styleManagerOpen} family={styleManagerFamily} editor={activeEditor} asianDocument={isAsianTag(tagForLanguage(documentLanguage) ?? '')} scripts={numberingScripts(documentLanguage, documentLanguageOther, locale())} />
   <NoteOptionsDialog bind:open={noteOptionsOpen} />
   <SaveFormatDialog bind:open={saveFormatOpen} onPick={handleSaveAs} />
 </main>
