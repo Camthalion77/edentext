@@ -1290,6 +1290,9 @@ function txbxParagraphXml(node: TiptapNode, parts: TxbxParts, indentTwip = 0, nu
     const lvl = Math.min(MAX_HEADING_LEVEL, Math.max(1, Number(attrs.level) || 1));
     pPr.push(`<w:pStyle w:val="Heading${lvl}"/>`);
   }
+  // CT_PPr puts both right after the style; an explicit off overrides a heading's keep.
+  if (typeof attrs.keepNext === 'boolean') pPr.push(attrs.keepNext ? '<w:keepNext/>' : '<w:keepNext w:val="0"/>');
+  if (attrs.keepLines === true) pPr.push('<w:keepLines/>');
   pPr.push(numPr, txbxPPrXml(attrs, indentTwip, blockPt(node)));
   const runProps = (marks: TiptapNode['marks']) => txbxRunPropsXml(marks, [attrs.lang, attrs.langAsian]);
   let runs = '';
