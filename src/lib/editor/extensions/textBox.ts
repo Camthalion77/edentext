@@ -11,7 +11,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
 import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, sinkToOffset, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
-import { SHAPES, shapePath, linePaths, pathHeadPaths, arrowHeadPx, isShapeKind, isLineKind, type PathHeads, type ShapeKind } from '../../utils/shapes';
+import { SHAPES, shapePath, linePaths, pathHeadPaths, arrowHeadPx, isShapeKind, isLineKind, outlineLayers, type PathHeads, type ShapeKind } from '../../utils/shapes';
 import { cmToPx } from '../../storage/pageMargins';
 import { normalizeColor } from '../../utils/color';
 
@@ -722,12 +722,29 @@ class TextBoxView {
       svg.appendChild(this.outline);
       this.rotor.insertBefore(svg, this.rotor.firstChild);
     }
-    this.outline.setAttribute('d', d);
-    // An outline that never closes is stroked only, whatever fill its style declares —
-    // which is how both products draw a polyline.
-    this.outline.setAttribute('fill', d.trimEnd().endsWith('Z') ? normalizeColor(a.fillColor) ?? 'none' : 'none');
-    this.outline.setAttribute('stroke', normalizeColor(a.strokeColor) ?? 'none');
-    this.outline.setAttribute('stroke-width', String(a.strokeWidthPt * PX_PER_PT));
+    // Parts filled only or stroked only (`outlineLayers`) need a second path for the lines.
+    const layers = outlineLayers(d);
+    const split = layers.fill !== layers.stroke;
+    let lines = this.outline.nextElementSibling as SVGPathElement | null;
+    if (split && !lines) {
+      lines = this.outline.cloneNode() as SVGPathElement;
+      this.outline.after(lines);
+    } else if (!split) lines?.remove();
+    const fill = normalizeColor(a.fillColor) ?? 'none';
+    const stroke = normalizeColor(a.strokeColor) ?? 'none';
+    const width = String(a.strokeWidthPt * PX_PER_PT);
+    // An outline none of whose parts closes is stroked only, whatever fill its style
+    // declares — which is how both products draw a polyline.
+    this.outline.setAttribute('d', layers.fill);
+    this.outline.setAttribute('fill', layers.fill.includes('Z') ? fill : 'none');
+    this.outline.setAttribute('stroke', split ? 'none' : stroke);
+    this.outline.setAttribute('stroke-width', width);
+    if (split && lines) {
+      lines.setAttribute('d', layers.stroke);
+      lines.setAttribute('fill', 'none');
+      lines.setAttribute('stroke', stroke);
+      lines.setAttribute('stroke-width', width);
+    }
   }
 
   // Pad the content into the shape's own text area — the ellipse's inscribed rectangle,

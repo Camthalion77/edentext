@@ -19,7 +19,9 @@ import { builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr } f
 import { formatOrdinal, knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromDocx } from '../utils/bulletListTypes';
 import { DATE_FORMATS, TIME_FORMATS, docxPicture, findFormat, toDateValue } from '../utils/dateTime';
-import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, connectorPath, pathHeadsFor } from '../utils/shapes';
+import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, pathHeadsFor, isOpenOutline, joinOutlineParts, type OutlinePart, type PathCmd } from '../utils/shapes';
+import { drawingMlArc, drawingMlGuides, drawingMlValue, enhancedGeometryPath } from '../utils/enhancedGeometry';
+import SHAPE_PRESETS from './shapePresets.json';
 import { imageDataUrl, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { parseImportXml } from './importLimits';
 import { PX_PER_CM, cmToPx, fitMargins, type PageMargins } from '../storage/pageMargins';
@@ -2663,61 +2665,107 @@ function setShapeStyleAttrs(attrs: Record<string, unknown>, fill: string | null,
   }
 }
 
-// <a:custGeom> read as the shape's own outline, in the coordinate space its path
-// declares. A segment no outline can hold (an arc) leaves the shape unsupported.
-function custGeomPath(spPr: Element | null): string {
-  const path = nsChild(nsChild(nsChild(spPr, A, 'custGeom'), A, 'pathLst'), A, 'path');
-  const w = intAttr(path, '', 'w') ?? 0;
-  const h = intAttr(path, '', 'h') ?? 0;
-  if (!path || w <= 0 || h <= 0) return '';
-  const parts: string[] = [];
-  for (const seg of Array.from(path.children)) {
-    const pts = Array.from(seg.getElementsByTagNameNS(A, 'pt'))
-      .map((p) => `${p.getAttribute('x') ?? 0} ${p.getAttribute('y') ?? 0}`).join(' ');
-    const cmd = { moveTo: 'M', lnTo: 'L', cubicBezTo: 'C', quadBezTo: 'Q', close: 'Z' }[seg.localName];
-    if (!cmd) return '';
-    parts.push(`${cmd} ${pts}`);
+// <a:custGeom> read as the shape's own outline: its guides resolved for the shape's
+// `w`×`h` size, each path a part in the space it declares (else that size), arcs as
+// curves. A segment or guide that won't resolve leaves the shape unsupported.
+function custGeomPath(spPr: Element | null, w: number, h: number): string {
+  const geom = nsChild(spPr, A, 'custGeom');
+  const pathLst = nsChild(geom, A, 'pathLst');
+  if (!pathLst) return '';
+  const guides = (list: string) => Array.from(nsChild(geom, A, list)?.children ?? [])
+    .map((gd): [string, string] => [gd.getAttribute('name') ?? '', gd.getAttribute('fmla') ?? '']);
+  try {
+    const vals = drawingMlGuides([...guides('avLst'), ...guides('gdLst')], w, h);
+    const v = (el: Element, name: string) => drawingMlValue(el.getAttribute(name) ?? '0', vals);
+    const parts: OutlinePart[] = [];
+    for (const path of Array.from(pathLst.children).filter((c) => c.localName === 'path')) {
+      const pw = intAttr(path, '', 'w') || w;
+      const ph = intAttr(path, '', 'h') || h;
+      const cmds: PathCmd[] = [];
+      let [x, y, sx, sy] = [0, 0, 0, 0];
+      for (const seg of Array.from(path.children)) {
+        const p = Array.from(seg.getElementsByTagNameNS(A, 'pt')).flatMap((pt) => [v(pt, 'x'), v(pt, 'y')]);
+        const name = seg.localName;
+        if (name === 'close') { cmds.push({ c: 'Z' }); [x, y] = [sx, sy]; continue; }
+        if (name === 'arcTo') cmds.push(...drawingMlArc(x, y, v(seg, 'wR'), v(seg, 'hR'), v(seg, 'stAng'), v(seg, 'swAng')));
+        else if (name === 'moveTo' || name === 'lnTo') cmds.push({ c: name === 'moveTo' ? 'M' : 'L', p: p.slice(0, 2) });
+        else if (name === 'cubicBezTo') cmds.push({ c: 'C', p: p.slice(0, 6) });
+        else if (name === 'quadBezTo') {
+          cmds.push({ c: 'C', p: [x + (2 / 3) * (p[0] - x), y + (2 / 3) * (p[1] - y),
+            p[2] + (2 / 3) * (p[0] - p[2]), p[3] + (2 / 3) * (p[1] - p[3]), p[2], p[3]] });
+        } else return '';
+        const last = cmds[cmds.length - 1];
+        if (last.c !== 'Z') [x, y] = last.p.slice(-2);
+        if (name === 'moveTo') [sx, sy] = [x, y];
+      }
+      const d = fitPath(cmds, pw, ph);
+      if (!d) return '';
+      parts.push({ d, fill: path.getAttribute('fill') !== 'none', stroke: !['0', 'false'].includes(path.getAttribute('stroke') ?? '') });
+    }
+    return parts.length ? joinOutlineParts(parts) : '';
+  } catch {
+    return '';
   }
-  return fitPath(parseSvgPath(parts.join(' ')), w, h);
 }
 
-// A connector preset (bentConnector3, …) drawn from its formula and adjust values,
-// since Word writes no path for one; '' for any other preset.
-function presetConnectorPath(prstGeom: Element | null, prst: string, xfrm: Element | null): string {
-  const adj: (number | undefined)[] = [];
+type ShapePreset = { adj?: [string, number][]; eq: string[]; path: string; sub?: number[] };
+
+/**
+ * A DrawingML preset (`prst`) the editor has no kind for, drawn from LibreOffice's table
+ * of their formulas: the file writes only the name and adjust values, at `w`×`h` EMU.
+ * Flips mirror it in the box; '' for a name the table lacks.
+ */
+export function presetOutline(prst: string, adj: Record<string, number>, w: number, h: number,
+  flipH = false, flipV = false): string {
+  const p = (SHAPE_PRESETS as unknown as Record<string, ShapePreset>)[prst];
+  if (!Object.hasOwn(SHAPE_PRESETS, prst)) return '';
+  return enhancedGeometryPath({
+    path: p.path,
+    equations: Object.fromEntries(p.eq.map((f, i) => [`f${i}`, f])),
+    modifiers: (p.adj ?? []).map(([name, v]) => adj[name] ?? v),
+    viewBox: [0, 0, 0, 0], logW: w / 360, logH: h / 360, mirrorH: flipH, mirrorV: flipV, subViews: p.sub,
+  });
+}
+
+function presetGeomPath(prstGeom: Element, prst: string, xfrm: Element | null, w: number, h: number): string {
+  const adj: Record<string, number> = {};
   for (const gd of Array.from(nsChild(prstGeom, A, 'avLst')?.children ?? [])) {
-    const i = Number(/^adj(\d?)$/.exec(gd.getAttribute('name') ?? '')?.[1] || 1) - 1;
     const v = Number(/^val\s+(-?\d+)$/.exec(gd.getAttribute('fmla') ?? '')?.[1]);
-    if (i >= 0 && i < 3 && Number.isFinite(v)) adj[i] = v;
+    if (Number.isFinite(v)) adj[gd.getAttribute('name') ?? ''] = v;
   }
-  return connectorPath(prst, adj, xfrm?.getAttribute('flipH') === '1', xfrm?.getAttribute('flipV') === '1');
+  return presetOutline(prst, adj, w, h, xfrm?.getAttribute('flipH') === '1', xfrm?.getAttribute('flipV') === '1');
 }
 
 // A DrawingML <wps:wsp> (text box, preset shape or freeform) → a textBox node. A preset
-// `utils/shapes.ts` can't draw, with no path or connector formula, is dropped with a
-// warning. All property lookups are scoped to spPr so a nested image's fill/xfrm can't leak in.
+// neither `utils/shapes.ts` nor the preset table draws is dropped with a warning. All property lookups are scoped to spPr so a nested image's fill/xfrm can't leak in.
 // `box` overrides the drawing's own extent for a shape inside a group, whose size is
 // its place in the group rather than the whole group's.
 function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ctx, box?: { w: number; h: number }): Node | null {
   const spPr = nsChild(wsp, WPS, 'spPr');
   const prstGeom = nsChild(spPr, A, 'prstGeom');
   const prst = prstGeom?.getAttribute('prst') ?? 'rect';
-  const outline = custGeomPath(spPr) || presetConnectorPath(prstGeom, prst, nsChild(spPr, A, 'xfrm'));
-  const kind = outline ? 'textbox' : shapeFromPrst(prst);
+  const xfrm = nsChild(spPr, A, 'xfrm');
+  const extent = root.getElementsByTagNameNS(WP, 'extent')[0];
+  const cx = intAttr(extent, '', 'cx');
+  const cy = intAttr(extent, '', 'cy');
+  // The shape's own size in its own space: a group member's lives on its xfrm.
+  const ext = nsChild(xfrm, A, 'ext');
+  const [ew, eh] = [intAttr(ext, '', 'cx') || cx || 0, intAttr(ext, '', 'cy') || cy || 0];
+  const known = shapeFromPrst(prst);
+  const outline = custGeomPath(spPr, ew, eh)
+    || (prstGeom && !known ? presetGeomPath(prstGeom, prst, xfrm, ew, eh) : '');
+  const kind = outline ? 'textbox' : known;
   if (!kind) { ctx.warnings.add('Unsupported shapes were removed'); return null; }
 
   const attrs: Record<string, unknown> = {};
   if (kind !== 'textbox') attrs.shapeKind = kind;
   if (outline) attrs.shapePath = outline;
-  const extent = root.getElementsByTagNameNS(WP, 'extent')[0];
-  const cx = intAttr(extent, '', 'cx');
-  const cy = intAttr(extent, '', 'cy');
   if (box) { attrs.width = box.w; attrs.height = box.h; }
   else {
     if (cx) attrs.width = framePx(emuToPx(cx));
     if (cy) attrs.height = framePx(emuToPx(cy));
   }
-  const rot = intAttr(nsChild(spPr, A, 'xfrm'), '', 'rot');
+  const rot = intAttr(xfrm, '', 'rot');
   if (rot) attrs.rotation = ((Math.round(rot / 60000) % 360) + 360) % 360;
   if (isAnchor) {
     const { wrap, offsetCm, offsetYCm, fromPage, fromBody, distCm } = anchorWrap(root, ctx);
@@ -2746,10 +2794,10 @@ function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ct
   // Word reaches the frame's other diagonal by flipping it. An open outline keeps its own.
   const head = (name: string) => (nsChild(ln, A, name)?.getAttribute('type') ?? 'none') !== 'none';
   const heads = pathHeadsFor(head('headEnd'), head('tailEnd'));
-  if (outline && heads && !outline.trimEnd().endsWith('Z')) attrs.arrowHeads = heads;
+  if (outline && heads && isOpenOutline(outline)) attrs.arrowHeads = heads;
   if (isLineKind(kind)) {
     attrs.shapeKind = lineKindFor(head('headEnd'), head('tailEnd'));
-    if (nsChild(spPr, A, 'xfrm')?.getAttribute('flipV') === '1') attrs.flipV = true;
+    if (xfrm?.getAttribute('flipV') === '1') attrs.flipV = true;
   }
 
   // Vertical text: every one of Word's top-to-bottom flows, the editor having the one
@@ -2837,7 +2885,7 @@ function convertPict(pict: Element, ctx: Ctx): Node | null {
   const vmlStroke = shape.getElementsByTagNameNS(VML, 'stroke')[0];
   const vmlHead = (end: string) => !!vmlStroke && (vmlStroke.getAttribute(end) ?? 'none') !== 'none';
   const vmlHeads = pathHeadsFor(vmlHead('startarrow'), vmlHead('endarrow'));
-  if (outline && vmlHeads && !outline.trimEnd().endsWith('Z')) attrs.arrowHeads = vmlHeads;
+  if (outline && vmlHeads && isOpenOutline(outline)) attrs.arrowHeads = vmlHeads;
   // VML says vertical text in the box's own style, as `layout-flow:vertical`.
   if (/layout-flow\s*:\s*vertical/.test(textbox?.getAttribute('style') ?? '')) attrs.textVertical = true;
   const kind = shape.localName === 'oval' ? 'ellipse' : shape.localName === 'roundrect' ? 'roundRect' : 'textbox';

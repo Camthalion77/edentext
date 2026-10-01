@@ -21,8 +21,9 @@ import { knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, R
 import { bulletCharAttr, bulletCharFromOdf } from '../utils/bulletListTypes';
 import { docxPicture, matchFormat, toDateValue, type Token } from '../utils/dateTime';
 import {
-  shapeFromOdfType, lineKindFor, pathHeadsFor, parseSvgPath, parseOdfPoints, fitPath, type ShapeKind,
+  shapeFromOdfType, lineKindFor, pathHeadsFor, parseSvgPath, parseOdfPoints, fitPath, isOpenOutline, type ShapeKind,
 } from '../utils/shapes';
+import { enhancedGeometryPath } from '../utils/enhancedGeometry';
 import { imageDataUrl, imageSizeCm, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { boundedInt, IMPORT_LIMITS, parseImportXml } from './importLimits';
 import { astToLatex } from '../math/latex';
@@ -664,10 +665,10 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
   else {
     const geo = el.getElementsByTagNameNS(NS.draw, 'enhanced-geometry')[0];
     kind = shapeFromOdfType(geo?.getAttributeNS(NS.draw, 'type'));
-    // A shape no preset covers still draws, as long as its own outline is one:
-    // LibreOffice writes a freeform as `non-primitive` plus the path itself.
+    // A shape no preset covers still draws from the outline it carries: LibreOffice
+    // writes a freeform as `non-primitive` plus the path, any other shape with formulas.
     if (!kind && geo) {
-      path = enhancedPathOutline(geo);
+      path = enhancedPathOutline(geo, el);
       if (path) kind = 'textbox';
     }
   }
@@ -691,15 +692,27 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
   return { type: 'textBox', attrs, content: textBoxContent(Array.from(el.children), ctx, wCm) };
 }
 
-// A `<draw:enhanced-geometry>` no preset matches, read as its own outline: only the
-// four commands a freeform is drawn with, so a shape with modifier formulas (`?f0`)
-// or an arc segment stays unsupported rather than drawing wrong.
-function enhancedPathOutline(geo: Element): string {
-  const raw = geo.getAttributeNS(NS.draw, 'enhanced-path') ?? '';
-  if (!raw || !/^[\sMLCZN\d.,+-]+$/.test(raw)) return '';
-  const vb = (geo.getAttributeNS(NS.svg, 'viewBox') ?? '').split(/\s+/).map(Number);
-  if (vb.length !== 4 || !(vb[2] > 0) || !(vb[3] > 0)) return '';
-  return fitPath(parseSvgPath(raw.replace(/N/g, '')), vb[2], vb[3], vb[0], vb[1]);
+// A `<draw:enhanced-geometry>` no preset matches, read as its own outline: its
+// equations and modifiers resolved for the shape's size, arcs as curves. LibreOffice
+// keeps the arcs only in its own `drawooo:enhanced-path`, so that one wins.
+function enhancedPathOutline(geo: Element, el: Element): string {
+  const path = geo.getAttributeNS(NS.drawooo, 'enhanced-path') || geo.getAttributeNS(NS.draw, 'enhanced-path');
+  if (!path) return '';
+  const nums = (v: string | null) => (v ?? '').trim().split(/\s+/).filter(Boolean).map(Number);
+  const equations: Record<string, string> = {};
+  for (const eq of Array.from(geo.getElementsByTagNameNS(NS.draw, 'equation'))) {
+    equations[eq.getAttributeNS(NS.draw, 'name') ?? ''] = eq.getAttributeNS(NS.draw, 'formula') ?? '';
+  }
+  const hundredthMm = (name: string) => (lengthToCm(el.getAttributeNS(NS.svg, name)) ?? 0) * 1000;
+  return enhancedGeometryPath({
+    path, equations,
+    modifiers: nums(geo.getAttributeNS(NS.draw, 'modifiers')),
+    viewBox: nums(geo.getAttributeNS(NS.svg, 'viewBox')),
+    logW: hundredthMm('width'), logH: hundredthMm('height'),
+    mirrorH: geo.getAttributeNS(NS.draw, 'mirror-horizontal') === 'true',
+    mirrorV: geo.getAttributeNS(NS.draw, 'mirror-vertical') === 'true',
+    subViews: nums(geo.getAttributeNS(NS.drawooo, 'sub-view-size')),
+  });
 }
 
 // draw:polygon / draw:polyline / draw:path / draw:connector → a box drawing the file's
@@ -740,7 +753,7 @@ function convertFreeform(el: Element, ctx: Ctx): Node | null {
 // The arrow heads an open outline's style declares. A closed one has no ends to carry them.
 function outlineHeads(gp: PropMap, attrs: Record<string, unknown>): void {
   const heads = pathHeadsFor(!!gp['draw:marker-start'], !!gp['draw:marker-end']);
-  if (heads && !String(attrs.shapePath).trimEnd().endsWith('Z')) attrs.arrowHeads = heads;
+  if (heads && isOpenOutline(String(attrs.shapePath))) attrs.arrowHeads = heads;
 }
 
 // draw:line → a textBox of the matching line kind: the two endpoints become the frame

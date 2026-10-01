@@ -19,7 +19,7 @@ npm run test:monkey  # random editing, undo/redo and save-read invariants
 npm run test:tabs    # two documents across reloads
 npm run test:coverage  # Vitest V8 coverage -> coverage/index.html
 npm run test:parity  # render parity; see tests/render-parity/README.md
-node scripts/make-thesaurus.mjs; node scripts/collect-licenses.mjs  # re-vendor thesaurus and licenses
+node scripts/make-thesaurus.mjs; node scripts/make-shape-presets.mjs; node scripts/collect-licenses.mjs  # re-vendor thesaurus, shape presets, licenses
 node scripts/showcase/run.mjs  # rebuild docs/showcase/; optional [regex] limits it
 ```
 

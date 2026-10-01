@@ -152,10 +152,28 @@ which is how both products draw a polyline.
   `draw:connector`, which carries the resolved elbow beside its endpoints), a
   `non-primitive` `draw:enhanced-path`, DrawingML's `a:custGeom` path list, and VML's
   `path` — whose cases are SVG's the other way round (`parseVmlPath`).
-- A geometry whose commands are **modifier formulas** (`?f0`) or an arc is not an
-  outline we can draw, so the shape stays unsupported and is dropped with the warning,
-  as before. A Word connector preset (`bentConnector3`, …) writes no path, only its
-  name and adjust values, so `connectorPath` evaluates the preset's own formula.
+- A geometry of **formulas and arcs** is resolved once, for the shape's size, into a
+  plain outline (`utils/enhancedGeometry.ts`): ODF's `draw:equation`s, `$N` modifiers
+  and every path command, arcs as cubics (`arcBeziers`, quarter turns at most).
+  LibreOffice writes its presets with an empty viewBox — the space is then the shape's
+  size in 1/100 mm (`logwidth`/`logheight`) — and keeps the arcs (`G`, OOXML's
+  `arcTo`) only in `drawooo:enhanced-path`, its `draw:` path being a stripped copy, so
+  that one is read first. `drawooo:sub-view-size` gives each `N`-ended part its own
+  space. A reference that will not resolve still drops the shape.
+- An outline keeps its **parts** in ODF's notation: each ends with `N`, `F` marks one
+  stroked only and `S` one filled only (`outlineParts`) — a preset fills its face once
+  and draws its mouth or edges as lines over it. The node view draws the filled and the
+  stroked parts as two paths, ODF writes the flags back, DOCX one `<a:path>` per part
+  with `fill="none"`/`stroke="0"`. Flattened into one path, LibreOffice's even-odd fill
+  cancelled a face drawn twice (probed). Shading (`H`–`K`, darken/lighten) is skipped.
+- A **DrawingML preset** writes no path, only its name and adjust values. The ones the
+  editor has no kind for (callouts, smiley, moon, connectors, …) are drawn from
+  `import/shapePresets.json`, LibreOffice's own table of all 187 in the same formula
+  language (`scripts/make-shape-presets.mjs`, MPL-2.0), with the file's `a:avLst` over
+  its defaults and the flips mirrored in. A `custGeom`'s guides (`a:gdLst`) and `arcTo`
+  go through `drawingMlGuides`/`drawingMlArc`. The result is a fixed outline: handles
+  and adjust values are not editable, and text uses the whole box, not the preset's
+  text area.
 - **Arrow heads** on an open outline ride `arrowHeads` (`start`/`end`/`both`): ODF's
   `draw:marker-*` on the style, DrawingML's `a:headEnd`/`a:tailEnd`, VML's
   `startarrow`/`endarrow`. The node view draws them like a line's, in real pixels along

@@ -209,12 +209,12 @@ export function linePaths(kind: ShapeKind, w: number, h: number, flip: boolean, 
 
 /**
  * The heads of an open outline drawn across a `w`×`h` box, in real pixels like a line's:
- * each points along the path's own last (or first) segment, a curve's control point
- * giving that direction.
+ * each points along its stroked parts' own last (or first) segment, a curve's control
+ * point giving that direction.
  */
 export function pathHeadPaths(path: string, w: number, h: number, heads: PathHeads, headLen: number): string[] {
   const pts: [number, number][] = [];
-  for (const c of parseSvgPath(path)) {
+  for (const c of parseSvgPath(outlineLayers(path).stroke)) {
     if (c.c === 'Z') return [];
     for (let i = 0; i + 1 < c.p.length; i += 2) pts.push([(c.p[i] * w) / 100, (c.p[i + 1] * h) / 100]);
   }
@@ -291,9 +291,49 @@ function pathTokens(d: string): { cmd: string; n: number[] }[] {
 const PATH_ARITY: Record<string, number> = { M: 2, L: 2, T: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, A: 7, Z: 0 };
 
 /**
- * SVG path data as absolute M/L/C/Z. A quadratic is raised to a cubic and a smooth
- * curve takes its own start as the first control point; an arc is joined by a line —
- * none of the three is what either product writes for a freeform.
+ * An elliptical arc as cubics, in quarter turns at most: centre, radii, the start
+ * angle on the ellipse's own parameter and the sweep, in radians with y pointing down.
+ */
+export function arcBeziers(cx: number, cy: number, rx: number, ry: number, t0: number, sweep: number): PathCmd[] {
+  const out: PathCmd[] = [];
+  const n = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2) - 1e-9));
+  const d = sweep / n;
+  const k = (4 / 3) * Math.tan(d / 4);
+  for (let i = 0, t = t0; i < n; i++, t += d) {
+    const [c0, s0, c1, s1] = [Math.cos(t), Math.sin(t), Math.cos(t + d), Math.sin(t + d)];
+    out.push({ c: 'C', p: [
+      cx + rx * (c0 - k * s0), cy + ry * (s0 + k * c0),
+      cx + rx * (c1 + k * s1), cy + ry * (s1 - k * c1),
+      cx + rx * c1, cy + ry * s1,
+    ] });
+  }
+  return out;
+}
+
+// SVG's endpoint arc as centre and angles (SVG 1.1, appendix F.6.5).
+function svgArc(x1: number, y1: number, a: number[], x2: number, y2: number): PathCmd[] {
+  let [rx, ry] = [Math.abs(a[0]), Math.abs(a[1])];
+  if (!rx || !ry || (x1 === x2 && y1 === y2)) return [{ c: 'L', p: [x2, y2] }];
+  const phi = (a[2] * Math.PI) / 180;
+  if (phi) return [{ c: 'L', p: [x2, y2] }];
+  const [px, py] = [(x1 - x2) / 2, (y1 - y2) / 2];
+  const lam = (px * px) / (rx * rx) + (py * py) / (ry * ry);
+  if (lam > 1) [rx, ry] = [rx * Math.sqrt(lam), ry * Math.sqrt(lam)];
+  const num = rx * rx * ry * ry - rx * rx * py * py - ry * ry * px * px;
+  const f = Math.sqrt(Math.max(0, num / (rx * rx * py * py + ry * ry * px * px))) * (a[3] === a[4] ? -1 : 1);
+  const [cxp, cyp] = [(f * rx * py) / ry, (-f * ry * px) / rx];
+  const [cx, cy] = [cxp + (x1 + x2) / 2, cyp + (y1 + y2) / 2];
+  const t0 = Math.atan2((py - cyp) / ry, (px - cxp) / rx);
+  let dt = Math.atan2((-py - cyp) / ry, (-px - cxp) / rx) - t0;
+  if (a[4] && dt < 0) dt += 2 * Math.PI;
+  if (!a[4] && dt > 0) dt -= 2 * Math.PI;
+  return arcBeziers(cx, cy, rx, ry, t0, dt);
+}
+
+/**
+ * SVG path data as absolute M/L/C/Z. A quadratic is raised to a cubic, a smooth
+ * curve takes its own start as the first control point and an arc becomes cubics;
+ * a rotated arc is joined by a line, which neither product writes for a freeform.
  */
 export function parseSvgPath(d: string): PathCmd[] {
   const out: PathCmd[] = [];
@@ -319,7 +359,7 @@ export function parseSvgPath(d: string): PathCmd[] {
         [x, y] = [px, py];
       } else if (k === 'A') {
         const [px, py] = at(a[5], a[6]);
-        out.push({ c: 'L', p: [px, py] });
+        out.push(...svgArc(x, y, a, px, py));
         [x, y] = [px, py];
       } else {
         const pts: number[] = [];
@@ -358,26 +398,34 @@ export function parseOdfPoints(points: string, closed: boolean): PathCmd[] {
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /**
- * A DrawingML connector preset as its outline: the file writes only the preset's name
- * and adjust values (fractions of 100000, default the middle), the geometry is the
- * preset's own formula. Flips mirror it in the box; an unknown preset gives ''.
+ * An outline's parts, in ODF's own notation: each ends with `N`, and one marked `F` is
+ * stroked only, one marked `S` filled only — how a preset fills a face once and draws
+ * its features as lines. A plain path is one part drawn both ways.
  */
-export function connectorPath(prst: string, adj: (number | undefined)[], flipH = false, flipV = false): string {
-  const [a1, a2, a3] = [0, 1, 2].map((i) => (adj[i] ?? 50000) / 1000);
-  const pts: Record<string, number[][]> = {
-    bentConnector2: [[0, 0], [100, 0], [100, 100]],
-    bentConnector3: [[0, 0], [a1, 0], [a1, 100], [100, 100]],
-    bentConnector4: [[0, 0], [a1, 0], [a1, a2], [100, a2], [100, 100]],
-    bentConnector5: [[0, 0], [a1, 0], [a1, a2], [a3, a2], [a3, 100], [100, 100]],
-  };
-  const fx = (x: number) => r3(flipH ? 100 - x : x);
-  const fy = (y: number) => r3(flipV ? 100 - y : y);
-  const at = (p: number[]) => `${fx(p[0])} ${fy(p[1])}`;
-  if (prst === 'curvedConnector3') {
-    return `M ${at([0, 0])} C ${at([a1 / 2, 0])} ${at([a1, 25])} ${at([a1, 50])}`
-      + ` C ${at([a1, 75])} ${at([(100 + a1) / 2, 100])} ${at([100, 100])}`;
-  }
-  return pts[prst]?.map((p, i) => `${i ? 'L' : 'M'} ${at(p)}`).join(' ') ?? '';
+export type OutlinePart = { d: string; fill: boolean; stroke: boolean };
+
+export function outlineParts(path: string): OutlinePart[] {
+  return path.split('N').map((p) => ({ d: p.replace(/[FS]/g, '').trim(), fill: !p.includes('F'), stroke: !p.includes('S') }))
+    .filter((p) => p.d);
+}
+
+export function joinOutlineParts(parts: OutlinePart[]): string {
+  // A lone open part is never filled, so its `F` says nothing.
+  const [one] = parts;
+  if (parts.length === 1 && one.stroke && (one.fill || !one.d.includes('Z'))) return one.d;
+  return parts.map((p) => `${p.d}${p.fill ? '' : ' F'}${p.stroke ? '' : ' S'} N`).join(' ');
+}
+
+/** The parts drawn filled and the parts drawn stroked, each as one SVG path. */
+export function outlineLayers(path: string): { fill: string; stroke: string } {
+  const parts = outlineParts(path);
+  const join = (keep: (p: OutlinePart) => boolean) => parts.filter(keep).map((p) => p.d).join(' ');
+  return { fill: join((p) => p.fill), stroke: join((p) => p.stroke) };
+}
+
+/** An outline whose stroked parts never close: a line, which may carry arrow heads. */
+export function isOpenOutline(path: string): boolean {
+  return !outlineLayers(path).stroke.includes('Z');
 }
 
 /** The outline mapped from its own viewBox into the 0…100 box the editor draws in. */
@@ -393,13 +441,20 @@ export function fitPath(cmds: PathCmd[], vbW: number, vbH: number, vbX = 0, vbY 
 
 /** ODF's `draw:enhanced-path` for an outline the editor holds in its 0…100 box. */
 export function odfEnhancedPath(path: string): string {
-  const body = parseSvgPath(path).map((c) => (c.c === 'Z' ? 'Z'
-    : `${c.c} ${c.p.map((v) => Math.round((v * VB) / 100)).join(' ')}`)).join(' ');
-  return `${body} N`;
+  return outlineParts(path).map(({ d, fill, stroke }) => {
+    const body = parseSvgPath(d).map((c) => (c.c === 'Z' ? 'Z'
+      : `${c.c} ${c.p.map((v) => Math.round((v * VB) / 100)).join(' ')}`)).join(' ');
+    return `${body}${fill ? '' : ' F'}${stroke ? '' : ' S'} N`;
+  }).join(' ');
 }
 
-/** DrawingML's `<a:path>` for the same outline, in a `w`×`h` coordinate space. */
+/** DrawingML's `<a:path>`s for the same outline, one per part, in a `w`×`h` space. */
 export function drawingMlPath(path: string, w: number, h: number): string {
+  return outlineParts(path).map(({ d, fill, stroke }) => drawingMlPart(d, w, h,
+    `${fill ? '' : ' fill="none"'}${stroke ? '' : ' stroke="0"'}`)).join('');
+}
+
+function drawingMlPart(path: string, w: number, h: number, attrs: string): string {
   const pt = (x: number, y: number) => `<a:pt x="${Math.round((x * w) / 100)}" y="${Math.round((y * h) / 100)}"/>`;
   const body = parseSvgPath(path).map((c) => {
     if (c.c === 'Z') return '<a:close/>';
@@ -409,7 +464,7 @@ export function drawingMlPath(path: string, w: number, h: number): string {
       : c.c === 'L' ? `<a:lnTo>${pts[0]}</a:lnTo>`
       : `<a:cubicBezTo>${pts.join('')}</a:cubicBezTo>`;
   }).join('');
-  return `<a:path w="${w}" h="${h}">${body}</a:path>`;
+  return `<a:path w="${w}" h="${h}"${attrs}>${body}</a:path>`;
 }
 
 // The three line kinds share their names, and the heads a file declares are what

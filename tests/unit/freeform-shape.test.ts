@@ -6,8 +6,8 @@ import { zipSync, strToU8, unzipSync, strFromU8 } from 'fflate';
 import { buildOdt } from '../../src/lib/export/odt';
 import { importOdt } from '../../src/lib/import/odt';
 import { buildDocx } from '../../src/lib/export/docx';
-import { importDocx } from '../../src/lib/import/docx';
-import { connectorPath, pathHeadPaths } from '../../src/lib/utils/shapes';
+import { importDocx, presetOutline } from '../../src/lib/import/docx';
+import { pathHeadPaths } from '../../src/lib/utils/shapes';
 
 type N = any;
 
@@ -128,7 +128,7 @@ describe('a freeform drawing', () => {
     expect(shape(r).attrs.fillColor).toBe('#FFD320');
   });
 
-  it('still drops a shape whose geometry is a formula', () => {
+  it('drops a formula that names no equation', () => {
     const r = importOdt(odt('<text:p><draw:custom-shape draw:style-name="gr1" text:anchor-type="paragraph"'
       + ' svg:width="4cm" svg:height="3cm"><text:p/><draw:enhanced-geometry draw:type="mso-spt100"'
       + ' svg:viewBox="0 0 21600 21600" draw:enhanced-path="M 0 0 L ?f0 ?f1 Z N"/></draw:custom-shape></text:p>'));
@@ -146,11 +146,11 @@ const shapes = (r: N): N[] => {
 
 describe('a Word connector preset', () => {
   it('draws the elbow its formula and adjust values give', () => {
-    expect(connectorPath('bentConnector3', [])).toBe('M 0 0 L 50 0 L 50 100 L 100 100');
-    expect(connectorPath('bentConnector3', [25000], false, true)).toBe('M 0 100 L 25 100 L 25 0 L 100 0');
-    expect(connectorPath('bentConnector2', [], true)).toBe('M 100 0 L 0 0 L 0 100');
-    expect(connectorPath('curvedConnector3', [])).toBe('M 0 0 C 25 0 50 25 50 50 C 50 75 75 100 100 100');
-    expect(connectorPath('borderCallout1', [])).toBe('');
+    expect(presetOutline('bentConnector3', {}, 3600, 3600)).toBe('M 0 0 L 50 0 L 50 100 L 100 100');
+    expect(presetOutline('bentConnector3', { adj1: 25000 }, 3600, 3600, false, true)).toBe('M 0 100 L 25 100 L 25 0 L 100 0');
+    expect(presetOutline('bentConnector2', {}, 3600, 3600, true)).toBe('M 100 0 L 0 0 L 0 100');
+    expect(presetOutline('curvedConnector3', {}, 3600, 3600)).toBe('M 0 0 C 25 0 50 25 50 50 C 50 75 75 100 100 100');
+    expect(presetOutline('noSuchPreset', {}, 3600, 3600)).toBe('');
   });
 
   it('imports as a box drawing that outline', () => {
