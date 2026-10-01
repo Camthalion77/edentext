@@ -1386,10 +1386,11 @@ function convertParagraph(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault:
   // A heading the file gives its own style is rendered by that style, and a style based
   // on another one inherits Standard — so its runs' bold is formatting, not the default.
   const headingBold = !ctx.styles.styleBasedOn(styleId);
-  const defaults = blockDefaults(name ? baseRun : ctx.styles.paragraphRun(ctx.styles.defaultParagraphStyle()), level, boldByDefault, headingBold);
-  // A heading keeps its level in a cell, where the editor re-applies the level's own
-  // size — so the mark is measured against that, not the default style's.
-  if (!name && level != null) defaults.fontSizePt = HEADING_SIZES[level - 1];
+  // A heading keeps its level in a cell or a box, where the editor re-applies the level's
+  // own style (`hN:not([data-style])`) — so it is measured against that one.
+  const levelStyled = level != null && kind !== 'zone';
+  const defaults = blockDefaults(name || levelStyled ? baseRun : ctx.styles.paragraphRun(ctx.styles.defaultParagraphStyle()), level, boldByDefault, headingBold);
+  if (!name && !levelStyled && level != null) defaults.fontSizePt = HEADING_SIZES[level - 1];
   // A run inherits the block's own size, not the default style's, so that is what it is
   // measured against — else a size the block overrides is suppressed and lost (odt.ts).
   const ownSizePt = blockDefaults(baseRun, level, boldByDefault).fontSizePt;

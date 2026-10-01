@@ -1847,7 +1847,7 @@ function convertParaLike(el: Element, ctx: Ctx, kind: BlockKind, boldByDefault =
   // keeps its level's yardstick, which is what `hN:not([data-style])` re-applies.
   // A header/footer zone renders its paragraphs at the editor's own defaults with only the
   // default style's font on top, so that is what its formatting is measured against.
-  const yardstick = kind === 'body' ? named : isHeading || kind === 'zone' ? null : DEFAULT_STYLE;
+  const yardstick = kind === 'body' || (isHeading && kind !== 'zone') ? named : kind === 'zone' ? null : DEFAULT_STYLE;
   const defaults = blockDefaults(resolver, yardstick, isHeading ? level : null, boldByDefault);
   // A cell paragraph's spacing is the exception: editor.css zeroes it whatever the default
   // style declares (only that rule outranks the style's — not the `li p` one, and not for a
