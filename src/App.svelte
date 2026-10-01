@@ -2,7 +2,7 @@
   import { onMount, tick as domUpdated } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import type { Content, Editor } from '@tiptap/core';
-  import { EditorState } from '@tiptap/pm/state';
+  import { EditorState, Selection } from '@tiptap/pm/state';
   import EditorComponent from './lib/components/Editor.svelte';
   import Toolbar from './lib/components/Toolbar.svelte';
   import ToolbarExpanded from './lib/components/ToolbarExpanded.svelte';
@@ -658,8 +658,12 @@
   // Putting a document in front of the reader is not an edit: while revisions are
   // recorded, the RECORDING meta keeps the whole file from arriving as this author's
   // insertion. Both word processors record what is typed after an open, not the file.
+  // A new document opens at its start: the old caret and scroll offset would drop the
+  // reader deep into a document that has not paginated yet.
   function loadContent(content: Content): void {
-    editor?.chain().setMeta(RECORDING, true).setContent(wrapLooseTextBoxes(content)).run();
+    editor?.chain().setMeta(RECORDING, true).setContent(wrapLooseTextBoxes(content))
+      .command(({ tr }) => { tr.setSelection(Selection.atStart(tr.doc)); return true; }).run();
+    editor?.view.dom.closest('.editor')?.scrollTo({ top: 0 });
   }
 
   // A text box used to be a block of its own; it is inline now, so a document written

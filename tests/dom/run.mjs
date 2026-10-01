@@ -188,6 +188,7 @@ try {
   // The whole margin band is the zone's double-click target, and an empty zone's
   // placeholder sits where the first typed character lands — not a line below it.
   await page.keyboard.press('Escape');
+  await page.locator('.hf-zone.hf-footer').first().scrollIntoViewIfNeeded();
   const fb = await page.locator('.hf-zone.hf-footer').first().boundingBox();
   await page.mouse.dblclick(fb.x - 40, fb.y + fb.height + 20);
   await page.waitForSelector('.hf-active.hf-footer .tiptap', { timeout: 5000 });
