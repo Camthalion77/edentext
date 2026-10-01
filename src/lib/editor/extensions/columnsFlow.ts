@@ -8,6 +8,7 @@ import {
   readVerticalMargins, bandAt, FORCE_PAGE_RECALC, isSplitPane, blockDeco, isBlockDeco, repairDecos,
 } from './pageBreaks';
 import { sameColumnsAttrs, COLUMNS_FIT_MARGIN_PX } from './columns';
+import { tabStopsKey } from './tabStops';
 
 // Cross-page column flow: keeps a columns chain's fragmentation in sync with the
 // page grid (split an overflowing fragment at a block or line boundary, pull a
@@ -194,6 +195,9 @@ export const ColumnsFlow = Extension.create({
           // A pass of its own never refreshes the budget — not even the recalc the
           // decoration update asks for, or reflow and decorations pump each other forever.
           if (tr.getMeta(FLOW_TX)) return value;
+          // Nor does the tab pass's recalc: it answers every doc change of ours, so counting
+          // it lets a join/split pair at one boundary restart the budget forever.
+          if (tr.getMeta(tabStopsKey)) return value;
           if (tr.docChanged || tr.getMeta(FORCE_PAGE_RECALC)) return value + 1;
           return value;
         },

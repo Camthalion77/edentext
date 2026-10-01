@@ -87,7 +87,7 @@ declare module '@tiptap/core' {
   }
 }
 
-const tabStopsKey = new PluginKey<DecorationSet>('tabStops');
+export const tabStopsKey = new PluginKey<DecorationSet>('tabStops');
 
 // A stop past the end of the line is drawn at the end of the line, as LibreOffice does:
 // the Math Guide's footer style puts its right stop at 18cm in a 17cm column, and honoured

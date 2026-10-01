@@ -617,6 +617,10 @@ export const isRepairable = (spec: { block?: unknown; spacer?: unknown }): boole
 export function repairDecos(before: DecorationSet, mapped: DecorationSet, tr: Transaction): DecorationSet {
   const decos = mapped.find(undefined, undefined, (spec) => !isBlockDeco(spec));
   for (const d of before.find(undefined, undefined, isBlockDeco)) {
+    // A bound inside a deleted range means the block was replaced (an open), not restyled:
+    // re-cut, its height would land on whatever blocks now fill the range.
+    const inside = (p: number) => tr.mapping.mapResult(p, -1).deleted && tr.mapping.mapResult(p, 1).deleted;
+    if (inside(d.from) || inside(d.to)) continue;
     const to = tr.mapping.map(d.to, 1);
     for (let pos = tr.mapping.map(d.from, -1); pos < to;) {
       const node = tr.doc.nodeAt(pos);
