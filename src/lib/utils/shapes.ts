@@ -318,6 +318,29 @@ export function parseOdfPoints(points: string, closed: boolean): PathCmd[] {
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
+/**
+ * A DrawingML connector preset as its outline: the file writes only the preset's name
+ * and adjust values (fractions of 100000, default the middle), the geometry is the
+ * preset's own formula. Flips mirror it in the box; an unknown preset gives ''.
+ */
+export function connectorPath(prst: string, adj: (number | undefined)[], flipH = false, flipV = false): string {
+  const [a1, a2, a3] = [0, 1, 2].map((i) => (adj[i] ?? 50000) / 1000);
+  const pts: Record<string, number[][]> = {
+    bentConnector2: [[0, 0], [100, 0], [100, 100]],
+    bentConnector3: [[0, 0], [a1, 0], [a1, 100], [100, 100]],
+    bentConnector4: [[0, 0], [a1, 0], [a1, a2], [100, a2], [100, 100]],
+    bentConnector5: [[0, 0], [a1, 0], [a1, a2], [a3, a2], [a3, 100], [100, 100]],
+  };
+  const fx = (x: number) => r3(flipH ? 100 - x : x);
+  const fy = (y: number) => r3(flipV ? 100 - y : y);
+  const at = (p: number[]) => `${fx(p[0])} ${fy(p[1])}`;
+  if (prst === 'curvedConnector3') {
+    return `M ${at([0, 0])} C ${at([a1 / 2, 0])} ${at([a1, 25])} ${at([a1, 50])}`
+      + ` C ${at([a1, 75])} ${at([(100 + a1) / 2, 100])} ${at([100, 100])}`;
+  }
+  return pts[prst]?.map((p, i) => `${i ? 'L' : 'M'} ${at(p)}`).join(' ') ?? '';
+}
+
 /** The outline mapped from its own viewBox into the 0…100 box the editor draws in. */
 export function fitPath(cmds: PathCmd[], vbW: number, vbH: number, vbX = 0, vbY = 0): string {
   if (!cmds.length || vbW <= 0 || vbH <= 0) return '';

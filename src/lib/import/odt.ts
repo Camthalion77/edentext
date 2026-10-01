@@ -756,9 +756,93 @@ function convertLine(el: Element, ctx: Ctx): Node | null {
   return { type: 'textBox', attrs, content: [{ type: 'paragraph' }] };
 }
 
+// Where a drawing in a group sits, in cm of its anchor's space: its own x/y, a line's
+// endpoints, or a rotated shape's box worked back from the rotate()/translate() pair.
+function drawBox(el: Element): { x: number; y: number; w: number; h: number } {
+  const at = (name: string) => lengthToCm(el.getAttributeNS(NS.svg, name));
+  const w = at('width'), h = at('height');
+  if (w == null || h == null) {
+    const [x1, y1, x2, y2] = ['x1', 'y1', 'x2', 'y2'].map((a) => at(a) ?? 0);
+    return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+  }
+  const transform = el.getAttributeNS(NS.draw, 'transform') ?? '';
+  const t = /translate\s*\(\s*(\S+?)\s*[ ,]\s*(\S+?)\s*\)/.exec(transform);
+  if (!t) return { x: at('x') ?? 0, y: at('y') ?? 0, w, h };
+  // The box turns counter-clockwise about its corner, which then moves to the translate.
+  const a = parseFloat(/rotate\s*\(\s*(-?[\d.eE+]+)/.exec(transform)?.[1] ?? '0') || 0;
+  const cx = (lengthToCm(t[1]) ?? 0) + (w / 2) * Math.cos(a) + (h / 2) * Math.sin(a);
+  const cy = (lengthToCm(t[2]) ?? 0) - (w / 2) * Math.sin(a) + (h / 2) * Math.cos(a);
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+const PLACEMENT_ATTRS = ['wrap', 'wrapOffset', 'wrapOffsetY', 'wrapFromPage', 'wrapFromBody', 'wrapAlign',
+  'wrapDist', 'inFront', 'anchorPage', 'vAlign'];
+
+// A draw:g opens as its members, as a DOCX group does: they sit in the anchor's space,
+// the group's style places their bounding box, and the first member carries that
+// placement (an as-char group's place in the line) while the rest run through over it.
+function convertDrawGroup(g: Element, ctx: Ctx): Node[] {
+  const leaves: Element[] = [];
+  const collect = (el: Element) => {
+    for (const c of Array.from(el.children)) {
+      if (c.namespaceURI !== NS.draw) continue;
+      if (c.localName === 'g' || c.localName === 'a') collect(c);
+      else leaves.push(c);
+    }
+  };
+  collect(g);
+  const members: { node: Node; box: ReturnType<typeof drawBox> }[] = [];
+  for (const leaf of leaves) {
+    const conv = convertDrawElement(leaf, ctx);
+    const node = conv?.inline ?? conv?.block;
+    if (node) members.push({ node, box: drawBox(leaf) });
+  }
+  if (!members.length) { ctx.warnings.add('Drawings were removed'); return []; }
+
+  const minX = Math.min(...members.map((m) => m.box.x));
+  const minY = Math.min(...members.map((m) => m.box.y));
+  const bounds = g.cloneNode(false) as Element;
+  bounds.setAttributeNS(NS.svg, 'svg:x', `${minX}cm`);
+  bounds.setAttributeNS(NS.svg, 'svg:y', `${minY}cm`);
+  bounds.setAttributeNS(NS.svg, 'svg:width', `${Math.max(...members.map((m) => m.box.x + m.box.w)) - minX}cm`);
+  bounds.setAttributeNS(NS.svg, 'svg:height', `${Math.max(...members.map((m) => m.box.y + m.box.h)) - minY}cm`);
+  const gp = ctx.resolver.graphicProps(g.getAttributeNS(NS.draw, 'style-name'));
+  const place: Record<string, unknown> = {};
+  applyFrameRotationAndWrap(bounds, place, gp, ctx.contentWidthCm, ctx.leftMarginCm);
+  delete place.rotation;
+
+  // Member offsets count from the group's own offset where it has one, else from the
+  // first member, which is where the line or the alignment puts it.
+  const [first, ...rest] = members;
+  const originX = place.wrap && place.wrapOffset != null ? (place.wrapOffset as number) - minX : -first.box.x;
+  const originY = place.wrap && place.wrapOffsetY != null ? (place.wrapOffsetY as number) - minY : -first.box.y;
+  const r = (n: number) => Math.round(n * 1000) / 1000;
+  const strip = (n: Node) => {
+    const attrs = { ...n.attrs };
+    for (const k of PLACEMENT_ATTRS) delete attrs[k];
+    return attrs;
+  };
+  const carrier = { ...first.node, attrs: { ...strip(first.node), ...place } };
+  if (place.wrap && place.wrapOffset != null) carrier.attrs.wrapOffset = r(originX + first.box.x);
+  if (place.wrap && place.wrapOffsetY != null) carrier.attrs.wrapOffsetY = r(originY + first.box.y);
+  const over = rest.map(({ node, box }) => ({
+    ...node,
+    attrs: {
+      ...strip(node), wrap: 'through', inFront: gp['style:run-through'] !== 'background',
+      wrapOffset: r(originX + box.x), wrapOffsetY: r(originY + box.y),
+      ...(place.wrapFromPage ? { wrapFromPage: true } : {}),
+      ...(place.wrapFromBody ? { wrapFromBody: true } : {}),
+      ...(place.anchorPage ? { anchorPage: place.anchorPage } : {}),
+    },
+  }));
+  // An as-char carrier reserves the group's place in the line, and the frames over it
+  // take their static position from the paragraph — so they precede it.
+  return place.wrap || place.anchorPage ? [carrier, ...over] : [...over, carrier];
+}
+
 // Dispatch any draw:* element: an image stays inline; a text box / shape is a block
-// node; everything else is dropped with a warning.
-function convertDrawElement(e: Element, ctx: Ctx): { inline?: Node; block?: Node } | null {
+// node; a group is its members; everything else is dropped with a warning.
+function convertDrawElement(e: Element, ctx: Ctx): { inline?: Node; block?: Node; group?: Node[] } | null {
   // The watermark is not a drawing: it rides the page decoration instead
   // (storage/pageDecor.ts), so it must not also arrive as a shape in the header.
   if (e.getAttributeNS(NS.draw, 'name')?.startsWith(WATERMARK_NAME)) return null;
@@ -796,6 +880,10 @@ function convertDrawElement(e: Element, ctx: Ctx): { inline?: Node; block?: Node
     || e.localName === 'connector') {
     const shape = convertFreeform(e, ctx);
     return shape ? { block: shape } : null;
+  }
+  if (e.localName === 'g') {
+    const group = convertDrawGroup(e, ctx);
+    return group.length ? { group } : null;
   }
   if (e.localName === 'a') {
     // draw:a wraps a drawing in a hyperlink; the editor has no image link, so unwrap
@@ -1245,8 +1333,8 @@ function convertBlocks(elements: Element[], ctx: Ctx, kind: BlockKind, boldByDef
       const conv = convertDrawElement(el, ctx);
       // A frame at block level (rare — ODF allows one straight under office:text)
       // → wrapped in a paragraph, which is where an inline node has to live.
-      const frame = conv?.inline ?? conv?.block;
-      if (frame) out.push({ type: 'paragraph', content: [frame] });
+      const frames = conv?.group ?? [conv?.inline ?? conv?.block].filter((n): n is Node => !!n);
+      if (frames.length) out.push({ type: 'paragraph', content: frames });
     }
   }
   // A block's own "break after" becomes the next block's break before — the same page
@@ -2583,6 +2671,7 @@ function convertInline(root: Element, ctx: Ctx, baseProps: PropMap, defaults: Bl
         // A box is inline like a picture, so it stays exactly where the frame sits.
         if (conv?.inline) out.push(conv.inline);
         else if (conv?.block) out.push(conv.block);
+        else if (conv?.group) out.push(...conv.group);
         continue;
       }
       if (e.namespaceURI === NS.office && (e.localName === 'annotation' || e.localName === 'annotation-end')) {

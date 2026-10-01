@@ -154,8 +154,13 @@ which is how both products draw a polyline.
   `path` — whose cases are SVG's the other way round (`parseVmlPath`).
 - A geometry whose commands are **modifier formulas** (`?f0`) or an arc is not an
   outline we can draw, so the shape stays unsupported and is dropped with the warning,
-  as before. So is a Word connector preset (`bentConnector3`), which is a geometry
-  Word resolves and does not write down.
+  as before. A Word connector preset (`bentConnector3`, …) writes no path, only its
+  name and adjust values, so `connectorPath` evaluates the preset's own formula; its
+  arrow heads are not kept, an outline having none.
+- **Groups** have no node: a `draw:g` opens as its members, as a DOCX `wpg:wgp` does.
+  The members' coordinates are the anchor's (probed), the group's box is their union
+  and its style places that box; the first member carries the placement and the rest
+  run through over it (`convertDrawGroup`).
 - **Writing** goes back out as the shape's own geometry: ODF a `non-primitive`
   `<draw:enhanced-geometry>` in its 21600 viewBox (probed: LibreOffice writes that
   straight back out unchanged), DOCX an `<a:custGeom>` path list in the shape's EMU

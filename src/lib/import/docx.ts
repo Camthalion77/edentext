@@ -19,7 +19,7 @@ import { builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr } f
 import { formatOrdinal, knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromDocx } from '../utils/bulletListTypes';
 import { DATE_FORMATS, TIME_FORMATS, docxPicture, findFormat, toDateValue } from '../utils/dateTime';
-import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath } from '../utils/shapes';
+import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, connectorPath } from '../utils/shapes';
 import { imageDataUrl, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { parseImportXml } from './importLimits';
 import { PX_PER_CM, cmToPx, fitMargins, type PageMargins } from '../storage/pageMargins';
@@ -2681,15 +2681,29 @@ function custGeomPath(spPr: Element | null): string {
   return fitPath(parseSvgPath(parts.join(' ')), w, h);
 }
 
+// A connector preset (bentConnector3, …) drawn from its formula and adjust values,
+// since Word writes no path for one; '' for any other preset.
+function presetConnectorPath(prstGeom: Element | null, prst: string, xfrm: Element | null): string {
+  const adj: (number | undefined)[] = [];
+  for (const gd of Array.from(nsChild(prstGeom, A, 'avLst')?.children ?? [])) {
+    const i = Number(/^adj(\d?)$/.exec(gd.getAttribute('name') ?? '')?.[1] || 1) - 1;
+    const v = Number(/^val\s+(-?\d+)$/.exec(gd.getAttribute('fmla') ?? '')?.[1]);
+    if (i >= 0 && i < 3 && Number.isFinite(v)) adj[i] = v;
+  }
+  return connectorPath(prst, adj, xfrm?.getAttribute('flipH') === '1', xfrm?.getAttribute('flipV') === '1');
+}
+
 // A DrawingML <wps:wsp> (text box, preset shape or freeform) → a textBox node. A preset
-// `utils/shapes.ts` can't draw and has no path of its own (a connector) is dropped with a
+// `utils/shapes.ts` can't draw, with no path or connector formula, is dropped with a
 // warning. All property lookups are scoped to spPr so a nested image's fill/xfrm can't leak in.
 // `box` overrides the drawing's own extent for a shape inside a group, whose size is
 // its place in the group rather than the whole group's.
 function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ctx, box?: { w: number; h: number }): Node | null {
   const spPr = nsChild(wsp, WPS, 'spPr');
-  const outline = custGeomPath(spPr);
-  const kind = outline ? 'textbox' : shapeFromPrst(nsChild(spPr, A, 'prstGeom')?.getAttribute('prst') ?? 'rect');
+  const prstGeom = nsChild(spPr, A, 'prstGeom');
+  const prst = prstGeom?.getAttribute('prst') ?? 'rect';
+  const outline = custGeomPath(spPr) || presetConnectorPath(prstGeom, prst, nsChild(spPr, A, 'xfrm'));
+  const kind = outline ? 'textbox' : shapeFromPrst(prst);
   if (!kind) { ctx.warnings.add('Unsupported shapes were removed'); return null; }
 
   const attrs: Record<string, unknown> = {};
