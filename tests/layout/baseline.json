@@ -316,12 +316,11 @@
    ]
   },
   "fuzz/seed-1.odt": {
-   "pages": 2,
-   "lines": 21,
-   "ms": 600,
+   "pages": 1,
+   "lines": 33,
+   "ms": 100,
    "starts": [
-    "Lorem",
-    "ipsum ipsum it's €42 dolor"
+    "fünf ipsum fünf \"quote\""
    ]
   },
   "fuzz/seed-10.odt": {
@@ -350,10 +349,10 @@
   },
   "fuzz/seed-4.odt": {
    "pages": 1,
-   "lines": 8,
+   "lines": 31,
    "ms": 100,
    "starts": [
-    "€42 Lorem ipsum it's €42 \"quote\" dolor x"
+    "sit a&b <tag> a&b fünf"
    ]
   },
   "fuzz/seed-5.odt": {

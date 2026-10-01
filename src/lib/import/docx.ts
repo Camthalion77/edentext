@@ -19,7 +19,7 @@ import { builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr } f
 import { formatOrdinal, knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromDocx } from '../utils/bulletListTypes';
 import { DATE_FORMATS, TIME_FORMATS, docxPicture, findFormat, toDateValue } from '../utils/dateTime';
-import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, pathHeadsFor, isOpenOutline, joinOutlineParts, shadeFromDrawingMl, type OutlinePart, type PathCmd, type DrawingMlPreset } from '../utils/shapes';
+import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, pathHeadsFor, isOpenOutline, joinOutlineParts, shadeFromDrawingMl, asTextArea, type OutlinePart, type PathCmd, type DrawingMlPreset } from '../utils/shapes';
 import { drawingMlArc, drawingMlGuides, drawingMlValue, type ResolvedGeometry } from '../utils/enhancedGeometry';
 import { presetGeometry } from '../utils/shapePresets';
 import { imageDataUrl, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
@@ -2711,8 +2711,8 @@ function custGeomOutline(spPr: Element | null, w: number, h: number): ResolvedGe
     if (!parts.length) return none;
     const rect = nsChild(geom, A, 'rect');
     const area = rect && w && h ? [v(rect, 'l') / w, v(rect, 't') / h, v(rect, 'r') / w, v(rect, 'b') / h]
-      .map((n) => Math.round(n * 100000) / 1000) as [number, number, number, number] : null;
-    return { path: joinOutlineParts(parts), textArea: area && area[0] < area[2] && area[1] < area[3] ? area : null };
+      .map((n) => Math.round(n * 100000) / 1000) : null;
+    return { path: joinOutlineParts(parts), textArea: asTextArea(area) };
   } catch {
     return none;
   }

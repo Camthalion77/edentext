@@ -451,9 +451,13 @@ export function shadeColor(hex: string, shade?: Shade): string {
 export type DrawingMlPreset = { name: string; adj: Record<string, number>; flipH?: boolean; flipV?: boolean };
 export type TextArea = [number, number, number, number];
 
-// Stored attrs checked before an export writes them.
-export const asTextArea = (v: unknown): TextArea | null =>
-  Array.isArray(v) && v.length === 4 && v.every(Number.isFinite) ? v as TextArea : null;
+// Stored attrs and imported text areas checked before use: a text area lies inside the
+// box (LibreOffice's DOCX export scales its own `a:rect` by 635, probed in 26.2).
+export const asTextArea = (v: unknown): TextArea | null => {
+  if (!Array.isArray(v) || v.length !== 4 || !v.every(Number.isFinite)) return null;
+  const [l, t, r, b] = v as TextArea;
+  return l >= -0.5 && t >= -0.5 && r <= 100.5 && b <= 100.5 && l < r && t < b ? v as TextArea : null;
+};
 export const asShapePreset = (v: unknown): DrawingMlPreset | null => {
   const p = v as DrawingMlPreset | null;
   return typeof p?.name === 'string' && /^\w+$/.test(p.name) && p.adj && typeof p.adj === 'object'

@@ -18,10 +18,10 @@ export function presetModifiers(p: DrawingMlPreset): number[] {
   return (entry(p.name)?.adj ?? []).map(([name, v]) => p.adj[name] ?? v);
 }
 
-/** The adjust values a list of `draw:modifiers` sets, named by the table. */
+/** The adjust values a list of `draw:modifiers` sets, named by the table; a default is no setting. */
 export function presetAdjust(name: string, modifiers: number[]): Record<string, number> {
-  return Object.fromEntries((entry(name)?.adj ?? []).flatMap(([n], i) =>
-    Number.isFinite(modifiers[i]) ? [[n, modifiers[i]]] : []));
+  return Object.fromEntries((entry(name)?.adj ?? []).flatMap(([n, v], i) =>
+    Number.isFinite(modifiers[i]) && modifiers[i] !== v ? [[n, modifiers[i]]] : []));
 }
 
 /** A preset's outline and text area at `w`×`h` EMU; an empty path for a name the table lacks. */

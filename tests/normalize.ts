@@ -91,10 +91,12 @@ export function normalize(node: N): N {
   }
   const attrs: N = {};
   // An auto date/time field re-evaluates on load (the DOCX importer stamps "now"), so
-  // its cached value is presentational; a citation's text label is derived the same way.
+  // its cached value is presentational; a citation's text label is derived the same way,
+  // as a preset box's outline and text area are, from its preset and size.
   const volatileKey = (k: string) =>
     (node.type === 'dateTimeField' && k === 'value' && node.attrs?.fixed !== true)
-    || (node.type === 'bibliographyEntry' && k === 'text');
+    || (node.type === 'bibliographyEntry' && k === 'text')
+    || (node.type === 'textBox' && node.attrs?.shapePreset && (k === 'shapePath' || k === 'shapeTextArea'));
   for (const [k, v] of Object.entries(node.attrs ?? {})) {
     if (v == null) continue;
     if (k in ORDERED_DEFAULTS && ORDERED_DEFAULTS[k] === v) continue;

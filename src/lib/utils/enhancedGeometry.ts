@@ -2,7 +2,7 @@
 // shape's formulas, modifiers and arc segments resolved once for its size, so the
 // result is an ordinary path in the 0…100 box (`shapes.ts`) both exports already write.
 
-import { arcBeziers, fitPath, joinOutlineParts, type OutlinePart, type PathCmd, type Shade } from './shapes';
+import { arcBeziers, asTextArea, fitPath, joinOutlineParts, type OutlinePart, type PathCmd, type Shade } from './shapes';
 
 export type EnhancedGeometry = {
   /** `draw:enhanced-path`, or LibreOffice's fuller `drawooo:enhanced-path`. */
@@ -234,8 +234,7 @@ function textArea(spec: string | undefined, num: (t: string) => number, [vx, vy,
   if (g.mirrorH) [l, r] = [2 * vx + vw - r, 2 * vx + vw - l];
   if (g.mirrorV) [t, b] = [2 * vy + vh - b, 2 * vy + vh - t];
   const area = [(l - vx) / vw, (t - vy) / vh, (r - vx) / vw, (b - vy) / vh].map((v) => Math.round(v * 100000) / 1000);
-  return area.every(Number.isFinite) && area[0] < area[2] && area[1] < area[3]
-    ? area as [number, number, number, number] : null;
+  return asTextArea(area);
 }
 
 // An angle in degrees as seen from the centre, as the ellipse parameter it lands on.
