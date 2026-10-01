@@ -151,6 +151,21 @@ export function lineKindFor(start: boolean, end: boolean): ShapeKind {
   return start || end ? 'lineArrow' : 'line';
 }
 
+/** Which ends of an open outline carry an arrow head (a connector's, a curve's). */
+export type PathHeads = 'start' | 'end' | 'both';
+
+export function pathHeadsFor(start: boolean, end: boolean): PathHeads | null {
+  return start && end ? 'both' : start ? 'start' : end ? 'end' : null;
+}
+
+/** The ends a box draws heads at: a line kind's own, else its outline's. */
+export function boxHeads(kind: ShapeKind, heads: PathHeads | null, path: string | null): { start: boolean; end: boolean } {
+  const line = SHAPES[kind].line;
+  if (line) return { start: line === 'both', end: line !== 'none' };
+  const own = path ? heads : null;
+  return { start: own === 'start' || own === 'both', end: own === 'end' || own === 'both' };
+}
+
 /** The kinds drawn as a polygon — everything past the three CSS ones. */
 export const POLYGON_KINDS = (Object.keys(SHAPES) as ShapeKind[]).filter((k) => SHAPES[k].points);
 
@@ -190,6 +205,30 @@ export function linePaths(kind: ShapeKind, w: number, h: number, flip: boolean, 
       : heads === 'end' ? [headPath(x2, y2, dx, dy, cap)]
       : [headPath(x2, y2, dx, dy, cap), headPath(x1, y1, -dx, -dy, cap)],
   };
+}
+
+/**
+ * The heads of an open outline drawn across a `w`×`h` box, in real pixels like a line's:
+ * each points along the path's own last (or first) segment, a curve's control point
+ * giving that direction.
+ */
+export function pathHeadPaths(path: string, w: number, h: number, heads: PathHeads, headLen: number): string[] {
+  const pts: [number, number][] = [];
+  for (const c of parseSvgPath(path)) {
+    if (c.c === 'Z') return [];
+    for (let i = 0; i + 1 < c.p.length; i += 2) pts.push([(c.p[i] * w) / 100, (c.p[i + 1] * h) / 100]);
+  }
+  const head = (tip: [number, number], from: [number, number][]) => {
+    const base = from.find(([x, y]) => Math.hypot(tip[0] - x, tip[1] - y) > 0.01);
+    if (!base) return null;
+    const len = Math.hypot(tip[0] - base[0], tip[1] - base[1]);
+    return headPath(tip[0], tip[1], (tip[0] - base[0]) / len, (tip[1] - base[1]) / len, headLen);
+  };
+  const out: (string | null)[] = [];
+  if (pts.length < 2) return [];
+  if (heads !== 'start') out.push(head(pts[pts.length - 1], pts.slice(0, -1).reverse()));
+  if (heads !== 'end') out.push(head(pts[0], pts.slice(1)));
+  return out.filter((d): d is string => !!d);
 }
 
 /** The outline as an SVG `d`, in the 0…100 box the node view's viewBox uses. */

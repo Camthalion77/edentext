@@ -11,7 +11,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
 import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, sinkToOffset, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
-import { SHAPES, shapePath, linePaths, arrowHeadPx, isShapeKind, isLineKind, type ShapeKind } from '../../utils/shapes';
+import { SHAPES, shapePath, linePaths, pathHeadPaths, arrowHeadPx, isShapeKind, isLineKind, type PathHeads, type ShapeKind } from '../../utils/shapes';
 import { cmToPx } from '../../storage/pageMargins';
 import { normalizeColor } from '../../utils/color';
 
@@ -61,6 +61,7 @@ export interface TextBoxAttrs {
   paddingCm: number;          // inset ring around the text (ODF fo:padding)
   shapeKind: ShapeKind;
   shapePath: string | null;   // a freeform's own outline, in the 0…100 box
+  arrowHeads: PathHeads | null; // the ends of that outline carrying an arrow head
   flipV: boolean;             // a line runs bottom-left → top-right instead
   textVertical: boolean;      // text runs top-to-bottom, right-to-left
   textVAlign: TextVAlign;     // where the text sits in a box taller than it is
@@ -259,6 +260,15 @@ export const TextBox = Node.create({
         parseHTML: el => (el as HTMLElement).getAttribute('data-shape-path') || null,
         renderHTML: () => ({}),
       },
+      // Arrow heads on an open outline (a connector's ends): which of them carry one.
+      arrowHeads: {
+        default: null,
+        parseHTML: el => {
+          const v = (el as HTMLElement).getAttribute('data-arrow-heads');
+          return v === 'start' || v === 'end' || v === 'both' ? v : null;
+        },
+        renderHTML: () => ({}),
+      },
       // Which diagonal of the frame a line runs along — the one flag Word's `flipV`
       // and ODF's own endpoints both come down to.
       flipV: {
@@ -341,6 +351,7 @@ export const TextBox = Node.create({
       ...(a.wrapFromBody ? { 'data-wrap-from-body': '' } : {}),
       ...(a.shapeKind !== 'textbox' ? { 'data-shape': a.shapeKind } : {}),
       ...(a.shapePath ? { 'data-shape-path': a.shapePath } : {}),
+      ...(a.arrowHeads ? { 'data-arrow-heads': a.arrowHeads } : {}),
       ...(a.flipV ? { 'data-flip-v': 'true' } : {}),
       ...(a.textVertical ? { 'data-text-vertical': 'true' } : {}),
       ...(a.textVAlign !== 'top' ? { 'data-text-valign': a.textVAlign } : {}),
@@ -649,7 +660,11 @@ class TextBoxView {
     const w = a.width ?? DEFAULT_WIDTH_PX;
     const h = a.height ?? DEFAULT_LINE_HEIGHT_PX;
     const stroke = a.strokeWidthPt * PX_PER_PT;
-    const paths = linePaths(a.shapeKind, w, h, a.flipV, arrowHeadPx(a.strokeWidthPt));
+    const headLen = arrowHeadPx(a.strokeWidthPt);
+    // An outline's heads ride the same real-pixel layer, over the stretched outline.
+    const paths = linePaths(a.shapeKind, w, h, a.flipV, headLen)
+      ?? (a.shapePath && a.arrowHeads && a.strokeColor
+        ? { line: '', heads: pathHeadPaths(a.shapePath, w, h, a.arrowHeads, headLen) } : null);
     if (!paths) {
       this.lineSvg?.remove();
       this.lineSvg = null;
@@ -670,12 +685,14 @@ class TextBoxView {
     this.lineSvg.setAttribute('height', `${vh}`);
     this.lineSvg.style.height = `${vh}px`;
     this.lineSvg.replaceChildren();
-    const line = document.createElementNS(SVG_NS, 'path');
-    line.setAttribute('d', paths.line);
-    line.setAttribute('fill', 'none');
-    line.setAttribute('stroke', color);
-    line.setAttribute('stroke-width', String(stroke));
-    this.lineSvg.appendChild(line);
+    if (paths.line) {
+      const line = document.createElementNS(SVG_NS, 'path');
+      line.setAttribute('d', paths.line);
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', String(stroke));
+      this.lineSvg.appendChild(line);
+    }
     for (const d of paths.heads) {
       const head = document.createElementNS(SVG_NS, 'path');
       head.setAttribute('d', d);

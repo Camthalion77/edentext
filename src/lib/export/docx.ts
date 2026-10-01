@@ -20,7 +20,7 @@ import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { isSvgDataUrl, svgToPngDataUrl } from '../import/imageFormats';
 import { TEXTBOX_PADDING_CM, type TextVAlign } from '../editor/extensions/textBox';
 import { cropOf, type Crop } from '../editor/extensions/image';
-import { SHAPES, isShapeKind, isLineKind, drawingMlPath, type ShapeKind } from '../utils/shapes';
+import { SHAPES, boxHeads, isShapeKind, isLineKind, drawingMlPath, type PathHeads, type ShapeKind } from '../utils/shapes';
 import { cellFormatCode, isCellFormat } from '../utils/cellFormat';
 import { cjkDocFont, isAsianTag, type ExportLanguage } from '../storage/documentLanguage';
 import { DEFAULT_MARGINS, type PageMargins } from '../storage/pageMargins';
@@ -1095,6 +1095,7 @@ type TextBoxDocx = {
   inFront: boolean;
   shapeKind: ShapeKind;
   shapePath: string | null;
+  arrowHeads: PathHeads | null;
   flipV: boolean;
   textVertical: boolean;
   textVAlign: TextVAlign;
@@ -1125,6 +1126,7 @@ function textBoxDocxDescriptor(node: TiptapNode): TextBoxDocx {
     inFront: a.inFront === true,
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
+    arrowHeads: a.arrowHeads === 'start' || a.arrowHeads === 'end' || a.arrowHeads === 'both' ? a.arrowHeads : null,
     flipV: a.flipV === true,
     textVertical: a.textVertical === true,
     textVAlign: a.textVAlign === 'middle' || a.textVAlign === 'bottom' ? a.textVAlign : 'top',
@@ -1494,10 +1496,10 @@ function textBoxDrawingXml(box: TextBoxDocx, index: number, parts: TxbxParts): s
   const fill = box.fill
     ? `<a:solidFill><a:srgbClr val="${hexColor(box.fill) ?? 'FFFFFF'}"/></a:solidFill>`
     : '<a:noFill/>';
-  // A line is only its stroke, and its heads ride the same <a:ln>.
+  // A line is only its stroke, and its heads ride the same <a:ln> (an outline's too).
   const line = SHAPES[box.shapeKind].line;
-  const ends = line === 'end' ? '<a:tailEnd type="triangle"/>'
-    : line === 'both' ? '<a:headEnd type="triangle"/><a:tailEnd type="triangle"/>' : '';
+  const heads = boxHeads(box.shapeKind, box.arrowHeads, box.shapePath);
+  const ends = (heads.start ? '<a:headEnd type="triangle"/>' : '') + (heads.end ? '<a:tailEnd type="triangle"/>' : '');
   const ln = box.stroke
     ? `<a:ln w="${Math.round(box.strokeWidthPt * EMU_PER_PT)}"><a:solidFill><a:srgbClr val="${hexColor(box.stroke) ?? '000000'}"/></a:solidFill>${ends}</a:ln>`
     : '<a:ln><a:noFill/></a:ln>';

@@ -7,7 +7,7 @@ import { buildOdt } from '../../src/lib/export/odt';
 import { importOdt } from '../../src/lib/import/odt';
 import { buildDocx } from '../../src/lib/export/docx';
 import { importDocx } from '../../src/lib/import/docx';
-import { connectorPath } from '../../src/lib/utils/shapes';
+import { connectorPath, pathHeadPaths } from '../../src/lib/utils/shapes';
 
 type N = any;
 
@@ -158,7 +158,7 @@ describe('a Word connector preset', () => {
       + '<a:graphic><a:graphicData><wps:wsp><wps:cNvCnPr/><wps:spPr>'
       + '<a:xfrm flipV="1"><a:off x="0" y="0"/><a:ext cx="1800000" cy="720000"/></a:xfrm>'
       + '<a:prstGeom prst="bentConnector3"><a:avLst><a:gd name="adj1" fmla="val 25000"/></a:avLst></a:prstGeom>'
-      + '<a:ln w="12700"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:ln></wps:spPr><wps:bodyPr/>'
+      + '<a:ln w="12700"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:tailEnd type="triangle"/></a:ln></wps:spPr><wps:bodyPr/>'
       + '</wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
     const r = importDocx(zipSync({
       'word/document.xml': strToU8(`<?xml version="1.0"?><w:document xmlns:w="${W}"`
@@ -169,7 +169,37 @@ describe('a Word connector preset', () => {
     }));
     expect(shape(r).attrs.shapePath).toBe('M 0 100 L 25 100 L 25 0 L 100 0');
     expect(shape(r).attrs.strokeColor).toBe('#FF0000');
+    expect(shape(r).attrs.arrowHeads).toBe('end');
     expect([...r.warnings]).toEqual([]);
+  });
+});
+
+describe("an open outline's arrow heads", () => {
+  it('point along the first and last segment, in real pixels', () => {
+    expect(pathHeadPaths('M 0 0 L 100 0', 100, 10, 'end', 10)).toEqual(['M 100,0 L 90,3.5 L 90,-3.5 Z']);
+    expect(pathHeadPaths('M 0 0 C 0 50 50 100 100 100', 100, 100, 'start', 10)).toEqual(['M 0,0 L 3.5,10 L -3.5,10 Z']);
+    expect(pathHeadPaths('M 0 0 L 100 0 L 50 50 Z', 100, 100, 'both', 10)).toEqual([]);
+  });
+
+  it('come from the style ODF names them in', () => {
+    const r = importOdt(odt('<text:p><draw:connector draw:style-name="grA" text:anchor-type="paragraph"'
+      + ' svg:x1="1cm" svg:y1="0cm" svg:x2="6cm" svg:y2="2cm"'
+      + ' svg:viewBox="0 0 5000 2000" svg:d="M0 0h2500v2000h2500"/></text:p>',
+    '<style:style style:name="grA" style:family="graphic"><style:graphic-properties draw:stroke="solid"'
+      + ' svg:stroke-color="#000000" draw:marker-start="Arrow" draw:marker-end="Arrow"/></style:style>'));
+    expect(shape(r).attrs.arrowHeads).toBe('both');
+  });
+
+  it('round-trip through both formats', async () => {
+    const box = { type: 'textBox', attrs: { width: 200, height: 100, shapePath: 'M 0 0 L 50 0 L 50 100 L 100 100',
+      arrowHeads: 'start', strokeColor: '#000000' }, content: [{ type: 'paragraph' }] };
+    const doc: N = { type: 'doc', content: [{ type: 'paragraph', content: [box] }] };
+    const odtBytes = await buildOdt(doc, margins, 'portrait');
+    expect(strFromU8(unzipSync(odtBytes)['styles.xml'])).toContain('draw:name="Arrow"');
+    expect(shape(importOdt(odtBytes)).attrs.arrowHeads).toBe('start');
+    const docxBytes = await buildDocx(doc, margins, 'portrait');
+    expect(strFromU8(unzipSync(docxBytes)['word/document.xml'])).toContain('<a:headEnd type="triangle"/></a:ln>');
+    expect(shape(importDocx(docxBytes)).attrs.arrowHeads).toBe('start');
   });
 });
 

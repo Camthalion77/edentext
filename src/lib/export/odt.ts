@@ -34,7 +34,7 @@ import { TEXTBOX_PADDING_CM, type TextVAlign } from '../editor/extensions/textBo
 import { cropOf, type Crop } from '../editor/extensions/image';
 import { imageSizeCm } from '../import/imageFormats';
 import { numberLocale, parseCellNumber, toWriterFormula, type CellRef, type NumberLocale } from '../utils/tableFormula';
-import { SHAPES, arrowHeadCm, isShapeKind, isLineKind, odfEnhancedGeometry, odfEnhancedPath, type ShapeKind } from '../utils/shapes';
+import { SHAPES, arrowHeadCm, boxHeads, isShapeKind, isLineKind, odfEnhancedGeometry, odfEnhancedPath, type PathHeads, type ShapeKind } from '../utils/shapes';
 import { normalizeLeader, parseTabStops } from '../editor/extensions/tabStops';
 import { charStyleProps, listMarkerFormat, type MarkerFormat } from '../editor/extensions/listMarker';
 import { orderedTypeDef, effectiveOrderedDef, effectiveOrderedDefAt, childCycle, formatOrdinal, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
@@ -1040,6 +1040,7 @@ type TextBoxExport = {
   paddingCm: number;
   shapeKind: ShapeKind;
   shapePath: string | null;
+  arrowHeads: PathHeads | null;
   flipV: boolean;
   textVertical: boolean;
   textVAlign: TextVAlign;
@@ -1071,6 +1072,7 @@ function textBoxDescriptor(node: TiptapNode): TextBoxExport {
     paddingCm: typeof a.paddingCm === 'number' ? round3(a.paddingCm) : TEXTBOX_PADDING_CM,
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
+    arrowHeads: a.arrowHeads === 'start' || a.arrowHeads === 'end' || a.arrowHeads === 'both' ? a.arrowHeads : null,
     flipV: a.flipV === true,
     textVertical: a.textVertical === true,
     textVAlign: a.textVAlign === 'middle' || a.textVAlign === 'bottom' ? a.textVAlign : 'top',
@@ -4749,11 +4751,10 @@ function textBoxGraphicStyle(box: TextBoxExport, index: number): string {
     ? ' draw:auto-grow-height="true"'
     : ' draw:auto-grow-height="false" draw:auto-grow-width="false"';
   // An arrow head is a named marker in ODF, defined once in styles.xml.
-  const heads = SHAPES[box.shapeKind].line;
+  const heads = boxHeads(box.shapeKind, box.arrowHeads, box.shapePath);
   const marker = (side: 'start' | 'end') =>
     ` draw:marker-${side}="${ODF_ARROW}" draw:marker-${side}-width="${arrowHeadCm(box.strokeWidthPt)}cm"`;
-  const arrows = heads === 'end' ? marker('end')
-    : heads === 'both' ? marker('end') + marker('start') : '';
+  const arrows = (heads.end ? marker('end') : '') + (heads.start ? marker('start') : '');
   // Vertical text: a frame takes style:writing-mode in its graphic properties (where
   // LibreOffice writes it); a drawing shape drops it there and needs the *paragraph*
   // properties of its style instead (both probed).
@@ -4844,9 +4845,9 @@ function applyTextBoxes(odtBytes: Uint8Array, boxes: TextBoxExport[]): Uint8Arra
   content = injectAutomaticStyles(content, boxes.map((b, i) => textBoxGraphicStyle(b, i)).join(''));
   files['content.xml'] = strToU8(content);
   // An arrow head is referenced by name, so its one definition goes where LibreOffice
-  // keeps its own — office:styles in styles.xml — and only when a line asks for it.
+  // keeps its own — office:styles in styles.xml — and only when a box asks for it.
   const stylesBytes = files['styles.xml'];
-  if (stylesBytes && boxes.some((b) => SHAPES[b.shapeKind].line && SHAPES[b.shapeKind].line !== 'none')) {
+  if (stylesBytes && boxes.some((b) => { const h = boxHeads(b.shapeKind, b.arrowHeads, b.shapePath); return h.start || h.end; })) {
     const styles = ensureDrawNamespaces(strFromU8(stylesBytes));
     if (!styles.includes(`draw:name="${ODF_ARROW}"`)) {
       files['styles.xml'] = strToU8(styles.replace(/<office:styles(\s[^>]*)?>/, (m) => `${m}${ODF_ARROW_MARKER}`));

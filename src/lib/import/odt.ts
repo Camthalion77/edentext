@@ -21,7 +21,7 @@ import { knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, R
 import { bulletCharAttr, bulletCharFromOdf } from '../utils/bulletListTypes';
 import { docxPicture, matchFormat, toDateValue, type Token } from '../utils/dateTime';
 import {
-  shapeFromOdfType, lineKindFor, parseSvgPath, parseOdfPoints, fitPath, type ShapeKind,
+  shapeFromOdfType, lineKindFor, pathHeadsFor, parseSvgPath, parseOdfPoints, fitPath, type ShapeKind,
 } from '../utils/shapes';
 import { imageDataUrl, imageSizeCm, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { boundedInt, IMPORT_LIMITS, parseImportXml } from './importLimits';
@@ -686,6 +686,7 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
   applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   boxWrapAlign(gp, attrs);
   shapeStyleAttrs(gp, attrs, true);
+  if (path) outlineHeads(gp, attrs);
   boxTextFlow(el, ctx, attrs);
   return { type: 'textBox', attrs, content: textBoxContent(Array.from(el.children), ctx, wCm) };
 }
@@ -732,7 +733,14 @@ function convertFreeform(el: Element, ctx: Ctx): Node | null {
   applyFrameRotationAndWrap(el, attrs, gp, ctx.contentWidthCm, ctx.leftMarginCm);
   boxWrapAlign(gp, attrs);
   shapeStyleAttrs(gp, attrs, true);
+  outlineHeads(gp, attrs);
   return { type: 'textBox', attrs, content: [{ type: 'paragraph' }] };
+}
+
+// The arrow heads an open outline's style declares. A closed one has no ends to carry them.
+function outlineHeads(gp: PropMap, attrs: Record<string, unknown>): void {
+  const heads = pathHeadsFor(!!gp['draw:marker-start'], !!gp['draw:marker-end']);
+  if (heads && !String(attrs.shapePath).trimEnd().endsWith('Z')) attrs.arrowHeads = heads;
 }
 
 // draw:line → a textBox of the matching line kind: the two endpoints become the frame

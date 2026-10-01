@@ -19,7 +19,7 @@ import { builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr } f
 import { formatOrdinal, knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromDocx } from '../utils/bulletListTypes';
 import { DATE_FORMATS, TIME_FORMATS, docxPicture, findFormat, toDateValue } from '../utils/dateTime';
-import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, connectorPath } from '../utils/shapes';
+import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, connectorPath, pathHeadsFor } from '../utils/shapes';
 import { imageDataUrl, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { parseImportXml } from './importLimits';
 import { PX_PER_CM, cmToPx, fitMargins, type PageMargins } from '../storage/pageMargins';
@@ -2743,9 +2743,11 @@ function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ct
   const lnW = intAttr(ln, '', 'w');
   setShapeStyleAttrs(attrs, fill, stroke, lnW != null ? lnW / 12700 : null);
   // A line's heads live on its <a:ln>, and they are what tells the three kinds apart;
-  // Word reaches the frame's other diagonal by flipping it.
+  // Word reaches the frame's other diagonal by flipping it. An open outline keeps its own.
+  const head = (name: string) => (nsChild(ln, A, name)?.getAttribute('type') ?? 'none') !== 'none';
+  const heads = pathHeadsFor(head('headEnd'), head('tailEnd'));
+  if (outline && heads && !outline.trimEnd().endsWith('Z')) attrs.arrowHeads = heads;
   if (isLineKind(kind)) {
-    const head = (name: string) => (nsChild(ln, A, name)?.getAttribute('type') ?? 'none') !== 'none';
     attrs.shapeKind = lineKindFor(head('headEnd'), head('tailEnd'));
     if (nsChild(spPr, A, 'xfrm')?.getAttribute('flipV') === '1') attrs.flipV = true;
   }
@@ -2831,6 +2833,11 @@ function convertPict(pict: Element, ctx: Ctx): Node | null {
 
   const attrs: Record<string, unknown> = {};
   if (outline) attrs.shapePath = outline;
+  // VML names an arrow head on the stroke, per end of the path.
+  const vmlStroke = shape.getElementsByTagNameNS(VML, 'stroke')[0];
+  const vmlHead = (end: string) => !!vmlStroke && (vmlStroke.getAttribute(end) ?? 'none') !== 'none';
+  const vmlHeads = pathHeadsFor(vmlHead('startarrow'), vmlHead('endarrow'));
+  if (outline && vmlHeads && !outline.trimEnd().endsWith('Z')) attrs.arrowHeads = vmlHeads;
   // VML says vertical text in the box's own style, as `layout-flow:vertical`.
   if (/layout-flow\s*:\s*vertical/.test(textbox?.getAttribute('style') ?? '')) attrs.textVertical = true;
   const kind = shape.localName === 'oval' ? 'ellipse' : shape.localName === 'roundrect' ? 'roundRect' : 'textbox';

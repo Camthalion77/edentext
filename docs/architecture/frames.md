@@ -155,8 +155,11 @@ which is how both products draw a polyline.
 - A geometry whose commands are **modifier formulas** (`?f0`) or an arc is not an
   outline we can draw, so the shape stays unsupported and is dropped with the warning,
   as before. A Word connector preset (`bentConnector3`, …) writes no path, only its
-  name and adjust values, so `connectorPath` evaluates the preset's own formula; its
-  arrow heads are not kept, an outline having none.
+  name and adjust values, so `connectorPath` evaluates the preset's own formula.
+- **Arrow heads** on an open outline ride `arrowHeads` (`start`/`end`/`both`): ODF's
+  `draw:marker-*` on the style, DrawingML's `a:headEnd`/`a:tailEnd`, VML's
+  `startarrow`/`endarrow`. The node view draws them like a line's, in real pixels along
+  the path's first and last segment (`pathHeadPaths`); LibreOffice draws both exports'.
 - **Groups** have no node: a `draw:g` opens as its members, as a DOCX `wpg:wgp` does.
   The members' coordinates are the anchor's (probed), the group's box is their union
   and its style places that box; the first member carries the placement and the rest
