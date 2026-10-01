@@ -2,7 +2,7 @@
 // shape's formulas, modifiers and arc segments resolved once for its size, so the
 // result is an ordinary path in the 0…100 box (`shapes.ts`) both exports already write.
 
-import { arcBeziers, fitPath, joinOutlineParts, type OutlinePart, type PathCmd } from './shapes';
+import { arcBeziers, fitPath, joinOutlineParts, type OutlinePart, type PathCmd, type Shade } from './shapes';
 
 export type EnhancedGeometry = {
   /** `draw:enhanced-path`, or LibreOffice's fuller `drawooo:enhanced-path`. */
@@ -20,7 +20,12 @@ export type EnhancedGeometry = {
   mirrorV?: boolean;
   /** `drawooo:sub-view-size`: each `N`-ended subpath's own width and height. */
   subViews?: number[];
+  /** `draw:text-areas`: the first rectangle's left, top, right and bottom. */
+  textAreas?: string;
 };
+
+/** A resolved geometry: the outline and the text area, both in the 0…100 box. */
+export type ResolvedGeometry = { path: string; textArea: [number, number, number, number] | null };
 
 const FUNCS: Record<string, (...a: number[]) => number> = {
   abs: Math.abs, sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan,
@@ -99,16 +104,22 @@ function turn(d: number): number {
   return m < 1e-9 ? TAU : m;
 }
 
-/**
- * The outline an enhanced geometry draws, in the 0…100 box; '' when a formula or a
- * reference cannot be resolved. Each `N`-ended part keeps its `F`/`S` switches
- * (`outlineParts`); the shading commands are skipped, so a shaded face takes the fill.
- */
+/** The outline an enhanced geometry draws, in the 0…100 box; '' when it cannot be resolved. */
 export function enhancedGeometryPath(g: EnhancedGeometry): string {
+  return resolveGeometry(g).path;
+}
+
+/**
+ * An enhanced geometry's outline and text area for its size. Each `N`-ended part keeps
+ * its `F`/`S` switches and its shading (`outlineParts`); a formula or reference that
+ * cannot be resolved gives no outline at all.
+ */
+export function resolveGeometry(g: EnhancedGeometry): ResolvedGeometry {
+  const none: ResolvedGeometry = { path: '', textArea: null };
   try {
     const own = !(g.viewBox[2] > 0 && g.viewBox[3] > 0);
     const [vx, vy, vw, vh] = own ? [0, 0, g.logW, g.logH] : g.viewBox;
-    if (!(vw > 0 && vh > 0)) return '';
+    if (!(vw > 0 && vh > 0)) return none;
     const consts: Record<string, number> = {
       left: vx, top: vy, right: vx + vw, bottom: vy + vh, width: vw, height: vh,
       logwidth: g.logW, logheight: g.logH, xstretch: 0, ystretch: 0, hasstroke: 1, hasfill: 1,
@@ -120,9 +131,10 @@ export function enhancedGeometryPath(g: EnhancedGeometry): string {
       : t[0] === '$' ? mod(Number(t.slice(1)))
       : /^[a-z]/.test(t) ? (t in consts ? consts[t] : NaN) : Number(t);
 
-    const parts: { cmds: PathCmd[]; fill: boolean; stroke: boolean }[] = [];
+    const parts: { cmds: PathCmd[]; fill: boolean; stroke: boolean; shade?: Shade }[] = [];
     let out: PathCmd[] = [];
     let [fill, stroke] = [true, true];
+    let shade: Shade | undefined;
     let [x, y, sx, sy] = [0, 0, 1, 1];
     let sub = 0;
     const subView = () => {
@@ -142,21 +154,22 @@ export function enhancedGeometryPath(g: EnhancedGeometry): string {
     while (i < toks.length) {
       const cmd = toks[i++];
       const n = ARITY[cmd];
-      if (n === undefined) return '';
+      if (n === undefined) return none;
       if (cmd === 'Z') { out.push({ c: 'Z' }); continue; }
       if (cmd === 'N') {
-        parts.push({ cmds: out, fill, stroke });
-        [out, fill, stroke] = [[], true, true];
+        parts.push({ cmds: out, fill, stroke, shade });
+        [out, fill, stroke, shade] = [[], true, true, undefined];
         sub++;
         subView();
         continue;
       }
       if (cmd === 'F') fill = false;
       if (cmd === 'S') stroke = false;
+      if (cmd === 'H' || cmd === 'I' || cmd === 'J' || cmd === 'K') shade = cmd;
       if (!n) continue;
       for (let first = true, quad = cmd === 'X'; i < toks.length && !/^[A-Z]$/.test(toks[i]); first = false) {
         const a = toks.slice(i, i + n).map(num);
-        if (a.length < n || a.some((v) => !Number.isFinite(v))) return '';
+        if (a.length < n || a.some((v) => !Number.isFinite(v))) return none;
         i += n;
         if (cmd === 'M' || cmd === 'L') to(cmd === 'M' && first ? 'M' : 'L', pt(a[0], a[1]));
         else if (cmd === 'C' || cmd === 'Q') {
@@ -199,16 +212,30 @@ export function enhancedGeometryPath(g: EnhancedGeometry): string {
         }
       }
     }
-    parts.push({ cmds: out, fill, stroke });
+    parts.push({ cmds: out, fill, stroke, shade });
     const mirror = (c: PathCmd): PathCmd => c.c === 'Z' ? c : {
       c: c.c, p: c.p.map((v, j) => j % 2 ? (g.mirrorV ? 2 * vy + vh - v : v) : (g.mirrorH ? 2 * vx + vw - v : v)),
     } as PathCmd;
     const fitted: OutlinePart[] = parts.filter((p) => p.cmds.length && (p.fill || p.stroke))
-      .map((p) => ({ d: fitPath(p.cmds.map(mirror), vw, vh, vx, vy), fill: p.fill, stroke: p.stroke }));
-    return fitted.length ? joinOutlineParts(fitted) : '';
+      .map((p) => ({ d: fitPath(p.cmds.map(mirror), vw, vh, vx, vy), fill: p.fill, stroke: p.stroke, ...(p.shade ? { shade: p.shade } : {}) }));
+    if (!fitted.length) return none;
+    return { path: joinOutlineParts(fitted), textArea: textArea(g.textAreas, num, [vx, vy, vw, vh], g) };
   } catch {
-    return '';
+    return none;
   }
+}
+
+// The first text rectangle, mirrored with the shape and as 0…100 fractions of its box.
+function textArea(spec: string | undefined, num: (t: string) => number, [vx, vy, vw, vh]: number[],
+  g: EnhancedGeometry): ResolvedGeometry['textArea'] {
+  const toks = spec?.trim().split(/\s+/) ?? [];
+  if (toks.length < 4) return null;
+  let [l, t, r, b] = toks.slice(0, 4).map(num);
+  if (g.mirrorH) [l, r] = [2 * vx + vw - r, 2 * vx + vw - l];
+  if (g.mirrorV) [t, b] = [2 * vy + vh - b, 2 * vy + vh - t];
+  const area = [(l - vx) / vw, (t - vy) / vh, (r - vx) / vw, (b - vy) / vh].map((v) => Math.round(v * 100000) / 1000);
+  return area.every(Number.isFinite) && area[0] < area[2] && area[1] < area[3]
+    ? area as [number, number, number, number] : null;
 }
 
 // An angle in degrees as seen from the centre, as the ellipse parameter it lands on.

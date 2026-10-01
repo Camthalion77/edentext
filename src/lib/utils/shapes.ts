@@ -400,28 +400,65 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 /**
  * An outline's parts, in ODF's own notation: each ends with `N`, and one marked `F` is
  * stroked only, one marked `S` filled only — how a preset fills a face once and draws
- * its features as lines. A plain path is one part drawn both ways.
+ * its features as lines. `H I J K` shade a face darker, a little darker, lighter, a little lighter.
  */
-export type OutlinePart = { d: string; fill: boolean; stroke: boolean };
+export type Shade = 'H' | 'I' | 'J' | 'K';
+export type OutlinePart = { d: string; fill: boolean; stroke: boolean; shade?: Shade };
 
 export function outlineParts(path: string): OutlinePart[] {
-  return path.split('N').map((p) => ({ d: p.replace(/[FS]/g, '').trim(), fill: !p.includes('F'), stroke: !p.includes('S') }))
-    .filter((p) => p.d);
+  return path.split('N').map((p) => {
+    const shade = /[HIJK]/.exec(p)?.[0] as Shade | undefined;
+    return { d: p.replace(/[FSHIJK]/g, '').trim(), fill: !p.includes('F'), stroke: !p.includes('S'), ...(shade ? { shade } : {}) };
+  }).filter((p) => p.d);
 }
+
+const flags = (p: OutlinePart) => `${p.shade ? ` ${p.shade}` : ''}${p.fill ? '' : ' F'}${p.stroke ? '' : ' S'} N`;
 
 export function joinOutlineParts(parts: OutlinePart[]): string {
   // A lone open part is never filled, so its `F` says nothing.
   const [one] = parts;
-  if (parts.length === 1 && one.stroke && (one.fill || !one.d.includes('Z'))) return one.d;
-  return parts.map((p) => `${p.d}${p.fill ? '' : ' F'}${p.stroke ? '' : ' S'} N`).join(' ');
+  if (parts.length === 1 && one.stroke && !one.shade && (one.fill || !one.d.includes('Z'))) return one.d;
+  return parts.map((p) => `${p.d}${flags(p)}`).join(' ');
 }
 
-/** The parts drawn filled and the parts drawn stroked, each as one SVG path. */
-export function outlineLayers(path: string): { fill: string; stroke: string } {
+/** The filled parts, one path per shade in drawing order, and the stroked parts as one path. */
+export function outlineLayers(path: string): { fills: { d: string; shade?: Shade }[]; stroke: string } {
   const parts = outlineParts(path);
-  const join = (keep: (p: OutlinePart) => boolean) => parts.filter(keep).map((p) => p.d).join(' ');
-  return { fill: join((p) => p.fill), stroke: join((p) => p.stroke) };
+  const fills: { d: string; shade?: Shade }[] = [];
+  for (const p of parts.filter((q) => q.fill)) {
+    const last = fills[fills.length - 1];
+    if (last && last.shade === p.shade) last.d += ` ${p.d}`;
+    else fills.push({ d: p.d, ...(p.shade ? { shade: p.shade } : {}) });
+  }
+  return { fills, stroke: parts.filter((p) => p.stroke).map((p) => p.d).join(' ') };
 }
+
+// LibreOffice's factors and truncation (measured on its render of a cube): darken scales
+// toward black, lighten mixes toward white.
+const SHADE: Record<Shade, number> = { H: -0.4, I: -0.2, J: 0.4, K: 0.2 };
+
+/** A `#rrggbb` fill shaded as a face marked `shade`. */
+export function shadeColor(hex: string, shade?: Shade): string {
+  if (!shade || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const f = SHADE[shade];
+  return `#${[1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16);
+    return Math.floor(f < 0 ? c * (1 + f) : c + (255 - c) * f).toString(16).padStart(2, '0');
+  }).join('')}`;
+}
+
+/** A DrawingML preset as a node keeps it: its name, the adjust values the file set, its flips. */
+export type DrawingMlPreset = { name: string; adj: Record<string, number>; flipH?: boolean; flipV?: boolean };
+export type TextArea = [number, number, number, number];
+
+// Stored attrs checked before an export writes them.
+export const asTextArea = (v: unknown): TextArea | null =>
+  Array.isArray(v) && v.length === 4 && v.every(Number.isFinite) ? v as TextArea : null;
+export const asShapePreset = (v: unknown): DrawingMlPreset | null => {
+  const p = v as DrawingMlPreset | null;
+  return typeof p?.name === 'string' && /^\w+$/.test(p.name) && p.adj && typeof p.adj === 'object'
+    && Object.values(p.adj).every(Number.isFinite) ? p : null;
+};
 
 /** An outline whose stroked parts never close: a line, which may carry arrow heads. */
 export function isOpenOutline(path: string): boolean {
@@ -439,19 +476,26 @@ export function fitPath(cmds: PathCmd[], vbW: number, vbH: number, vbX = 0, vbY 
   return parts.join(' ');
 }
 
-/** ODF's `draw:enhanced-path` for an outline the editor holds in its 0…100 box. */
-export function odfEnhancedPath(path: string): string {
-  return outlineParts(path).map(({ d, fill, stroke }) => {
-    const body = parseSvgPath(d).map((c) => (c.c === 'Z' ? 'Z'
+/**
+ * ODF's `draw:enhanced-path` for an outline the editor holds in its 0…100 box. The
+ * shading letters are LibreOffice's own (`drawooo:`); `plain` leaves them out for `draw:`.
+ */
+export function odfEnhancedPath(path: string, plain = false): string {
+  return outlineParts(path).map((p) => {
+    const body = parseSvgPath(p.d).map((c) => (c.c === 'Z' ? 'Z'
       : `${c.c} ${c.p.map((v) => Math.round((v * VB) / 100)).join(' ')}`)).join(' ');
-    return `${body}${fill ? '' : ' F'}${stroke ? '' : ' S'} N`;
+    return `${body}${flags(plain ? { ...p, shade: undefined } : p)}`;
   }).join(' ');
 }
 
+const ML_SHADE: Record<Shade, string> = { H: 'darken', I: 'darkenLess', J: 'lighten', K: 'lightenLess' };
+export const shadeFromDrawingMl = (fill: string | null): Shade | undefined =>
+  (Object.keys(ML_SHADE) as Shade[]).find((k) => ML_SHADE[k] === fill);
+
 /** DrawingML's `<a:path>`s for the same outline, one per part, in a `w`×`h` space. */
 export function drawingMlPath(path: string, w: number, h: number): string {
-  return outlineParts(path).map(({ d, fill, stroke }) => drawingMlPart(d, w, h,
-    `${fill ? '' : ' fill="none"'}${stroke ? '' : ' stroke="0"'}`)).join('');
+  return outlineParts(path).map(({ d, fill, stroke, shade }) => drawingMlPart(d, w, h,
+    `${!fill ? ' fill="none"' : shade ? ` fill="${ML_SHADE[shade]}"` : ''}${stroke ? '' : ' stroke="0"'}`)).join('');
 }
 
 function drawingMlPart(path: string, w: number, h: number, attrs: string): string {

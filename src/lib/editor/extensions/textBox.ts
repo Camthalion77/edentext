@@ -11,7 +11,8 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import { placeFromPage, placeInColumn, freeDragX } from './pageBreaks';
 import { HANDLES, MIN_SIZE_PX, clamp, parsePx, frameMargins, pageContentHeightPx, sinkToOffset, applyRunThrough, clearPagePlace, startFreeMove, droppedFrameAttrs, type WrapMode } from './image';
-import { SHAPES, shapePath, linePaths, pathHeadPaths, arrowHeadPx, isShapeKind, isLineKind, outlineLayers, type PathHeads, type ShapeKind } from '../../utils/shapes';
+import { SHAPES, shapePath, linePaths, pathHeadPaths, arrowHeadPx, isShapeKind, isLineKind, outlineLayers, shadeColor, asShapePreset, asTextArea, type PathHeads, type ShapeKind, type DrawingMlPreset, type TextArea } from '../../utils/shapes';
+import type { ResolvedGeometry } from '../../utils/enhancedGeometry';
 import { cmToPx } from '../../storage/pageMargins';
 import { normalizeColor } from '../../utils/color';
 
@@ -61,6 +62,8 @@ export interface TextBoxAttrs {
   paddingCm: number;          // inset ring around the text (ODF fo:padding)
   shapeKind: ShapeKind;
   shapePath: string | null;   // a freeform's own outline, in the 0…100 box
+  shapeTextArea: TextArea | null; // where its text goes, same box
+  shapePreset: DrawingMlPreset | null; // a DrawingML preset it stays, shapePath its snapshot
   arrowHeads: PathHeads | null; // the ends of that outline carrying an arrow head
   flipV: boolean;             // a line runs bottom-left → top-right instead
   textVertical: boolean;      // text runs top-to-bottom, right-to-left
@@ -260,6 +263,21 @@ export const TextBox = Node.create({
         parseHTML: el => (el as HTMLElement).getAttribute('data-shape-path') || null,
         renderHTML: () => ({}),
       },
+      // The text area of that outline: left, top, right, bottom in the same box.
+      shapeTextArea: {
+        default: null,
+        parseHTML: el => asTextArea(((el as HTMLElement).getAttribute('data-shape-text-area') ?? '').split(' ').map(Number)),
+        renderHTML: () => ({}),
+      },
+      // A DrawingML preset the outline came from, redrawn for whatever size the box takes.
+      shapePreset: {
+        default: null,
+        parseHTML: el => {
+          try { return asShapePreset(JSON.parse((el as HTMLElement).getAttribute('data-shape-preset') ?? 'null')); }
+          catch { return null; }
+        },
+        renderHTML: () => ({}),
+      },
       // Arrow heads on an open outline (a connector's ends): which of them carry one.
       arrowHeads: {
         default: null,
@@ -351,6 +369,8 @@ export const TextBox = Node.create({
       ...(a.wrapFromBody ? { 'data-wrap-from-body': '' } : {}),
       ...(a.shapeKind !== 'textbox' ? { 'data-shape': a.shapeKind } : {}),
       ...(a.shapePath ? { 'data-shape-path': a.shapePath } : {}),
+      ...(a.shapeTextArea ? { 'data-shape-text-area': a.shapeTextArea.join(' ') } : {}),
+      ...(a.shapePreset ? { 'data-shape-preset': JSON.stringify(a.shapePreset) } : {}),
       ...(a.arrowHeads ? { 'data-arrow-heads': a.arrowHeads } : {}),
       ...(a.flipV ? { 'data-flip-v': 'true' } : {}),
       ...(a.textVertical ? { 'data-text-vertical': 'true' } : {}),
@@ -514,6 +534,10 @@ const rotorSize = (el: HTMLElement): Size => ({ w: el.offsetWidth, h: el.offsetH
 // frames — 1.4 s on a document holding 450 of them.
 const fitted = new WeakMap<Element, TextBoxView>();
 let fitObserver: ResizeObserver | null = null;
+// The preset table, loaded the first time a box needs it (`resolvePreset`).
+let presetTable: typeof import('../../utils/shapePresets') | null = null;
+let presetsLoading: Promise<void> | null = null;
+const EMU_PER_PX = 9525;
 
 function observeFit(rotor: HTMLElement, view: TextBoxView): void {
   fitted.set(rotor, view);
@@ -547,7 +571,9 @@ class TextBoxView {
   private dragBy: { x: number; y: number } | null = null;
   private dragX = 0;
   // The polygon outline, for a shape CSS cannot draw; null for the three it can.
-  private outline: SVGPathElement | null = null;
+  private outline: SVGSVGElement | null = null;
+  // A preset's outline and text area for the size last drawn (`resolvePreset`).
+  private live: { key: string; geo: ResolvedGeometry } | null = null;
   // The line and its arrow heads, for the kinds that are two endpoints, not a box.
   private lineSvg: SVGSVGElement | null = null;
   // Last text-area inset applied; guards the ResizeObserver feedback loop.
@@ -644,6 +670,7 @@ class TextBoxView {
     this.rotor.style.display = a.textVAlign === 'top' ? '' : 'flex';
     this.rotor.style.flexDirection = 'column';
     this.rotor.style.justifyContent = a.textVAlign === 'middle' ? 'center' : a.textVAlign === 'bottom' ? 'flex-end' : '';
+    this.resolvePreset();
     this.applyOutline();
     this.applyLine();
     this.applyWrap();
@@ -664,7 +691,7 @@ class TextBoxView {
     // An outline's heads ride the same real-pixel layer, over the stretched outline.
     const paths = linePaths(a.shapeKind, w, h, a.flipV, headLen)
       ?? (a.shapePath && a.arrowHeads && a.strokeColor
-        ? { line: '', heads: pathHeadPaths(a.shapePath, w, h, a.arrowHeads, headLen) } : null);
+        ? { line: '', heads: pathHeadPaths(this.live?.geo.path || a.shapePath, w, h, a.arrowHeads, headLen) } : null);
     if (!paths) {
       this.lineSvg?.remove();
       this.lineSvg = null;
@@ -706,45 +733,61 @@ class TextBoxView {
   // width under that distortion.
   private applyOutline(): void {
     const a = this.attrs();
-    const d = shapePath(a.shapeKind, a.shapePath);
+    const d = this.live?.geo.path || shapePath(a.shapeKind, a.shapePath);
     if (!d) {
-      this.outline?.parentElement?.remove();
+      this.outline?.remove();
       this.outline = null;
       return;
     }
     if (!this.outline) {
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('class', 'textbox-outline');
-      svg.setAttribute('viewBox', '0 0 100 100');
-      svg.setAttribute('preserveAspectRatio', 'none');
-      this.outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      this.outline.setAttribute('vector-effect', 'non-scaling-stroke');
-      svg.appendChild(this.outline);
-      this.rotor.insertBefore(svg, this.rotor.firstChild);
+      this.outline = document.createElementNS(SVG_NS, 'svg');
+      this.outline.setAttribute('class', 'textbox-outline');
+      this.outline.setAttribute('viewBox', '0 0 100 100');
+      this.outline.setAttribute('preserveAspectRatio', 'none');
+      this.rotor.insertBefore(this.outline, this.rotor.firstChild);
     }
-    // Parts filled only or stroked only (`outlineLayers`) need a second path for the lines.
-    const layers = outlineLayers(d);
-    const split = layers.fill !== layers.stroke;
-    let lines = this.outline.nextElementSibling as SVGPathElement | null;
-    if (split && !lines) {
-      lines = this.outline.cloneNode() as SVGPathElement;
-      this.outline.after(lines);
-    } else if (!split) lines?.remove();
-    const fill = normalizeColor(a.fillColor) ?? 'none';
+    // Faces filled only, shaded or stroked only (`outlineLayers`) each take a path: the
+    // fills in drawing order, then the lines over them.
+    const { fills, stroke: lines } = outlineLayers(d);
+    const fill = normalizeColor(a.fillColor);
     const stroke = normalizeColor(a.strokeColor) ?? 'none';
-    const width = String(a.strokeWidthPt * PX_PER_PT);
     // An outline none of whose parts closes is stroked only, whatever fill its style
     // declares — which is how both products draw a polyline.
-    this.outline.setAttribute('d', layers.fill);
-    this.outline.setAttribute('fill', layers.fill.includes('Z') ? fill : 'none');
-    this.outline.setAttribute('stroke', split ? 'none' : stroke);
-    this.outline.setAttribute('stroke-width', width);
-    if (split && lines) {
-      lines.setAttribute('d', layers.stroke);
-      lines.setAttribute('fill', 'none');
-      lines.setAttribute('stroke', stroke);
-      lines.setAttribute('stroke-width', width);
+    const layers = fills.map((f) => ({ d: f.d, fill: fill && f.d.includes('Z') ? shadeColor(fill, f.shade) : 'none', stroke: 'none' }));
+    if (layers.length === 1 && fills[0].d === lines) layers[0].stroke = stroke;
+    else layers.push({ d: lines, fill: 'none', stroke });
+    const paths = Array.from(this.outline.children) as SVGPathElement[];
+    layers.forEach((l, i) => {
+      const p = paths[i] ?? this.outline!.appendChild(document.createElementNS(SVG_NS, 'path'));
+      p.setAttribute('vector-effect', 'non-scaling-stroke');
+      p.setAttribute('d', l.d);
+      p.setAttribute('fill', l.fill);
+      p.setAttribute('stroke', l.stroke);
+      p.setAttribute('stroke-width', String(a.strokeWidthPt * PX_PER_PT));
+    });
+    paths.slice(layers.length).forEach((p) => p.remove());
+  }
+
+  // A preset is redrawn from its formulas at the size the box renders at, so a corner
+  // or a depth keeps its measure however the box is stretched. The table loads once;
+  // until then the snapshot in `shapePath` draws.
+  private resolvePreset(size?: Size): void {
+    const preset = this.attrs().shapePreset;
+    if (!preset) { this.live = null; return; }
+    if (!presetTable) {
+      presetsLoading ??= import('../../utils/shapePresets').then((m) => { presetTable = m; });
+      presetsLoading.then(() => { if (this.attrs().shapePreset) this.applyAll(); }, () => {});
+      return;
     }
+    const a = this.attrs();
+    const { w, h } = size ?? { w: a.width ?? DEFAULT_WIDTH_PX, h: a.height ?? DEFAULT_HEIGHT_PX };
+    if (!w || !h) return;
+    const key = `${JSON.stringify(preset)} ${Math.round(w)} ${Math.round(h)}`;
+    if (this.live?.key === key) return;
+    const geo = presetTable.presetGeometry(preset, w * EMU_PER_PX, h * EMU_PER_PX);
+    this.live = geo.path ? { key, geo } : null;
+    this.applyOutline();
+    this.applyLine();
   }
 
   // Pad the content into the shape's own text area — the ellipse's inscribed rectangle,
@@ -753,7 +796,7 @@ class TextBoxView {
   // ResizeObserver then settles (every ratio below 0.5 converges).
   private applyShapeInset(size?: Size): void {
     const kind = this.attrs().shapeKind;
-    const area = SHAPES[kind]?.textArea;
+    const area = SHAPES[kind]?.textArea ?? (this.live ? this.live.geo.textArea : this.attrs().shapeTextArea);
     if (kind !== 'ellipse' && !area) {
       if (this.contentDOM.style.padding) this.contentDOM.style.padding = '';
       this.lastInset = '';
@@ -1088,6 +1131,7 @@ class TextBoxView {
   // What the shared observer reports, so nothing here reads the rotor back: one
   // frame's write between two reads is a forced layout per frame in the document.
   refit(size: Size): void {
+    this.resolvePreset(size);
     this.applyShapeInset(size);
     this.fitWrapper(size);
     // A right float's margin is computed from the wrapper width just set.

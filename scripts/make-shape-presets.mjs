@@ -1,11 +1,11 @@
-// Regenerates src/lib/import/shapePresets.json from LibreOffice's dump of the DrawingML
+// Regenerates src/lib/utils/shapePresets.json from LibreOffice's dump of the DrawingML
 // preset shapes (filter/oox-drawingml-cs-presets, MPL-2.0): per preset its adjust
-// defaults, equations and path, in the ODF enhanced-geometry language. Argument: the dump.
+// defaults, equations, path and text area, in the ODF enhanced-geometry language. Argument: the dump.
 import { readFile, writeFile } from 'node:fs/promises';
 
 const SRC = process.argv[2]
   ?? '/Applications/LibreOffice.app/Contents/Resources/filter/oox-drawingml-cs-presets';
-const OUT = 'src/lib/import/shapePresets.json';
+const OUT = 'src/lib/utils/shapePresets.json';
 
 // EnhancedCustomShapeSegmentCommand → path letter, and the coordinate pairs one takes.
 const SEGMENTS = {
@@ -30,9 +30,10 @@ for (const block of (await readFile(SRC, 'utf8')).split(/^\/\* (?=\w+ \*\/$)/m).
     .map((m) => [m[2], Number(m[1])]);
   const eq = [...prop('Equations').matchAll(/"([^"]*)"/g)].map((m) => m[1].replace(/\?(\d+)/g, '?f$1').trim());
   const path = prop('Path');
-  const coords = [...between(path, 'Name = "Coordinates"', 'Name = "Segments"')
-    .matchAll(/\(long\) (-?\d+) \}, Type = \(short\) (\d)/g)]
+  const params = (s) => [...s.matchAll(/\(long\) (-?\d+) \}, Type = \(short\) (\d)/g)]
     .map((m) => (m[2] === '1' ? `?f${m[1]}` : m[2] === '2' ? `$${m[1]}` : m[1]));
+  const coords = params(between(path, 'Name = "Coordinates"', 'Name = "Segments"'));
+  const text = params(between(path, 'Name = "TextFrames"', 'State =')).slice(0, 4).join(' ');
   const parts = [];
   let at = 0;
   for (const m of between(path, 'Name = "Segments"', 'State =').matchAll(/Command = \(short\) (\d+), Count = \(short\) (\d+)/g)) {
@@ -43,7 +44,8 @@ for (const block of (await readFile(SRC, 'utf8')).split(/^\/\* (?=\w+ \*\/$)/m).
   }
   const sub = [...between(path, 'Name = "SubViewSize"', 'State =')
     .matchAll(/Width = \(long\) (\d+), Height = \(long\) (\d+)/g)].flatMap((m) => [Number(m[1]), Number(m[2])]);
-  presets[name] = { ...(adj.length ? { adj } : {}), eq, path: parts.join(' '), ...(sub.length ? { sub } : {}) };
+  presets[name] = { ...(adj.length ? { adj } : {}), eq, path: parts.join(' '), ...(sub.length ? { sub } : {}),
+    ...(text ? { text } : {}) };
 }
 
 await writeFile(OUT, `${JSON.stringify(presets)}\n`);

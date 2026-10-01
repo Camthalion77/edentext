@@ -6,7 +6,8 @@ import { zipSync, strToU8, unzipSync, strFromU8 } from 'fflate';
 import { buildOdt } from '../../src/lib/export/odt';
 import { importOdt } from '../../src/lib/import/odt';
 import { buildDocx } from '../../src/lib/export/docx';
-import { importDocx, presetOutline } from '../../src/lib/import/docx';
+import { importDocx } from '../../src/lib/import/docx';
+import { presetGeometry } from '../../src/lib/utils/shapePresets';
 import { pathHeadPaths } from '../../src/lib/utils/shapes';
 
 type N = any;
@@ -146,11 +147,12 @@ const shapes = (r: N): N[] => {
 
 describe('a Word connector preset', () => {
   it('draws the elbow its formula and adjust values give', () => {
-    expect(presetOutline('bentConnector3', {}, 3600, 3600)).toBe('M 0 0 L 50 0 L 50 100 L 100 100');
-    expect(presetOutline('bentConnector3', { adj1: 25000 }, 3600, 3600, false, true)).toBe('M 0 100 L 25 100 L 25 0 L 100 0');
-    expect(presetOutline('bentConnector2', {}, 3600, 3600, true)).toBe('M 100 0 L 0 0 L 0 100');
-    expect(presetOutline('curvedConnector3', {}, 3600, 3600)).toBe('M 0 0 C 25 0 50 25 50 50 C 50 75 75 100 100 100');
-    expect(presetOutline('noSuchPreset', {}, 3600, 3600)).toBe('');
+    const outline = (name: string, adj = {}, flips = {}) => presetGeometry({ name, adj, ...flips }, 3600, 3600).path;
+    expect(outline('bentConnector3')).toBe('M 0 0 L 50 0 L 50 100 L 100 100');
+    expect(outline('bentConnector3', { adj1: 25000 }, { flipV: true })).toBe('M 0 100 L 25 100 L 25 0 L 100 0');
+    expect(outline('bentConnector2', {}, { flipH: true })).toBe('M 100 0 L 0 0 L 0 100');
+    expect(outline('curvedConnector3')).toBe('M 0 0 C 25 0 50 25 50 50 C 50 75 75 100 100 100');
+    expect(outline('noSuchPreset')).toBe('');
   });
 
   it('imports as a box drawing that outline', () => {

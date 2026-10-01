@@ -23,7 +23,9 @@ import { docxPicture, matchFormat, toDateValue, type Token } from '../utils/date
 import {
   shapeFromOdfType, lineKindFor, pathHeadsFor, parseSvgPath, parseOdfPoints, fitPath, isOpenOutline, type ShapeKind,
 } from '../utils/shapes';
-import { enhancedGeometryPath } from '../utils/enhancedGeometry';
+import { resolveGeometry, type ResolvedGeometry } from '../utils/enhancedGeometry';
+import { isPresetName, presetAdjust } from '../utils/shapePresets';
+import type { DrawingMlPreset } from '../utils/shapes';
 import { imageDataUrl, imageSizeCm, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { boundedInt, IMPORT_LIMITS, parseImportXml } from './importLimits';
 import { astToLatex } from '../math/latex';
@@ -660,15 +662,26 @@ function loadObjectDoc(href: string | null, ctx: Ctx): Document | null {
 function convertShape(el: Element, ctx: Ctx): Node | null {
   let kind: ShapeKind | null = null;
   let path = '';
+  let resolved: ResolvedGeometry | null = null;
+  let preset: DrawingMlPreset | null = null;
   if (el.localName === 'rect') kind = 'textbox';
   else if (el.localName === 'ellipse') kind = 'ellipse';
   else {
     const geo = el.getElementsByTagNameNS(NS.draw, 'enhanced-geometry')[0];
-    kind = shapeFromOdfType(geo?.getAttributeNS(NS.draw, 'type'));
+    const type = geo?.getAttributeNS(NS.draw, 'type') ?? '';
+    kind = shapeFromOdfType(type);
     // A shape no preset covers still draws from the outline it carries: LibreOffice
     // writes a freeform as `non-primitive` plus the path, any other shape with formulas.
+    // A DrawingML preset (`ooxml-name`) stays one, so it keeps resizing as a preset.
     if (!kind && geo) {
-      path = enhancedPathOutline(geo, el);
+      resolved = enhancedPathOutline(geo, el);
+      path = resolved.path;
+      const name = type.startsWith('ooxml-') ? type.slice(6) : '';
+      if (path && isPresetName(name)) {
+        const flag = (a: string) => geo.getAttributeNS(NS.draw, a) === 'true';
+        preset = { name, adj: presetAdjust(name, (geo.getAttributeNS(NS.draw, 'modifiers') ?? '').trim().split(/\s+/).filter(Boolean).map(Number)),
+          ...(flag('mirror-horizontal') ? { flipH: true } : {}), ...(flag('mirror-vertical') ? { flipV: true } : {}) };
+      }
       if (path) kind = 'textbox';
     }
   }
@@ -679,6 +692,8 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
   const attrs: Record<string, unknown> = {};
   if (kind !== 'textbox') attrs.shapeKind = kind;
   if (path) attrs.shapePath = path;
+  if (resolved?.textArea) attrs.shapeTextArea = resolved.textArea;
+  if (preset) attrs.shapePreset = preset;
   const wCm = lengthToCm(el.getAttributeNS(NS.svg, 'width'));
   const hCm = lengthToCm(el.getAttributeNS(NS.svg, 'height'));
   if (wCm != null) attrs.width = framePx(cmToPx(wCm));
@@ -695,16 +710,16 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
 // A `<draw:enhanced-geometry>` no preset matches, read as its own outline: its
 // equations and modifiers resolved for the shape's size, arcs as curves. LibreOffice
 // keeps the arcs only in its own `drawooo:enhanced-path`, so that one wins.
-function enhancedPathOutline(geo: Element, el: Element): string {
+function enhancedPathOutline(geo: Element, el: Element): ResolvedGeometry {
   const path = geo.getAttributeNS(NS.drawooo, 'enhanced-path') || geo.getAttributeNS(NS.draw, 'enhanced-path');
-  if (!path) return '';
+  if (!path) return { path: '', textArea: null };
   const nums = (v: string | null) => (v ?? '').trim().split(/\s+/).filter(Boolean).map(Number);
   const equations: Record<string, string> = {};
   for (const eq of Array.from(geo.getElementsByTagNameNS(NS.draw, 'equation'))) {
     equations[eq.getAttributeNS(NS.draw, 'name') ?? ''] = eq.getAttributeNS(NS.draw, 'formula') ?? '';
   }
   const hundredthMm = (name: string) => (lengthToCm(el.getAttributeNS(NS.svg, name)) ?? 0) * 1000;
-  return enhancedGeometryPath({
+  return resolveGeometry({
     path, equations,
     modifiers: nums(geo.getAttributeNS(NS.draw, 'modifiers')),
     viewBox: nums(geo.getAttributeNS(NS.svg, 'viewBox')),
@@ -712,6 +727,7 @@ function enhancedPathOutline(geo: Element, el: Element): string {
     mirrorH: geo.getAttributeNS(NS.draw, 'mirror-horizontal') === 'true',
     mirrorV: geo.getAttributeNS(NS.draw, 'mirror-vertical') === 'true',
     subViews: nums(geo.getAttributeNS(NS.drawooo, 'sub-view-size')),
+    textAreas: geo.getAttributeNS(NS.draw, 'text-areas') ?? undefined,
   });
 }
 

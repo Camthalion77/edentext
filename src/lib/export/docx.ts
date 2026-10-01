@@ -20,7 +20,7 @@ import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { isSvgDataUrl, svgToPngDataUrl } from '../import/imageFormats';
 import { TEXTBOX_PADDING_CM, type TextVAlign } from '../editor/extensions/textBox';
 import { cropOf, type Crop } from '../editor/extensions/image';
-import { SHAPES, boxHeads, isShapeKind, isLineKind, drawingMlPath, type PathHeads, type ShapeKind } from '../utils/shapes';
+import { SHAPES, boxHeads, isShapeKind, isLineKind, drawingMlPath, asShapePreset, asTextArea, type PathHeads, type ShapeKind, type DrawingMlPreset, type TextArea } from '../utils/shapes';
 import { cellFormatCode, isCellFormat } from '../utils/cellFormat';
 import { cjkDocFont, isAsianTag, type ExportLanguage } from '../storage/documentLanguage';
 import { DEFAULT_MARGINS, type PageMargins } from '../storage/pageMargins';
@@ -1095,6 +1095,8 @@ type TextBoxDocx = {
   inFront: boolean;
   shapeKind: ShapeKind;
   shapePath: string | null;
+  shapeTextArea: TextArea | null;
+  shapePreset: DrawingMlPreset | null;
   arrowHeads: PathHeads | null;
   flipV: boolean;
   textVertical: boolean;
@@ -1126,6 +1128,8 @@ function textBoxDocxDescriptor(node: TiptapNode): TextBoxDocx {
     inFront: a.inFront === true,
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
+    shapeTextArea: asTextArea(a.shapeTextArea),
+    shapePreset: typeof a.shapePath === 'string' && a.shapePath ? asShapePreset(a.shapePreset) : null,
     arrowHeads: a.arrowHeads === 'start' || a.arrowHeads === 'end' || a.arrowHeads === 'both' ? a.arrowHeads : null,
     flipV: a.flipV === true,
     textVertical: a.textVertical === true,
@@ -1509,13 +1513,20 @@ function textBoxDrawingXml(box: TextBoxDocx, index: number, parts: TxbxParts): s
   // (probed: the text lands in the body, over whatever follows).
   const autofit = '<a:noAutofit/>';
   // A freeform is its own outline: custGeom over the same 0…100 box, in the shape's
-  // own EMU extent so the path needs no second scale.
-  const geom = box.shapePath
-    ? `<a:custGeom><a:avLst/><a:pathLst>${drawingMlPath(box.shapePath, cx, cy)}</a:pathLst></a:custGeom>`
+  // own EMU extent so the path needs no second scale. A preset is only its name.
+  const preset = box.shapePreset;
+  const area = box.shapeTextArea;
+  const rect = area ? `<a:rect l="${Math.round((area[0] * cx) / 100)}" t="${Math.round((area[1] * cy) / 100)}"`
+    + ` r="${Math.round((area[2] * cx) / 100)}" b="${Math.round((area[3] * cy) / 100)}"/>` : '';
+  const geom = preset
+    ? `<a:prstGeom prst="${preset.name}"><a:avLst>${Object.entries(preset.adj)
+      .map(([n, v]) => `<a:gd name="${escapeXml(n)}" fmla="val ${Math.round(v)}"/>`).join('')}</a:avLst></a:prstGeom>`
+    : box.shapePath
+    ? `<a:custGeom><a:avLst/>${rect}<a:pathLst>${drawingMlPath(box.shapePath, cx, cy)}</a:pathLst></a:custGeom>`
     : `<a:prstGeom prst="${SHAPES[box.shapeKind].prst}"><a:avLst/></a:prstGeom>`;
   // Word draws the `line` preset down the frame's diagonal and flips it to reach the
   // other one; a line carries no fill and no text body.
-  const flip = line && box.flipV ? ' flipV="1"' : '';
+  const flip = (preset?.flipH ? ' flipH="1"' : '') + ((line && box.flipV) || preset?.flipV ? ' flipV="1"' : '');
   const body = line
     ? ''
     : `<wps:txbx><w:txbxContent>${txbxContentXml(box.content, parts)}</w:txbxContent></wps:txbx>`;

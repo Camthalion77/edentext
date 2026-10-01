@@ -3,7 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import { zipSync, strToU8, strFromU8, unzipSync } from 'fflate';
 import { evalFormula, enhancedGeometryPath, drawingMlGuides } from '../../src/lib/utils/enhancedGeometry';
-import { arcBeziers, parseSvgPath } from '../../src/lib/utils/shapes';
+import { arcBeziers, parseSvgPath, shadeColor } from '../../src/lib/utils/shapes';
+import { presetGeometry } from '../../src/lib/utils/shapePresets';
 import { importOdt } from '../../src/lib/import/odt';
 import { importDocx } from '../../src/lib/import/docx';
 import { buildOdt } from '../../src/lib/export/odt';
@@ -72,13 +73,13 @@ const odt = (body: string) => zipSync({
 });
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-const wsp = (spPr: string) => zipSync({
+const wsp = (spPr: string, flip = '') => zipSync({
   'word/document.xml': strToU8(`<?xml version="1.0"?><w:document xmlns:w="${W}"`
     + ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
     + ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
     + ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><w:body>'
     + '<w:p><w:r><w:drawing><wp:inline><wp:extent cx="1440000" cy="1080000"/><a:graphic><a:graphicData>'
-    + `<wps:wsp><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1440000" cy="1080000"/></a:xfrm>${spPr}</wps:spPr>`
+    + `<wps:wsp><wps:spPr><a:xfrm${flip}><a:off x="0" y="0"/><a:ext cx="1440000" cy="1080000"/></a:xfrm>${spPr}</wps:spPr>`
     + '<wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p></w:body></w:document>'),
 });
 
@@ -126,17 +127,70 @@ describe('a shape built from formulas', () => {
 
   it('keeps the outline and its parts through both formats', async () => {
     const box = shape(importDocx(wsp('<a:prstGeom prst="smileyFace"><a:avLst/></a:prstGeom>')));
-    const doc: N = { type: 'doc', content: [{ type: 'paragraph', content: [box] }] };
-    const margins = { top: 2, bottom: 2, left: 2, right: 2 };
-    const near = (d: string) => (d.match(/-?[\d.]+/g) ?? []).map((v) => Math.round(Number(v)));
-    const odtBytes = await buildOdt(doc, margins, 'portrait');
-    const docxBytes = await buildDocx(doc, margins, 'portrait');
-    expect(strFromU8(unzipSync(odtBytes)['content.xml'])).toMatch(/draw:enhanced-path="M [^"]* Z S N [^"]* F N"/);
-    expect(strFromU8(unzipSync(docxBytes)['word/document.xml'])).toContain(' fill="none">');
-    const viaOdt = shape(importOdt(odtBytes)).attrs.shapePath;
-    const viaDocx = shape(importDocx(docxBytes)).attrs.shapePath;
-    expect(near(viaOdt)).toEqual(near(box.attrs.shapePath));
-    expect(near(viaDocx)).toEqual(near(box.attrs.shapePath));
-    expect(viaDocx.match(/[FS] N/g)).toEqual(box.attrs.shapePath.match(/[FS] N/g));
+    const { viaOdt, viaDocx, odt, docx } = await roundTrip({ ...box, attrs: { ...box.attrs, shapePreset: null } });
+    expect(odt).toMatch(/draw:enhanced-path="M [^"]* Z S N [^"]* F N"/);
+    expect(docx).toContain(' fill="none">');
+    expect(near(viaOdt.attrs.shapePath)).toEqual(near(box.attrs.shapePath));
+    expect(near(viaDocx.attrs.shapePath)).toEqual(near(box.attrs.shapePath));
+    expect(viaDocx.attrs.shapePath.match(/[FS] N/g)).toEqual(box.attrs.shapePath.match(/[FS] N/g));
+  });
+
+  it('shades a face darker or lighter, in both formats', async () => {
+    const cube = shape(importDocx(wsp('<a:prstGeom prst="cube"><a:avLst/></a:prstGeom>')));
+    expect(cube.attrs.shapePath).toMatch(/Z I S N .* Z K S N/);
+    expect(shadeColor('#ffd320', 'I')).toBe('#cca819');
+    expect(shadeColor('#ffd320', 'K')).toBe('#ffdb4c');
+    const { viaOdt, viaDocx, odt, docx } = await roundTrip({ ...cube, attrs: { ...cube.attrs, shapePreset: null } });
+    expect(docx).toContain(' fill="darkenLess"');
+    expect(odt).toMatch(/drawooo:enhanced-path="[^"]* I S N/);
+    expect(odt).not.toMatch(/ draw:enhanced-path="[^"]*[HIJK] /);
+    expect(odt).toContain('xmlns:drawooo=');
+    for (const b of [viaOdt, viaDocx]) expect(b.attrs.shapePath.match(/[HIJK]/g)).toEqual(['I', 'K']);
+  });
+
+  it('keeps the text area a shape declares', async () => {
+    const area = presetGeometry({ name: 'cube', adj: {} }, 1440000, 1080000).textArea!;
+    expect(area[0]).toBe(0);
+    expect(area[1]).toBeGreaterThan(0);
+    expect(area[2]).toBeLessThan(100);
+    const free = shape(importDocx(wsp('<a:custGeom><a:avLst/><a:rect l="wd4" t="t" r="r" b="vc"/><a:pathLst>'
+      + '<a:path w="2" h="2"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="2" y="2"/></a:lnTo>'
+      + '<a:lnTo><a:pt x="0" y="2"/></a:lnTo><a:close/></a:path></a:pathLst></a:custGeom>')));
+    expect(free.attrs.shapeTextArea).toEqual([25, 0, 100, 50]);
+    const { viaOdt, viaDocx } = await roundTrip(free);
+    expect(viaOdt.attrs.shapeTextArea).toEqual([25, 0, 100, 50]);
+    expect(viaDocx.attrs.shapeTextArea).toEqual([25, 0, 100, 50]);
+  });
+
+  it('keeps a preset a preset, its adjust values and flips with it', async () => {
+    const moon = shape(importDocx(wsp('<a:prstGeom prst="moon"><a:avLst><a:gd name="adj" fmla="val 10000"/></a:avLst></a:prstGeom>', ' flipH="1"')));
+    const preset = { name: 'moon', adj: { adj: 10000 }, flipH: true };
+    expect(moon.attrs.shapePreset).toEqual(preset);
+    const { viaOdt, viaDocx, odt, docx } = await roundTrip(moon);
+    expect(docx).toContain('<a:prstGeom prst="moon"><a:avLst><a:gd name="adj" fmla="val 10000"/></a:avLst></a:prstGeom>');
+    expect(docx).toContain('flipH="1"');
+    expect(odt).toContain('draw:type="ooxml-moon"');
+    expect(odt).toContain('draw:modifiers="10000"');
+    expect(viaOdt.attrs.shapePreset).toEqual(preset);
+    expect(viaDocx.attrs.shapePreset).toEqual(preset);
+    expect(near(viaOdt.attrs.shapePath)).toEqual(near(moon.attrs.shapePath));
+    // Redrawn for its size: a cube's depth is a share of its shorter side.
+    const cube = (w: number, h: number) => presetGeometry({ name: 'cube', adj: {} }, w, h).path;
+    expect(cube(2000000, 1000000)).not.toBe(cube(1000000, 2000000));
   });
 });
+
+const near = (d: string) => (d.match(/-?[\d.]+/g) ?? []).map((v) => Math.round(Number(v)));
+
+async function roundTrip(box: N) {
+  const doc: N = { type: 'doc', content: [{ type: 'paragraph', content: [box] }] };
+  const margins = { top: 2, bottom: 2, left: 2, right: 2 };
+  const odtBytes = await buildOdt(doc, margins, 'portrait');
+  const docxBytes = await buildDocx(doc, margins, 'portrait');
+  return {
+    odt: strFromU8(unzipSync(odtBytes)['content.xml']),
+    docx: strFromU8(unzipSync(docxBytes)['word/document.xml']),
+    viaOdt: shape(importOdt(odtBytes)),
+    viaDocx: shape(importDocx(docxBytes)),
+  };
+}

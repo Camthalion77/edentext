@@ -19,9 +19,9 @@ import { builtinTableStyles, parseTableLook, resolveTableCell, tableLookAttr } f
 import { formatOrdinal, knownNumFormat, orderedTypeFromFormat, orderedTypeAttrAt, childCycle, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
 import { bulletCharAttr, bulletCharFromDocx } from '../utils/bulletListTypes';
 import { DATE_FORMATS, TIME_FORMATS, docxPicture, findFormat, toDateValue } from '../utils/dateTime';
-import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, pathHeadsFor, isOpenOutline, joinOutlineParts, type OutlinePart, type PathCmd } from '../utils/shapes';
-import { drawingMlArc, drawingMlGuides, drawingMlValue, enhancedGeometryPath } from '../utils/enhancedGeometry';
-import SHAPE_PRESETS from './shapePresets.json';
+import { shapeFromPrst, isLineKind, lineKindFor, parseSvgPath, parseVmlPath, fitPath, pathHeadsFor, isOpenOutline, joinOutlineParts, shadeFromDrawingMl, type OutlinePart, type PathCmd, type DrawingMlPreset } from '../utils/shapes';
+import { drawingMlArc, drawingMlGuides, drawingMlValue, type ResolvedGeometry } from '../utils/enhancedGeometry';
+import { presetGeometry } from '../utils/shapePresets';
 import { imageDataUrl, placeholderImage, unzipArchive, type ConvertedImages } from './imageFormats';
 import { parseImportXml } from './importLimits';
 import { PX_PER_CM, cmToPx, fitMargins, type PageMargins } from '../storage/pageMargins';
@@ -2665,13 +2665,14 @@ function setShapeStyleAttrs(attrs: Record<string, unknown>, fill: string | null,
   }
 }
 
-// <a:custGeom> read as the shape's own outline: its guides resolved for the shape's
-// `w`×`h` size, each path a part in the space it declares (else that size), arcs as
-// curves. A segment or guide that won't resolve leaves the shape unsupported.
-function custGeomPath(spPr: Element | null, w: number, h: number): string {
+// <a:custGeom> read as the shape's own outline and text area: its guides resolved for
+// the shape's `w`×`h` size, each path a part in the space it declares (else that size),
+// arcs as curves. A segment or guide that won't resolve leaves the shape unsupported.
+function custGeomOutline(spPr: Element | null, w: number, h: number): ResolvedGeometry {
+  const none: ResolvedGeometry = { path: '', textArea: null };
   const geom = nsChild(spPr, A, 'custGeom');
   const pathLst = nsChild(geom, A, 'pathLst');
-  if (!pathLst) return '';
+  if (!pathLst) return none;
   const guides = (list: string) => Array.from(nsChild(geom, A, list)?.children ?? [])
     .map((gd): [string, string] => [gd.getAttribute('name') ?? '', gd.getAttribute('fmla') ?? '']);
   try {
@@ -2693,47 +2694,37 @@ function custGeomPath(spPr: Element | null, w: number, h: number): string {
         else if (name === 'quadBezTo') {
           cmds.push({ c: 'C', p: [x + (2 / 3) * (p[0] - x), y + (2 / 3) * (p[1] - y),
             p[2] + (2 / 3) * (p[0] - p[2]), p[3] + (2 / 3) * (p[1] - p[3]), p[2], p[3]] });
-        } else return '';
+        } else return none;
         const last = cmds[cmds.length - 1];
         if (last.c !== 'Z') [x, y] = last.p.slice(-2);
         if (name === 'moveTo') [sx, sy] = [x, y];
       }
       const d = fitPath(cmds, pw, ph);
-      if (!d) return '';
-      parts.push({ d, fill: path.getAttribute('fill') !== 'none', stroke: !['0', 'false'].includes(path.getAttribute('stroke') ?? '') });
+      if (!d) return none;
+      const shade = shadeFromDrawingMl(path.getAttribute('fill'));
+      parts.push({ d, fill: path.getAttribute('fill') !== 'none', stroke: !['0', 'false'].includes(path.getAttribute('stroke') ?? ''),
+        ...(shade ? { shade } : {}) });
     }
-    return parts.length ? joinOutlineParts(parts) : '';
+    if (!parts.length) return none;
+    const rect = nsChild(geom, A, 'rect');
+    const area = rect && w && h ? [v(rect, 'l') / w, v(rect, 't') / h, v(rect, 'r') / w, v(rect, 'b') / h]
+      .map((n) => Math.round(n * 100000) / 1000) as [number, number, number, number] : null;
+    return { path: joinOutlineParts(parts), textArea: area && area[0] < area[2] && area[1] < area[3] ? area : null };
   } catch {
-    return '';
+    return none;
   }
 }
 
-type ShapePreset = { adj?: [string, number][]; eq: string[]; path: string; sub?: number[] };
-
-/**
- * A DrawingML preset (`prst`) the editor has no kind for, drawn from LibreOffice's table
- * of their formulas: the file writes only the name and adjust values, at `w`×`h` EMU.
- * Flips mirror it in the box; '' for a name the table lacks.
- */
-export function presetOutline(prst: string, adj: Record<string, number>, w: number, h: number,
-  flipH = false, flipV = false): string {
-  const p = (SHAPE_PRESETS as unknown as Record<string, ShapePreset>)[prst];
-  if (!Object.hasOwn(SHAPE_PRESETS, prst)) return '';
-  return enhancedGeometryPath({
-    path: p.path,
-    equations: Object.fromEntries(p.eq.map((f, i) => [`f${i}`, f])),
-    modifiers: (p.adj ?? []).map(([name, v]) => adj[name] ?? v),
-    viewBox: [0, 0, 0, 0], logW: w / 360, logH: h / 360, mirrorH: flipH, mirrorV: flipV, subViews: p.sub,
-  });
-}
-
-function presetGeomPath(prstGeom: Element, prst: string, xfrm: Element | null, w: number, h: number): string {
+// A DrawingML preset (`prst`) the editor has no kind for, as the node keeps it: the
+// file writes only the name, its adjust values and the flips.
+function presetOf(prstGeom: Element, prst: string, xfrm: Element | null): DrawingMlPreset {
   const adj: Record<string, number> = {};
   for (const gd of Array.from(nsChild(prstGeom, A, 'avLst')?.children ?? [])) {
     const v = Number(/^val\s+(-?\d+)$/.exec(gd.getAttribute('fmla') ?? '')?.[1]);
     if (Number.isFinite(v)) adj[gd.getAttribute('name') ?? ''] = v;
   }
-  return presetOutline(prst, adj, w, h, xfrm?.getAttribute('flipH') === '1', xfrm?.getAttribute('flipV') === '1');
+  return { name: prst, adj, ...(xfrm?.getAttribute('flipH') === '1' ? { flipH: true } : {}),
+    ...(xfrm?.getAttribute('flipV') === '1' ? { flipV: true } : {}) };
 }
 
 // A DrawingML <wps:wsp> (text box, preset shape or freeform) → a textBox node. A preset
@@ -2752,14 +2743,18 @@ function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ct
   const ext = nsChild(xfrm, A, 'ext');
   const [ew, eh] = [intAttr(ext, '', 'cx') || cx || 0, intAttr(ext, '', 'cy') || cy || 0];
   const known = shapeFromPrst(prst);
-  const outline = custGeomPath(spPr, ew, eh)
-    || (prstGeom && !known ? presetGeomPath(prstGeom, prst, xfrm, ew, eh) : '');
+  const own = custGeomOutline(spPr, ew, eh);
+  const preset = !own.path && prstGeom && !known ? presetOf(prstGeom, prst, xfrm) : null;
+  const geo = preset ? presetGeometry(preset, ew, eh) : own;
+  const outline = geo.path;
   const kind = outline ? 'textbox' : known;
   if (!kind) { ctx.warnings.add('Unsupported shapes were removed'); return null; }
 
   const attrs: Record<string, unknown> = {};
   if (kind !== 'textbox') attrs.shapeKind = kind;
   if (outline) attrs.shapePath = outline;
+  if (geo.textArea) attrs.shapeTextArea = geo.textArea;
+  if (preset && outline) attrs.shapePreset = preset;
   if (box) { attrs.width = box.w; attrs.height = box.h; }
   else {
     if (cx) attrs.width = framePx(emuToPx(cx));

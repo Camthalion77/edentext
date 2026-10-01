@@ -34,7 +34,8 @@ import { TEXTBOX_PADDING_CM, type TextVAlign } from '../editor/extensions/textBo
 import { cropOf, type Crop } from '../editor/extensions/image';
 import { imageSizeCm } from '../import/imageFormats';
 import { numberLocale, parseCellNumber, toWriterFormula, type CellRef, type NumberLocale } from '../utils/tableFormula';
-import { SHAPES, arrowHeadCm, boxHeads, isShapeKind, isLineKind, odfEnhancedGeometry, odfEnhancedPath, type PathHeads, type ShapeKind } from '../utils/shapes';
+import { presetOdfGeometry } from '../utils/shapePresets';
+import { SHAPES, arrowHeadCm, boxHeads, isShapeKind, isLineKind, odfEnhancedGeometry, odfEnhancedPath, asShapePreset, asTextArea, type PathHeads, type ShapeKind, type DrawingMlPreset, type TextArea } from '../utils/shapes';
 import { normalizeLeader, parseTabStops } from '../editor/extensions/tabStops';
 import { charStyleProps, listMarkerFormat, type MarkerFormat } from '../editor/extensions/listMarker';
 import { orderedTypeDef, effectiveOrderedDef, effectiveOrderedDefAt, childCycle, formatOrdinal, ROOT_ORDERED_CYCLE, type OrderedCycle } from '../utils/orderedListTypes';
@@ -1040,6 +1041,8 @@ type TextBoxExport = {
   paddingCm: number;
   shapeKind: ShapeKind;
   shapePath: string | null;
+  shapeTextArea: TextArea | null;
+  shapePreset: DrawingMlPreset | null;
   arrowHeads: PathHeads | null;
   flipV: boolean;
   textVertical: boolean;
@@ -1072,6 +1075,8 @@ function textBoxDescriptor(node: TiptapNode): TextBoxExport {
     paddingCm: typeof a.paddingCm === 'number' ? round3(a.paddingCm) : TEXTBOX_PADDING_CM,
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
+    shapeTextArea: asTextArea(a.shapeTextArea),
+    shapePreset: typeof a.shapePath === 'string' && a.shapePath ? asShapePreset(a.shapePreset) : null,
     arrowHeads: a.arrowHeads === 'start' || a.arrowHeads === 'end' || a.arrowHeads === 'both' ? a.arrowHeads : null,
     flipV: a.flipV === true,
     textVertical: a.textVertical === true,
@@ -4746,10 +4751,11 @@ function textBoxGraphicStyle(box: TextBoxExport, index: number): string {
       ` style:vertical-pos="${box.wrapOffsetYCm != null ? 'from-top' : 'top'}"` +
       ` style:vertical-rel="${verticalRel(box)}"`;
   // auto-grow only for plain text boxes; a custom-shape needs both explicitly
-  // false, or LibreOffice's shape autofit shrinks it to its text.
+  // false, or LibreOffice's shape autofit shrinks it to its text, and wrap on, or its
+  // text runs on one line out of the shape.
   const grow = box.shapeKind === 'textbox' && !box.shapePath
     ? ' draw:auto-grow-height="true"'
-    : ' draw:auto-grow-height="false" draw:auto-grow-width="false"';
+    : ' draw:auto-grow-height="false" draw:auto-grow-width="false" fo:wrap-option="wrap"';
   // An arrow head is a named marker in ODF, defined once in styles.xml.
   const heads = boxHeads(box.shapeKind, box.arrowHeads, box.shapePath);
   const marker = (side: 'start' | 'end') =>
@@ -4803,11 +4809,16 @@ function textBoxXml(box: TextBoxExport, inner: string, index: number): string {
     );
   }
   // A freeform is its own outline rather than a preset's: `non-primitive` plus the
-  // path, which is what LibreOffice writes back out unchanged (probed).
-  const geometry = box.shapePath
+  // path, which is what LibreOffice writes back out unchanged (probed). Shading is its
+  // own `drawooo:` path. A DrawingML preset goes out with its formulas, as LibreOffice's.
+  const path = box.shapePath;
+  const area = box.shapeTextArea;
+  const geometry = (box.shapePreset && presetOdfGeometry(box.shapePreset)) || (path
     ? `<draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="non-primitive"`
-      + ` draw:enhanced-path="${odfEnhancedPath(box.shapePath)}"/>`
-    : odfEnhancedGeometry(box.shapeKind) ?? '';
+      + (area ? ` draw:text-areas="${area.map((v) => Math.round((v * 21600) / 100)).join(' ')}"` : '')
+      + ` draw:enhanced-path="${odfEnhancedPath(path, true)}"`
+      + (/[HIJK]/.test(path) ? ` drawooo:enhanced-path="${odfEnhancedPath(path)}"` : '') + '/>'
+    : odfEnhancedGeometry(box.shapeKind) ?? '');
   return (
     `<draw:custom-shape draw:name="Shape${n}"${common} svg:height="${box.heightCm}cm"${transform}>` +
     `${inner}${geometry}</draw:custom-shape>`
@@ -5601,14 +5612,23 @@ export async function buildOdt(docJson: TiptapNode, margins: PageMargins = DEFAU
   return zipFinal(declareLoext(applyOdfVersion(applyDocProperties(applyPageNumberStart(applySpacingModel(withFonts, spacingModel, spacingAtPageStart, balanceSpaces), pageNumbering.start), props))));
 }
 
-// A pass that writes a loext: attribute (a character indent) leaves its declaration here.
+// A pass that writes a loext: attribute (a character indent) or a drawooo: one (a shape's
+// arcs and shading) leaves its declaration here.
+const EXTENSION_NS: Record<string, string> = {
+  loext: 'urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0',
+  drawooo: 'http://openoffice.org/2010/draw',
+};
 function declareLoext(odtBytes: Uint8Array): Uint8Array {
   const files = unzipSync(odtBytes);
   for (const name of ['content.xml', 'styles.xml']) {
-    const xml = files[name] && strFromU8(files[name]);
-    if (!xml || !/\sloext:/.test(xml) || xml.includes('xmlns:loext=')) continue;
-    files[name] = strToU8(xml.replace(/<office:document-(?:content|styles)\b/,
-      '$& xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"'));
+    let xml = files[name] && strFromU8(files[name]);
+    if (!xml) continue;
+    const before = xml;
+    for (const [prefix, uri] of Object.entries(EXTENSION_NS)) {
+      if (!new RegExp(`\\s${prefix}:`).test(xml) || xml.includes(`xmlns:${prefix}=`)) continue;
+      xml = xml.replace(/<office:document-(?:content|styles)\b/, `$& xmlns:${prefix}="${uri}"`);
+    }
+    if (xml !== before) files[name] = strToU8(xml);
   }
   return rezipOdt(files);
 }

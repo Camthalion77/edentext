@@ -165,15 +165,27 @@ which is how both products draw a polyline.
   and draws its mouth or edges as lines over it. The node view draws the filled and the
   stroked parts as two paths, ODF writes the flags back, DOCX one `<a:path>` per part
   with `fill="none"`/`stroke="0"`. Flattened into one path, LibreOffice's even-odd fill
-  cancelled a face drawn twice (probed). Shading (`H`–`K`, darken/lighten) is skipped.
+  cancelled a face drawn twice (probed). A part may also be **shaded** — `H I J K`,
+  DrawingML's `darken`/`darkenLess`/`lighten`/`lightenLess` — and takes the fill scaled
+  toward black by 0.6/0.8 or mixed 40/20 % toward white, truncated (`shadeColor`,
+  measured on LibreOffice's cube). LibreOffice reads the shading only from
+  `drawooo:enhanced-path`, so ODF writes that beside the plain `draw:` path.
+- A **text area** (`shapeTextArea`, the 0…100 box) comes from ODF's `draw:text-areas`
+  or DrawingML's `a:rect` and goes back out as both; the node view pads the text into
+  it as into a built-in polygon's `textArea`.
 - A **DrawingML preset** writes no path, only its name and adjust values. The ones the
   editor has no kind for (callouts, smiley, moon, connectors, …) are drawn from
-  `import/shapePresets.json`, LibreOffice's own table of all 187 in the same formula
-  language (`scripts/make-shape-presets.mjs`, MPL-2.0), with the file's `a:avLst` over
-  its defaults and the flips mirrored in. A `custGeom`'s guides (`a:gdLst`) and `arcTo`
-  go through `drawingMlGuides`/`drawingMlArc`. The result is a fixed outline: handles
-  and adjust values are not editable, and text uses the whole box, not the preset's
-  text area.
+  `utils/shapePresets.json`, LibreOffice's own table of all 187 in the same formula
+  language (`scripts/make-shape-presets.mjs`, MPL-2.0, text areas included), with the
+  file's `a:avLst` over its defaults and the flips mirrored in. Such a box keeps
+  `shapePreset` (name, adjust values, flips) beside `shapePath`, its snapshot at import:
+  the node view loads the table lazily and redraws outline and text area for the size it
+  renders at, so a depth or corner keeps its measure. DOCX writes the `prstGeom` back;
+  ODF writes the table's geometry as LibreOffice does (`draw:type="ooxml-name"`, empty
+  viewBox, equations, `drawooo:` path), which LibreOffice resizes itself and which reads
+  back as the preset. Handles are not draggable. A `custGeom`'s guides (`a:gdLst`) and
+  `arcTo` go through `drawingMlGuides`/`drawingMlArc`; it and LibreOffice's own shape
+  types stay fixed outlines.
 - **Arrow heads** on an open outline ride `arrowHeads` (`start`/`end`/`both`): ODF's
   `draw:marker-*` on the style, DrawingML's `a:headEnd`/`a:tailEnd`, VML's
   `startarrow`/`endarrow`. The node view draws them like a line's, in real pixels along
