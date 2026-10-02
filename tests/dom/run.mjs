@@ -733,6 +733,78 @@ try {
   check(gridPages > 6 && gridFaults.length === 0,
     `the page grid shows each page in its own cell and the caret where it is (${gridPages} pages${gridFaults.length ? `: ${gridFaults.join('; ')}` : ''})`);
 
+  // Dark theme: every menu each ribbon tab opens, a text box selected so its contextual
+  // tab shows too. A glyph or label barely apart from what it sits on is a colour some
+  // control fixed instead of taking the theme's (a popover's black, the shape gallery's).
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('edentext-theme', 'dark'); });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForSelector('.tiptap', { timeout: 15_000 });
+  await page.click('.tiptap');
+  await page.keyboard.type('Contrast');
+  await page.evaluate(() => document.querySelector('.tiptap').editor.commands.insertTextBox());
+  const selectBox = () => page.evaluate(() => {
+    const ed = document.querySelector('.tiptap').editor;
+    ed.state.doc.descendants((n, p) => { if (n.type.name === 'textBox') ed.commands.setNodeSelection(p); });
+  });
+  const lowContrast = (where) => page.evaluate((where) => {
+    const rgb = (c) => {
+      const v = (c.match(/[\d.]+/g) ?? []).map(Number);
+      return c.startsWith('color(') ? [...v.slice(0, 3).map((x) => x * 255), v[3] ?? 1] : [...v.slice(0, 3), v[3] ?? 1];
+    };
+    const lum = (c) => c.slice(0, 3).reduce((sum, v, i) => {
+      v /= 255;
+      return sum + [0.2126, 0.7152, 0.0722][i] * (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    }, 0);
+    const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    const backdrop = (el) => {
+      for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length === 4 && c[3] > 0.5) return c; }
+      return [255, 255, 255, 1];
+    };
+    const shown = (el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2 || getComputedStyle(el).visibility === 'hidden') return false;
+      for (let e = el; e; e = e.parentElement) if (parseFloat(getComputedStyle(e).opacity) < 0.6) return false;
+      return true;
+    };
+    const out = [];
+    // The column previews' page frame is a hairline on purpose, in every theme.
+    for (const el of document.querySelectorAll('body *:not(.paper *, .col-preview > rect:first-child)')) {
+      if (!shown(el)) continue;
+      let fg;
+      if (el instanceof SVGGeometryElement) {
+        const cs = getComputedStyle(el);
+        if (cs.stroke === 'none' && cs.fill === 'none') continue;
+        fg = rgb(cs.stroke !== 'none' ? cs.stroke : cs.fill);
+      } else if ([...el.childNodes].some((n) => n.nodeType === 3 && n.nodeValue.trim())) {
+        fg = rgb(getComputedStyle(el).color);
+      } else continue;
+      if (fg.length < 4 || fg[3] < 0.5) continue;
+      const r = ratio(fg, backdrop(el instanceof SVGElement ? el.closest('svg').parentElement : el));
+      const named = el.closest('[aria-label],[title]');
+      if (r < 2) out.push(`${where}: ${named?.getAttribute('aria-label') || named?.title || el.textContent.trim().slice(0, 30)} (${r.toFixed(2)})`);
+    }
+    return out;
+  }, where);
+  const contrastFaults = new Set();
+  for (const tab of await page.$$eval('.ribbon-tab', (els) => els.map((e) => e.textContent.trim()))) {
+    await selectBox();
+    const button = page.locator('.ribbon-tab', { hasText: tab }).first();
+    if (!(await button.isVisible())) continue;
+    await button.click();
+    (await lowContrast(tab)).forEach((f) => contrastFaults.add(f));
+    const menus = await page.$$eval('.ribbon-body [aria-haspopup]', (els) =>
+      els.map((e, i) => { e.dataset.contrastMenu = String(i); return e.offsetParent ? i : -1; }).filter((i) => i >= 0));
+    for (const i of menus) {
+      const trigger = page.locator(`[data-contrast-menu="${i}"]`);
+      const label = await trigger.evaluate((e) => e.getAttribute('aria-label') || e.title || e.textContent.trim());
+      try { await trigger.click({ timeout: 1500 }); } catch { continue; }
+      (await lowContrast(`${tab} › ${label}`)).forEach((f) => contrastFaults.add(f));
+      await page.keyboard.press('Escape');
+      await page.mouse.click(5, 300);
+    }
+  }
+  check(contrastFaults.size === 0, `the dark theme draws no menu glyph or label in a colour of its own${contrastFaults.size ? `: ${[...contrastFaults].slice(0, 8).join('; ')}` : ''}`);
+
 } catch (err) {
   check(false, `dom run threw: ${err.message ?? err}`);
 } finally {
