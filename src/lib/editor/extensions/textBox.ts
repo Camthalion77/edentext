@@ -734,6 +734,7 @@ class TextBoxView {
   private applyOutline(): void {
     const a = this.attrs();
     const d = this.live?.geo.path || shapePath(a.shapeKind, a.shapePath);
+    this.dom.classList.toggle('textbox-outlined', !!d);
     if (!d) {
       this.outline?.remove();
       this.outline = null;
@@ -919,9 +920,11 @@ class TextBoxView {
   }
 
   // Frame hit test: the border plus a few px of the inner padding ring
-  // select the box; anywhere further inside is text area. Rotation-aware (the point
+  // select the box; anywhere further inside is text area. An outline is hit where CSS
+  // lets it be: on the shape but off its text. Rotation-aware (the point
   // is un-rotated into the rotor's own axes) and zoom-aware.
   private isFrameHit(e: MouseEvent): boolean {
+    if (this.outline) return this.outline.contains(e.target as globalThis.Node);
     const r = this.rotor.getBoundingClientRect();
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
@@ -986,7 +989,11 @@ class TextBoxView {
   private commit(attrs: Partial<TextBoxAttrs>): void {
     const pos = this.getPos();
     if (typeof pos !== 'number') return;
-    this.editor.view.dispatch(this.editor.state.tr.setNodeMarkup(pos, undefined, { ...this.node.attrs, ...attrs }));
+    const { state } = this.editor;
+    const tr = state.tr.setNodeMarkup(pos, undefined, { ...this.node.attrs, ...attrs });
+    // Replacing the node's markup maps a selection of it to a caret; the frame stays selected.
+    if (state.selection instanceof NodeSelection && state.selection.from === pos) tr.setSelection(NodeSelection.create(tr.doc, pos));
+    this.editor.view.dispatch(tr);
   }
 
   // Largest width the box may take: the page text column.

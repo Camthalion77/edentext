@@ -555,6 +555,21 @@
 .paper .tiptap .textbox-rotor {
   cursor: move;
 }
+/* A shape drawn as an outline is hit where it is painted, its text where the lines are:
+   everywhere else on the shape grabs it, and the empty corners of its box hit the page. */
+.paper .tiptap .textbox-node.textbox-outlined,
+.paper .tiptap .textbox-outlined .textbox-rotor,
+.paper .tiptap .textbox-outlined .textbox-content {
+  pointer-events: none;
+}
+.paper .tiptap .textbox-outlined .textbox-outline path {
+  pointer-events: visible;
+  cursor: move;
+}
+.paper .tiptap .textbox-outlined .textbox-content > *,
+.paper .tiptap .textbox-outlined :is(.image-resize-handle, .image-rotate-handle) {
+  pointer-events: auto;
+}
 /* The outline of a shape CSS can't draw, behind the text. Such a frame carries no
    padding of its own (the text inset moves to .textbox-content), so the padding box
    this covers is the frame. overflow stays visible or the stroke is clipped in half
