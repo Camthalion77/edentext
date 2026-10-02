@@ -461,27 +461,35 @@ function behindTextPlugin(): Plugin {
           // context-menu handling does with the point.
           if (!view.editable || event.button !== 0) return false;
           if (at instanceof HTMLElement && at.closest('[data-wrap="through"]')) return false;
-          const frame = frameBehindPoint(view, event.clientX, event.clientY);
-          if (!frame) return false;
+          const hit = frameBehindPoint(view, event.clientX, event.clientY);
+          if (!hit) return false;
           event.preventDefault();
-          (frame.querySelector('img') ?? frame).dispatchEvent(new MouseEvent('mousedown', {
-            clientX: event.clientX, clientY: event.clientY, button: 0, cancelable: true,
+          // A text box tells its outline from its text by the element hit; a picture is its image.
+          const frame = hit.closest('[data-wrap="through"]')!;
+          (frame.classList.contains('textbox-node') ? hit : frame.querySelector('img') ?? frame).dispatchEvent(new MouseEvent('mousedown', {
+            clientX: event.clientX, clientY: event.clientY, button: 0, cancelable: true, bubbles: true,
           }));
           return true;
+        },
+        // The page over such a frame would show its own cursor; the frame's is the one meant.
+        mousemove(view, event) {
+          const hit = view.editable && !event.buttons ? frameBehindPoint(view, event.clientX, event.clientY) : null;
+          view.dom.style.cursor = hit ? getComputedStyle(hit).cursor : '';
+          return false;
         },
       },
     },
   });
 }
 
-// The topmost behind-text frame under the point, or null where text painted over it
-// covers the point — the elements above it are walked in paint order.
-function frameBehindPoint(view: EditorView, x: number, y: number): HTMLElement | null {
+// The element hit in the topmost behind-text frame under the point, or null where text
+// painted over it covers the point — the elements above it are walked in paint order.
+// A shape's outline is an SVG path, and only it and the shape's text take the hit.
+function frameBehindPoint(view: EditorView, x: number, y: number): Element | null {
   const doc = view.dom.ownerDocument;
   for (const el of doc.elementsFromPoint(x, y)) {
-    if (!(el instanceof HTMLElement)) continue;
-    if (el.dataset.wrap === 'through' && view.dom.contains(el)) return el;
-    if (textUnder(el, x, y)) return null;
+    if (el.closest('[data-wrap="through"]') && view.dom.contains(el)) return el;
+    if (el instanceof HTMLElement && textUnder(el, x, y)) return null;
   }
   return null;
 }

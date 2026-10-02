@@ -77,7 +77,9 @@ so the browser hit-tests the page and every paragraph over it first and a cover 
 took no click whatever. `behindTextPlugin` (`image.ts`) walks `elementsFromPoint` for the
 topmost such frame and hands the mousedown to its own node view, which selects and drags
 it as a click on any other frame does; a text run painted over the point stops the walk,
-so text keeps the caret, as it does in both products.
+so text keeps the caret, as it does in both products. A shape takes the hit on its outline or its own text
+only (the element hit is handed on, so it tells the two apart), and the page shows the
+frame's cursor while the pointer is over it.
 
 ## Stacking behind the text
 

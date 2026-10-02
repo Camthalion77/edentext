@@ -968,9 +968,10 @@ class TextBoxView {
         startFreeMove(e, this.dom, { ...this.node.attrs, wrapOffset: this.dragX }, by => { this.dragBy = by; this.applyWrap(); },
           offsets => { if (offsets) this.commit(offsets); });
       }
-    } else if (!this.editing(view.state)) {
+    } else if (!this.editing(view.state) || !e.isTrusted) {
       // Body click on a box nobody is editing: the frame is not editable yet, so the
-      // browser places no caret in it. Do it ourselves at the click point.
+      // browser places no caret in it. Do it ourselves at the click point — also for a
+      // click handed on to a box behind the text, which the browser never saw.
       e.preventDefault();
       const from = pos + 1, to = pos + this.node.nodeSize - 1;
       const hit = view.posAtCoords({ left: e.clientX, top: e.clientY })?.pos;
