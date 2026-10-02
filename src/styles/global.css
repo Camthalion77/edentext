@@ -711,6 +711,12 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The browser paints a popover in its own CanvasText, black whatever the theme; a menu
+   lifted into the top layer takes the colour of the control it opens from instead. */
+:where([popover]) {
+  color: inherit;
+}
+
 #app {
   height: 100%;
   display: flex;
