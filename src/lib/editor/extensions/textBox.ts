@@ -835,7 +835,9 @@ class TextBoxView {
   private fitWrapper(size?: Size): void {
     const { w, h } = size ?? rotorSize(this.rotor);
     if (!w || !h) return;
-    const rad = (this.attrs().rotation * Math.PI) / 180;
+    // Out of the flow nothing is reserved and the offsets place the unrotated box, as
+    // both formats do, so it turns about a centre that stays put.
+    const rad = this.attrs().wrap === 'through' || this.pastZone() ? 0 : (this.attrs().rotation * Math.PI) / 180;
     const bw = Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad));
     const bh = Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad));
     // A band-wrapped frame spans the column instead (applyWrap), which is what keeps

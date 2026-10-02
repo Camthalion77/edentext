@@ -659,7 +659,8 @@ class ImageView {
     if (w && h) {
       this.rotor.style.width = `${w}px`;
       this.rotor.style.height = `${h}px`;
-      const rad = (deg * Math.PI) / 180;
+      // Out of the flow the offsets place the unrotated box, as both formats do.
+      const rad = this.isFree() ? 0 : (deg * Math.PI) / 180;
       const bw = Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad));
       const bh = Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad));
       this.dom.style.width = `${bw}px`;
