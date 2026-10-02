@@ -432,7 +432,10 @@ export const TextBox = Node.create({
           const found = findTextBox(state);
           if (!found) return false;
           if (dispatch) {
-            dispatch(state.tr.setNodeMarkup(found.pos, undefined, { ...found.node.attrs, ...attrs }));
+            const tr = state.tr.setNodeMarkup(found.pos, undefined, { ...found.node.attrs, ...attrs });
+            // As in commit(): a selected frame stays selected, its toolbar with it.
+            if (state.selection instanceof NodeSelection) tr.setSelection(NodeSelection.create(tr.doc, found.pos));
+            dispatch(tr);
           }
           return true;
         },

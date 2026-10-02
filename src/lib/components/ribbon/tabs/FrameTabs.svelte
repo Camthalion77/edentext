@@ -50,7 +50,7 @@
   function setWrap(w: WrapChoice) {
     const mode: WrapMode = w === 'behind' || w === 'front' ? 'through' : w;
     if (which === 'picture') editor?.chain().focus().setImageWrap(mode, w === 'front').run();
-    else editor?.chain().focus().setTextBoxAttrs({ wrap: mode, ...droppedFrameAttrs(mode, w === 'front') }).run();
+    else editor?.chain().focus().setTextBoxAttrs({ wrap: mode, ...droppedFrameAttrs(mode, w === 'front', wrap) }).run();
   }
 </script>
 

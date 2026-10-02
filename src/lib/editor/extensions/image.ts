@@ -112,7 +112,9 @@ export function frameMargins(wrap: WrapMode, offsetCm: unknown, boxWidthPx: numb
 // What picking a wrap mode by hand drops: the offsets belong to the mode that was set,
 // and so do the coordinate systems they were measured in (the page corner, a fixed
 // page). `inFront` means something for run-through alone. Shared with textBox.ts.
-export function droppedFrameAttrs(wrap: WrapMode, inFront: boolean): Record<string, unknown> {
+// Behind and in front of the text are one mode, so a switch between them keeps the place.
+export function droppedFrameAttrs(wrap: WrapMode, inFront: boolean, from: unknown): Record<string, unknown> {
+  if (wrap === 'through' && from === 'through') return { inFront };
   return {
     wrapOffset: null,
     wrapOffsetY: null,
@@ -428,7 +430,7 @@ export const Image = Node.create({
           const wrapDist = wrap === 'inline' ? sel.node.attrs.wrapDist : sel.node.attrs.wrapDist ?? 0.32;
           if (dispatch) {
             dispatch(atomAttrTr(state, sel.from,
-              { ...sel.node.attrs, wrap, wrapDist, ...droppedFrameAttrs(wrap, inFront) }));
+              { ...sel.node.attrs, wrap, wrapDist, ...droppedFrameAttrs(wrap, inFront, sel.node.attrs.wrap) }));
           }
           return true;
         },

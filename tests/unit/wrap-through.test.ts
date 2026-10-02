@@ -57,13 +57,17 @@ describe('a run-through frame', () => {
 // otherwise export as vertical-rel="page" with an offset that now counts from a paragraph.
 describe('picking a wrap mode by hand', () => {
   it('drops the offsets and the frame of reference they belonged to', () => {
-    const dropped = droppedFrameAttrs('left', false);
+    const dropped = droppedFrameAttrs('left', false, 'through');
     expect(dropped).toMatchObject({ wrapOffset: null, wrapOffsetY: null, wrapFromPage: false, anchorPage: null });
   });
 
   it('keeps inFront for run-through alone', () => {
-    expect(droppedFrameAttrs('through', true).inFront).toBe(true);
-    expect(droppedFrameAttrs('through', false).inFront).toBe(false);
-    expect(droppedFrameAttrs('topBottom', true).inFront).toBe(false);
+    expect(droppedFrameAttrs('through', true, 'left').inFront).toBe(true);
+    expect(droppedFrameAttrs('through', false, 'inline').inFront).toBe(false);
+    expect(droppedFrameAttrs('topBottom', true, 'through').inFront).toBe(false);
+  });
+
+  it('keeps the place between behind and in front of the text, one mode', () => {
+    expect(droppedFrameAttrs('through', true, 'through')).toEqual({ inFront: true });
   });
 });
