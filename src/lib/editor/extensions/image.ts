@@ -846,8 +846,11 @@ class ImageView {
   // Drag an image to re-anchor it live to the text position under the cursor (text
   // reflows in real time, throttled): a float re-anchors on a line change, an inline
   // image to the exact character. One undo step (later moves are addToHistory:false).
+  // The press selects the image, as it does a shape, so its frame shows while it moves.
   private startReposition(event: MouseEvent): void {
     if (!this.editor.isEditable) return;
+    const pos = this.getPos();
+    if (typeof pos === 'number') this.view.dispatch(this.view.state.tr.setSelection(NodeSelection.create(this.view.state.doc, pos)));
     if (this.isFree()) { this.startFreeDrag(event); return; }
     event.preventDefault();
     event.stopPropagation();
@@ -858,7 +861,6 @@ class ImageView {
 
     let curPos = origPos;
     let firstMove = true;
-    let moved = false;
     let raf = 0;
     let lastX = event.clientX;
     let lastY = event.clientY;
@@ -897,7 +899,6 @@ class ImageView {
         view.dispatch(tr);
         curPos = ip;
         firstMove = false;
-        moved = true;
       } catch { /* target can't hold an inline image — ignore */ }
     };
 
@@ -911,28 +912,17 @@ class ImageView {
       if (raf) win.cancelAnimationFrame(raf);
       win.removeEventListener('mousemove', move);
       win.removeEventListener('mouseup', finish);
-      // A plain click (no move) just selects the image so its toolbar/handles show.
-      if (!moved && typeof this.getPos() === 'number') {
-        const pos = this.getPos();
-        view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos)));
-      }
     };
     win.addEventListener('mousemove', move);
     win.addEventListener('mouseup', finish);
   }
 
   // A frame out of the flow moves by its own offsets instead of re-anchoring: nothing
-  // wraps around it, so there is no text position to follow. A click that never moved
-  // selects it, as it does everywhere else.
+  // wraps around it, so there is no text position to follow.
   private startFreeDrag(event: MouseEvent): void {
     this.dragX = freeDragX(this.view, this.dom, this.node.attrs.wrapOffset);
-    startFreeMove(event, this.dom, { ...this.node.attrs, wrapOffset: this.dragX }, by => { this.dragBy = by; this.applyWrap(); }, offsets => {
-      if (offsets) { this.commit(offsets); return; }
-      const pos = this.getPos();
-      if (typeof pos === 'number') {
-        this.view.dispatch(this.view.state.tr.setSelection(NodeSelection.create(this.view.state.doc, pos)));
-      }
-    });
+    startFreeMove(event, this.dom, { ...this.node.attrs, wrapOffset: this.dragX }, by => { this.dragBy = by; this.applyWrap(); },
+      offsets => { if (offsets) this.commit(offsets); });
   }
 
   private adoptNaturalSize(): void {
