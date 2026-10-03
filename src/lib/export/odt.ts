@@ -4330,9 +4330,10 @@ function applyInlineSentinels(odtBytes: Uint8Array): Uint8Array {
   return rezipOdt(files);
 }
 
-// ODF draw:transform for a rotated frame/shape. ODF rotate() is CCW radians (ours is
-// CW degrees) about the origin, so the translate re-centres it on the unrotated box.
-function frameTransform(rotationDeg: number, widthCm: number, heightCm: number): string {
+// ODF draw:transform for a rotated frame/shape: rotate() turns the box CCW radians (ours
+// is CW degrees) about its corner, and translate() puts that corner where the unrotated
+// box at (x, y) keeps its centre. It replaces svg:x/y, which LibreOffice misreads beside it.
+function frameTransform(rotationDeg: number, widthCm: number, heightCm: number, xCm = 0, yCm = 0): string {
   if (!rotationDeg || !widthCm || !heightCm) return '';
   const a = (-rotationDeg * Math.PI) / 180;
   const cw = widthCm / 2;
@@ -4340,13 +4341,9 @@ function frameTransform(rotationDeg: number, widthCm: number, heightCm: number):
   const cos = Math.cos(a);
   const sin = Math.sin(a);
   const r3 = (v: number) => Math.round(v * 1000) / 1000;
-  const tx = r3(cos * cw - sin * ch - cw);
-  const ty = r3(sin * cw + cos * ch - ch);
+  const tx = r3(xCm + cw - cos * cw - sin * ch);
+  const ty = r3(yCm + ch + sin * cw - cos * ch);
   return ` draw:transform="rotate (${a.toFixed(6)}) translate (${tx}cm ${ty}cm)"`;
-}
-
-function imageTransform(img: ImageExport): string {
-  return frameTransform(img.rotationDeg, img.widthCm, img.heightCm);
 }
 
 // ODF style:wrap is the side TEXT flows on (inverse of the image side); horizontal-pos
@@ -4446,12 +4443,14 @@ function imageFrameXml(img: ImageExport, index: number): string {
     : ` text:anchor-type="${floats ? 'char' : 'as-char'}"`;
   const named = floats || !!img.clip || (img.vAlign != null && img.vAlign in INLINE_VALIGN_ODF);
   const styleName = named ? ` draw:style-name="ImgFr${index + 1}"` : '';
-  const x = img.wrapOffsetCm != null && floats && !img.wrapAlign ? ` svg:x="${img.wrapOffsetCm}cm"` : '';
+  const xCm = img.wrapOffsetCm != null && floats && !img.wrapAlign ? img.wrapOffsetCm : null;
   // An as-char frame carries svg:y only for the offset alignment, which is what it means.
-  const y = img.wrapOffsetYCm != null && (floats || img.vAlign === 'offset')
-    ? ` svg:y="${img.wrapOffsetYCm}cm"` : '';
+  const yCm = img.wrapOffsetYCm != null && (floats || img.vAlign === 'offset') ? img.wrapOffsetYCm : null;
+  const transform = frameTransform(img.rotationDeg, img.widthCm, img.heightCm, xCm ?? 0, yCm ?? 0);
+  const at = transform ? transform
+    : (xCm != null ? ` svg:x="${xCm}cm"` : '') + (yCm != null ? ` svg:y="${yCm}cm"` : '');
   return (
-    `<draw:frame draw:name="Image${index + 1}"${styleName}${anchor} draw:z-index="${img.zIndex}"${dims}${x}${y}${imageTransform(img)}>` +
+    `<draw:frame draw:name="Image${index + 1}"${styleName}${anchor} draw:z-index="${img.zIndex}"${dims}${at}>` +
     `${inner}</draw:frame>`
   );
 }
@@ -4793,10 +4792,13 @@ function textBoxGraphicStyle(box: TextBoxExport, index: number): string {
 function textBoxXml(box: TextBoxExport, inner: string, index: number): string {
   const n = index + 1;
   const anchor = box.wrap === 'inline' ? 'as-char' : 'char';
-  const transform = frameTransform(box.rotationDeg, box.widthCm, box.heightCm);
-  const at = box.wrap === 'inline' ? ''
-    : (box.wrapOffsetCm != null ? ` svg:x="${box.wrapOffsetCm}cm"` : '') +
-      (box.wrapOffsetYCm != null ? ` svg:y="${box.wrapOffsetYCm}cm"` : '');
+  const placed = box.wrap !== 'inline';
+  const xCm = placed ? box.wrapOffsetCm : null;
+  const yCm = placed ? box.wrapOffsetYCm : null;
+  const transform = isLineKind(box.shapeKind) ? ''
+    : frameTransform(box.rotationDeg, box.widthCm, box.heightCm, xCm ?? 0, yCm ?? 0);
+  const at = transform ? ''
+    : (xCm != null ? ` svg:x="${xCm}cm"` : '') + (yCm != null ? ` svg:y="${yCm}cm"` : '');
   const common =
     ` draw:style-name="TbxFr${n}" text:anchor-type="${anchor}" draw:z-index="${box.zIndex}"` +
     ` svg:width="${box.widthCm}cm"${at}`;

@@ -319,7 +319,7 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   const hrel = gp['style:horizontal-rel'];
   const pageX = hrel === 'page' || hrel === 'page-start-margin' ? leftMarginCm : 0;
   // Set against the page's left edge is x 0 there: a cover picture filling the sheet.
-  const rawX = hpos === 'from-left' ? lengthToCm(el.getAttributeNS(NS.svg, 'x'))
+  const rawX = hpos === 'from-left' ? placedAt(el, 'x')
     : hpos === 'left' && pageX ? 0 : null;
   const x = rawX == null ? null : rawX - pageX;
   if (x != null && attrs.wrap) attrs.wrapOffset = Math.round(x * 100) / 100;
@@ -342,7 +342,7 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   const fromBody = rel === 'page-content';
   const vpos = gp['style:vertical-pos'];
   const y = vpos === 'from-top' && (!rel || rel.startsWith('paragraph') || rel === 'line' || fromPage || fromBody)
-    ? lengthToCm(el.getAttributeNS(NS.svg, 'y')) : vpos === 'top' && (fromPage || fromBody) ? 0 : null;
+    ? placedAt(el, 'y') : vpos === 'top' && (fromPage || fromBody) ? 0 : null;
   if (y != null && attrs.wrap && (fromPage || fromBody || y > 0 || (attrs.wrap === 'through' && y < 0))) {
     attrs.wrapOffsetY = Math.round(y * 100) / 100;
     if (fromPage) attrs.wrapFromPage = true;
@@ -354,8 +354,8 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   if (anchor === 'page') {
     const page = Number(el.getAttributeNS(NS.text, 'anchor-page-number'));
     attrs.anchorPage = Number.isInteger(page) && page > 0 ? page : 1;
-    attrs.wrapOffset = Math.max(0, lengthToCm(el.getAttributeNS(NS.svg, 'x')) ?? 0);
-    attrs.wrapOffsetY = Math.max(0, lengthToCm(el.getAttributeNS(NS.svg, 'y')) ?? 0);
+    attrs.wrapOffset = Math.max(0, placedAt(el, 'x') ?? 0);
+    attrs.wrapOffsetY = Math.max(0, placedAt(el, 'y') ?? 0);
     // "background" (LibreOffice's default for a new one) sits behind text; a cover
     // page's own graphic instead declares "foreground" to sit in front of everything.
     if (gp['style:run-through'] === 'foreground') attrs.inFront = true;
@@ -812,6 +812,14 @@ function drawBox(el: Element): { x: number; y: number; w: number; h: number } {
   const cx = (lengthToCm(t[1]) ?? 0) + (w / 2) * Math.cos(a) + (h / 2) * Math.sin(a);
   const cy = (lengthToCm(t[2]) ?? 0) - (w / 2) * Math.sin(a) + (h / 2) * Math.cos(a);
   return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+// A frame's unrotated corner: svg:x/y, or for a rotated one its translate(). Files that
+// carry both (earlier exports of this editor) keep svg:x/y; their translate is off.
+function placedAt(el: Element, axis: 'x' | 'y'): number | null {
+  const v = lengthToCm(el.getAttributeNS(NS.svg, axis));
+  if (v != null || !/translate/.test(el.getAttributeNS(NS.draw, 'transform') ?? '')) return v;
+  return drawBox(el)[axis];
 }
 
 const PLACEMENT_ATTRS = ['wrap', 'wrapOffset', 'wrapOffsetY', 'wrapFromPage', 'wrapFromBody', 'wrapAlign',
