@@ -89,6 +89,18 @@ both public domain.
 </tr>
 </table>
 
+## Desktop app
+
+Each release also carries unsigned desktop installers built with Electron:
+
+- **macOS** — `EdenText-<version>-arm64.dmg` (Apple silicon) or `EdenText-<version>.dmg` (Intel).
+  Drag the app into Applications. As it is unsigned, open it the first time via
+  right-click → Open, or run `xattr -d com.apple.quarantine /Applications/EdenText.app`.
+- **Windows** — `EdenText-Setup-<version>.exe`. SmartScreen warns about an unknown
+  publisher: More info → Run anyway.
+- **Linux** — `EdenText-<version>.AppImage` (`chmod +x`, then run it) or the `.deb`
+  (`sudo apt install ./edentext_*.deb`).
+
 ## Development
 
 ```bash
@@ -96,6 +108,7 @@ npm install
 npm run dev      # dev server with hot-reload
 npm test         # test suite
 npm run build    # production build → dist/
+cd desktop && npm install && npm start   # desktop app on the same build
 ```
 
 Built with Svelte 5, TypeScript, Vite and TipTap 3 (ProseMirror).
