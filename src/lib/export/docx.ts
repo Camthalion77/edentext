@@ -983,9 +983,11 @@ function paraOffsetEmu(cm: number): number {
 
 // offsetCm places the frame in the text column (Word's posOffset); without one it is
 // flush to its side. offsetYCm is how far below the anchor paragraph it sits.
-// relativeHeight as Word numbers a new drawing; the frame's rank counts up from it, so
-// it reads back as itself (stackRank).
+// relativeHeight counts up from where Word numbers a new drawing, by rank and then in
+// document order: readers break a tie differently, so every frame gets its own height.
 const RELATIVE_HEIGHT_BASE = 251658240;
+let frameSeq = 0;
+const relativeHeight = (rank: number) => RELATIVE_HEIGHT_BASE + rank * 65536 + frameSeq++;
 
 function floatingFor(wrap: string, offsetCm: number | null, offsetYCm: number | null, alignH?: string | null, distCm?: number | null, inFront?: boolean, fromPage?: boolean, fromBody?: boolean): IFloating | undefined {
   if (wrap === 'inline') return undefined;
@@ -1087,7 +1089,7 @@ function imageRun(node: TiptapNode): ImageRun | null {
     data: decoded.bytes,
     altText: alt ? { name: alt + mark, title: alt, description: alt } : mark ? { name: mark } : undefined,
     transformation: { width, height, rotation: rotation || undefined },
-    floating: floating && { ...floating, zIndex: RELATIVE_HEIGHT_BASE + frameRank(node.attrs?.zIndex) },
+    floating: floating && { ...floating, zIndex: relativeHeight(frameRank(node.attrs?.zIndex)) },
   });
 }
 
@@ -1140,7 +1142,7 @@ function textBoxDocxDescriptor(node: TiptapNode): TextBoxDocx {
     fromPage: a.wrapFromPage === true,
     fromBody: a.wrapFromBody === true,
     inFront: a.inFront === true,
-    zIndex: frameRank(a.zIndex),
+    zIndex: relativeHeight(frameRank(a.zIndex)),
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
     shapeTextArea: asTextArea(a.shapeTextArea),
@@ -1577,7 +1579,7 @@ function textBoxDrawingXml(box: TextBoxDocx, index: number, parts: TxbxParts): s
     : `<wp:align>${align}</wp:align>`;
   return (
     `<w:drawing><wp:anchor ${WP_NS} distT="0" distB="0" distL="${emu(box.distCm ?? 0)}" distR="${emu(box.distCm ?? 0)}"` +
-    ` simplePos="0" relativeHeight="${RELATIVE_HEIGHT_BASE + box.zIndex}" behindDoc="${box.wrap === 'through' && !box.inFront ? 1 : 0}" locked="0" layoutInCell="1" allowOverlap="${box.wrap === 'through' ? 1 : 0}">` +
+    ` simplePos="0" relativeHeight="${box.zIndex}" behindDoc="${box.wrap === 'through' && !box.inFront ? 1 : 0}" locked="0" layoutInCell="1" allowOverlap="${box.wrap === 'through' ? 1 : 0}">` +
     `<wp:simplePos x="0" y="0"/>` +
     `<wp:positionH relativeFrom="margin">${posH}</wp:positionH>` +
     (box.fromPage || box.fromBody
@@ -3266,6 +3268,7 @@ export async function buildDocx(
   docxBookmarkNames = new Map();
   docRubies = [];
   docCrops = false;
+  frameSeq = 0;
   docPlaceholders = [];
   docSources = [];
   const num = new Numbering();

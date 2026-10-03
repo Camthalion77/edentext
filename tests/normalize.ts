@@ -62,11 +62,12 @@ function canonNoteIds(doc: N): void {
 
 // A frame's stacking rank compares as its place in the stack: LibreOffice numbers every
 // object afresh on save, ties in document order, which is how the editor breaks them.
+// An inline frame overlaps nothing, and DOCX gives it no rank at all.
 let frameRanks = new WeakMap<object, number>();
 function canonFrameOrder(doc: N): void {
   const frames: N[] = [];
   (function walk(n: N) {
-    if (n.type === 'image' || n.type === 'textBox') frames.push(n);
+    if ((n.type === 'image' || n.type === 'textBox') && (n.attrs?.wrap ?? 'inline') !== 'inline') frames.push(n);
     for (const c of n.content ?? []) walk(c);
   })(doc);
   const z = (n: N) => Number(n.attrs?.zIndex) || 0;

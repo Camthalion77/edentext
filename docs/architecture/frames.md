@@ -84,6 +84,7 @@ sheets at -200 (`PageSheetLayer`). Ties and ranks past the caps (20, 60) go by d
 Arrange group's four buttons (`restackFrame`) move a frame within that layer and renumber all of
 them from 0. Imports rank the part's `draw:z-index` / `relativeHeight` values (`stackRank`); exports
 write the rank as it is, so it reads back as itself — LibreOffice renumbers every object on save.
+DOCX gives each frame its own `relativeHeight` (rank, then document order); LibreOffice 24.2 flips ties.
 
 ## Shapes (`utils/shapes.ts`)
 
