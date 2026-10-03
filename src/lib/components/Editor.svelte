@@ -816,6 +816,14 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
     tableUi = { visible: true, top, left, bottom: tRect.bottom - cRect.top + container.scrollTop };
   }
 
+  // A frame toolbar anchors above the rotate grip (it protrudes above the frame) so it
+  // never covers it; the frame top when the grip isn't rendered.
+  function toolbarAnchorTop(dom: HTMLElement, r: DOMRect): number {
+    const grip = dom.querySelector('.image-rotate-handle');
+    const gr = grip instanceof HTMLElement ? grip.getBoundingClientRect() : null;
+    return gr && gr.height > 0 ? Math.min(r.top, gr.top) : r.top;
+  }
+
   // --- Floating image wrap toolbar ---
   // Shown when a single image node is selected; positioned just above it.
   let imageUi = $state<{ visible: boolean; top: number; left: number; wrap: WrapMode; inFront: boolean }>({ visible: false, top: 0, left: 0, wrap: 'inline', inFront: false });
@@ -838,7 +846,7 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
     const cRect = container.getBoundingClientRect();
     imageUi = {
       visible: true,
-      top: r.top - cRect.top + container.scrollTop,
+      top: toolbarAnchorTop(dom, r) - cRect.top + container.scrollTop,
       left: r.left - cRect.left + container.scrollLeft,
       wrap: ((sel as NodeSelection).node.attrs.wrap as WrapMode) || 'inline',
       inFront: (sel as NodeSelection).node.attrs.inFront === true,
@@ -867,14 +875,9 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
     const r = dom.getBoundingClientRect();
     const cRect = container!.getBoundingClientRect();
     const a = found.node.attrs;
-    // Anchor above the rotate grip (it protrudes above the box) so the toolbar never
-    // covers it; fall back to the box top when the grip isn't rendered.
-    const grip = dom.querySelector('.image-rotate-handle');
-    const gr = grip instanceof HTMLElement ? grip.getBoundingClientRect() : null;
-    const anchorTop = gr && gr.height > 0 ? Math.min(r.top, gr.top) : r.top;
     textBoxUi = {
       visible: true,
-      top: anchorTop - cRect.top + container!.scrollTop,
+      top: toolbarAnchorTop(dom, r) - cRect.top + container!.scrollTop,
       left: r.left - cRect.left + container!.scrollLeft,
       wrap: (a.wrap as WrapMode) || 'inline',
       inFront: a.inFront === true,
