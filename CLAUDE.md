@@ -7,8 +7,7 @@ Serverless, fully client-side rich-text editor that saves `.odt` and `.docx`; st
 
 ```bash
 npm run dev      # Vite dev server (hot-reload, --host)
-npm run build    # production build -> dist/
-npm run preview  # serve dist/
+npm run build    # production build -> dist/; npm run preview serves it
 npm run check    # svelte-check type-check
 npm test         # Vitest once (tests/**/*.test.ts)
 npm run test:lo      # LibreOffice round trip, fuzz re-read, ODT/DOCX consistency (needs soffice)
@@ -21,7 +20,6 @@ npm run test:coverage  # Vitest V8 coverage -> coverage/index.html
 npm run test:parity  # render parity; see tests/render-parity/README.md
 node scripts/make-thesaurus.mjs; node scripts/make-shape-presets.mjs; node scripts/collect-licenses.mjs  # re-vendor thesaurus, shape presets, licenses
 node scripts/showcase/run.mjs  # rebuild docs/showcase/; optional [regex] limits it
-cd desktop && npm start | npm run dist | npm test  # Electron app on dist/, installers -> desktop/release/, smoke (APP=<binary> for a built one)
 ```
 
 Tests are jsdom Vitest files outside `src/`; `npm test` covers round trips, corpus/fuzz exports, schemas and unit helpers. Browser legs share `tests/browser.mjs`; test tooling stays a `devDependency`, and CI runs `check` plus `test`.
@@ -75,7 +73,7 @@ src/
   lib/{export,import,i18n,spell,storage,styles,crypto}/ - I/O, localization, persistence, styles, protection
   lib/templates/            - built-in localized templates
   styles/                   - global and editor CSS
-desktop/                    - Electron shell around dist/, own package.json; see desktop/CLAUDE.md
+desktop/                    - Electron shell around dist/ with its own npm commands; see desktop/CLAUDE.md
 ```
 
 ## Where the detail lives
