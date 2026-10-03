@@ -91,7 +91,14 @@ try {
   // gives clearing it something to change. Every step is undone again after.
   const breaks = () => page.evaluate(() => Array.from(document.querySelectorAll('[data-page-break-spacer]'),
     (s) => Math.round(s.getBoundingClientRect().top)).join(','));
-  const relabel = async (how) => { await page.evaluate(how); await page.waitForTimeout(1500); return breaks(); };
+  // A slow runner may still be paginating after a fixed pause: read until two reads agree.
+  const relabel = async (how) => {
+    await page.evaluate(how);
+    await page.waitForTimeout(1500);
+    let prev, cur = await breaks();
+    for (let i = 0; i < 20 && cur !== prev; i++) { await page.waitForTimeout(750); [prev, cur] = [cur, await breaks()]; }
+    return cur;
+  };
   const undo = () => document.querySelector('.tiptap').editor.commands.undo();
   const breaksKept = await relabel(() => document.querySelector('.tiptap').editor.chain()
     .selectAll().updateAttributes('paragraph', { keepLines: true }).setTextSelection(1).run());
