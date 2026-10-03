@@ -2,6 +2,43 @@
 
 <!-- Newest release first. New entries go here: ## [x.y.z] — YYYY-MM-DD -->
 
+## [0.8.0] — 2026-10-03
+
+EdenText now installs as a desktop app on macOS, Windows and Linux, and speaks Ukrainian. Shapes
+and frames get most of the work: Word presets, formula shapes, groups and connectors open instead of
+dropping, keep their shading and arrow heads, and stack forward and back. On a phone the ribbon,
+dialogs and zoom fit the screen.
+
+### Added
+- **A desktop app** — unsigned installers for macOS (dmg), Windows (exe) and Linux (AppImage, deb)
+  on every release, saving straight to files on disk
+- **Ukrainian as a program and document language**, and Russian list numbering with letters that
+  repeat past the end of the alphabet
+- **Shapes open instead of dropping** — ODF groups, shapes built from formulas and arcs, Word
+  connector presets — and keep their shading, text area, preset and the arrow heads of an open outline
+- **Bring frames forward or send them back**
+- **Ribbon command search** (Alt+Q)
+- **A recent documents list** for the browser's autosaved documents, and a new tab starts on an
+  empty document
+- **On a phone**, pinch zooms only the document, the ribbon tab strip scrolls sideways and the
+  ruler starts hidden
+
+### Fixed
+- Rotated shapes and images keep their place in LibreOffice, every DOCX frame gets its own stacking
+  height, and a frame out of the flow turns about its own centre
+- A shape behind the text takes clicks and drags again, is grabbed anywhere off its text, and
+  switching between behind and in front of the text keeps its place
+- Dragging an image shows its frame at once, with the move cursor, and the image toolbar leaves the
+  rotate grip free
+- A reopened file keeps its column sections and starts at its first page
+- A heading in a box or cell reads back without its style as direct formatting, and a paragraph in
+  a text box keeps its keep options in DOCX
+- Every import warning appears in the UI language
+- Spelling squiggles no longer shorten hyphenated lines and paint only near the viewport
+- Menus, dropdowns and dialogs fit the window, scroll when taller and stay legible under a dark theme
+- A closed tab no longer lists its document as open, and setting a language for all text leaves the
+  view where it was
+
 ## [0.7.0] — 2026-09-29
 
 EdenText now speaks Japanese, and Chinese and Japanese documents get the typography they need:
