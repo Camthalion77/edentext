@@ -7,3 +7,4 @@ Electron shell around `../dist`. Its own npm project, so the web app's install a
 - `main.mjs` covers only what a browser does around the page: `http(s)` links go to the system browser, navigation off the origin (a dropped file) is blocked, and `will-prevent-unload` turns the page's silent `beforeunload` block into a discard dialog.
 - The service worker cannot register on `app://`; `src/main.ts` already swallows that.
 - Version and metadata come from the root `package.json` (`electron-builder.config.cjs`). The `desktop` job in `.github/workflows/release.yml` builds unsigned installers per platform and uploads them to the tag's release.
+- The macOS `icon.png` is rendered from `icon.svg` (the favicon plant on a white tile in the macOS icon grid); Windows and Linux use the free-standing `public/icon-512.png`. Render with `rsvg-convert -w 1024 -h 1024 icon.svg -o icon.png`.
