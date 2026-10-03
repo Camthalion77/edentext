@@ -101,6 +101,12 @@ export async function putImages(blobs: Map<string, string>): Promise<boolean> {
   }
 }
 
+/** Drop every key no document references, as after deleting documents. */
+export function sweepImages(): Promise<boolean> {
+  inUse = true;
+  return putImages(new Map());
+}
+
 /**
  * Put the pictures back. Returns how many keys the store no longer had — their nodes
  * keep the key as their `src`, which renders as a broken picture rather than quietly

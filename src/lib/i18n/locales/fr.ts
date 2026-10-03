@@ -23,6 +23,8 @@ const fr: Messages = {
     confirmDelete: 'Supprimer ce document du navigateur ? Il ne pourra pas être restauré.',
     resume: 'Reprendre le travail',
     showAll: 'Tous les documents…',
+    forgetClosed: 'Supprimer de ce navigateur les documents fermés au prochain démarrage',
+    forgetClosedHint: 'Les documents protégés par mot de passe sont toujours supprimés, car leur copie ici n’est pas chiffrée.',
   },
   docProps: {
     title: 'Propriétés du document',

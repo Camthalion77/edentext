@@ -65,4 +65,40 @@ describe('deleteDocument', () => {
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
     expect(keys.sort()).toEqual(['edentext-doc@d4', 'edentext-footer@d5', 'edentext-live@d3', 'edentext-live@d4', 'edentext-live@d5', 'edentext-live@d9']);
   });
+  it('drops every document no tab holds once they are not to be kept, the first one too', async () => {
+    localStorage.clear();
+    sessionStorage.setItem('edentext-tab-doc', 'd9');
+    vi.resetModules();
+    const scope = await import('../../src/lib/storage/docScope');
+    scope.docKey('edentext-doc');
+    const released = String(-(Date.now() - MIN));
+    const text = '{"content":[{"type":"paragraph","content":[{"text":"x"}]}]}';
+    localStorage.setItem('edentext-live@', released);
+    localStorage.setItem('edentext-doc', text);
+    localStorage.setItem('edentext-live@d1', released);
+    localStorage.setItem('edentext-doc@d1', text);
+    localStorage.setItem('edentext-live@d3', String(Date.now()));
+    localStorage.setItem('edentext-doc@d3', text);
+    localStorage.setItem('edentext-doc@d9', text);
+    scope.saveKeepDocuments(false);
+    await scope.pruneOldDocuments();
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+    expect(keys.sort()).toEqual(['edentext-doc@d3', 'edentext-doc@d9', 'edentext-keep-documents', 'edentext-live@d3', 'edentext-live@d9']);
+  });
+
+  it('always drops a protected document no tab holds', async () => {
+    localStorage.clear();
+    sessionStorage.setItem('edentext-tab-doc', 'd9');
+    vi.resetModules();
+    const scope = await import('../../src/lib/storage/docScope');
+    const released = String(-(Date.now() - MIN));
+    const text = '{"content":[{"type":"paragraph","content":[{"text":"x"}]}]}';
+    localStorage.setItem('edentext-live@d1', released);
+    localStorage.setItem('edentext-doc@d1', text);
+    localStorage.setItem('edentext-doc-protected@d1', '1');
+    localStorage.setItem('edentext-live@d2', released);
+    localStorage.setItem('edentext-doc@d2', text);
+    await scope.pruneOldDocuments();
+    expect((await scope.listDocuments()).map((d) => d.id).sort()).toEqual(['d2', 'd9']);
+  });
 });

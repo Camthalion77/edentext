@@ -23,6 +23,8 @@ const pt: Messages = {
     confirmDelete: 'Eliminar este documento do navegador? Não poderá ser recuperado.',
     resume: 'Continuar a trabalhar em',
     showAll: 'Todos os documentos…',
+    forgetClosed: 'Eliminar deste navegador os documentos fechados no próximo arranque',
+    forgetClosedHint: 'Os documentos protegidos por palavra-passe são sempre eliminados, porque a sua cópia aqui não está encriptada.',
   },
   docProps: {
     title: 'Propriedades do documento',

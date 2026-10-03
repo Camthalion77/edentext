@@ -25,6 +25,8 @@ const ja: Messages = {
     confirmDelete: 'この文書をブラウザーから削除しますか? 元に戻すことはできません。',
     resume: '作業を再開',
     showAll: 'すべての文書…',
+    forgetClosed: '閉じた文書を次回起動時にこのブラウザーから削除する',
+    forgetClosedHint: 'パスワードで保護された文書は、ここにあるコピーが暗号化されていないため、常に削除されます。',
   },
   docProps: {
     title: '文書プロパティ',

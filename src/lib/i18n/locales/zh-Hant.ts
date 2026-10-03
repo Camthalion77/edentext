@@ -25,6 +25,8 @@ const zhHant: Messages = {
     confirmDelete: '要從瀏覽器中刪除此文件嗎？刪除後無法復原。',
     resume: '繼續處理',
     showAll: '所有文件…',
+    forgetClosed: '下次啟動時從此瀏覽器中刪除已關閉的文件',
+    forgetClosedHint: '受密碼保護的文件一律會被刪除，因為其在此處的副本未加密。',
   },
   docProps: {
     title: '文件屬性',

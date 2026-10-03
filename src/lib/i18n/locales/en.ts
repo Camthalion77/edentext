@@ -24,6 +24,8 @@ const en = {
     confirmDelete: 'Delete this document from the browser? It cannot be restored.',
     resume: 'Continue where you left off',
     showAll: 'All documents…',
+    forgetClosed: 'Delete closed documents from this browser at the next start',
+    forgetClosedHint: 'Password-protected documents are always deleted, since their copy here is not encrypted.',
   },
   docProps: {
     title: 'Document properties',

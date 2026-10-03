@@ -24,6 +24,8 @@ const zhHans: Messages = {
     confirmDelete: '要从浏览器中删除此文档吗？删除后无法恢复。',
     resume: '继续处理',
     showAll: '所有文档…',
+    forgetClosed: '下次启动时从此浏览器中删除已关闭的文档',
+    forgetClosedHint: '受密码保护的文档始终会被删除，因为它们在此处的副本未加密。',
   },
   docProps: {
     title: '文档属性',

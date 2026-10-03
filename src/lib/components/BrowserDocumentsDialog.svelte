@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listDocuments, openDocument, deleteDocument, type BrowserDocument } from '../storage/docScope';
+  import { listDocuments, openDocument, deleteDocument, loadKeepDocuments, saveKeepDocuments, type BrowserDocument } from '../storage/docScope';
   import { t, locale } from '../i18n/i18n.svelte';
   import { localeTag } from '../utils/dateTime';
 
@@ -36,6 +36,10 @@
   <div class="body">
     <h2>{t().browserDocs.title}</h2>
     <p class="intro">{t().browserDocs.intro}</p>
+    <label class="forget">
+      <input type="checkbox" checked={!loadKeepDocuments()} onchange={(e) => saveKeepDocuments(!e.currentTarget.checked)} />
+      <span>{t().browserDocs.forgetClosed}<em>{t().browserDocs.forgetClosedHint}</em></span>
+    </label>
 
     <ul>
       {#each docs as d (d.id)}
@@ -87,6 +91,8 @@
 
   h2 { font-size: 1rem; }
   .intro { color: var(--color-text-muted); }
+  .forget { display: flex; align-items: baseline; gap: 8px; }
+  .forget em { display: block; font-style: normal; color: var(--color-text-muted); font-size: 0.78rem; }
 
   ul { list-style: none; display: flex; flex-direction: column; }
   li {

@@ -1,3 +1,5 @@
+import { sweepImages } from './imageStore';
+
 // Which document this tab edits. Every document-scoped key hangs off the id, so two
 // tabs never write over each other; the first document keeps the empty id, and with it
 // the bare key names every earlier version wrote.
@@ -107,15 +109,43 @@ async function heldBy(): Promise<(id: string, at: number) => boolean> {
   return (id) => ids.has(id);
 }
 
+// Whether documents stay in this browser once no tab holds them (app-wide, absent = on).
+// Off, or for a password-protected document whose copy here is unencrypted, the next
+// start drops them; a reload keeps its own, since the tab's id survives in sessionStorage.
+const KEEP_KEY = 'edentext-keep-documents';
+
+export function loadKeepDocuments(): boolean {
+  return localStorage.getItem(KEEP_KEY) !== '0';
+}
+
+export function saveKeepDocuments(on: boolean): void {
+  if (on) localStorage.removeItem(KEEP_KEY);
+  else localStorage.setItem(KEEP_KEY, '0');
+}
+
+// The start's prune, which listing waits for so it never offers a document being dropped.
+let pruning: Promise<void> = Promise.resolve();
+
 /**
- * Drop every empty document no tab holds — each fresh tab mints one — then keep the
- * newest MAX_DOCS. A held document is never dropped, however old; neither is the
- * first one for its age.
+ * Drop every document no tab holds that is not to be kept, and every empty one — each
+ * fresh tab mints one — then keep the newest MAX_DOCS. A held document is never
+ * dropped, however old; neither is the first one for its age.
  */
-export async function pruneOldDocuments(): Promise<void> {
+export function pruneOldDocuments(): Promise<void> {
+  return (pruning = prune());
+}
+
+async function prune(): Promise<void> {
   const isHeld = await heldBy();
   let docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   const drop = (id: string) => { dropDocument(id); localStorage.removeItem(LIVE + id); };
+  const keep = loadKeepDocuments();
+  const forget = docs.filter(([id, at]) => id !== docId && !isHeld(id, at)
+    && (!keep || localStorage.getItem(keyOf(id, 'edentext-doc-protected')) === '1'));
+  for (const [id] of forget) drop(id);
+  // Their pictures go now, not at the next save that happens to have pictures of its own.
+  if (forget.length) await sweepImages();
+  docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   for (const [id, at] of docs) if (id !== docId && !isHeld(id, at) && isEmpty(id)) drop(id);
   docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   for (const [id, at] of docs.slice(MAX_DOCS)) if (id !== '' && id !== docId && !isHeld(id, at)) drop(id);
@@ -172,6 +202,7 @@ function labelOf(id: string): string {
 
 /** Every document this browser keeps, most recently used first; an empty one only while open. */
 export async function listDocuments(): Promise<BrowserDocument[]> {
+  await pruning;
   const isHeld = await heldBy();
   return Object.entries(markers())
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))

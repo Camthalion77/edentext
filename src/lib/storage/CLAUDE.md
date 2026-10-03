@@ -53,7 +53,10 @@ a quit fires no `pagehide`. `edentext-live@<id>` is the marker — epoch ms whil
 negated on `pagehide`, refreshed every 60 s: the last use, and where Web Locks are missing
 (an insecure origin) the hold itself, abandoned after 10 min. Only the holding tab ever
 writes its own marker, so no two tabs race over one key.
-`pruneOldDocuments()` (from `main.ts`) drops every empty document no tab holds, then all
+`pruneOldDocuments()` (from `main.ts`) first drops every document no tab holds when
+`edentext-keep-documents` is `'0'` (the checkbox in *Recent documents*), and a protected one
+always, since its copy here is unencrypted; their pictures are swept at once, and
+`listDocuments` waits for the prune. Then it drops every empty document no tab holds, then all
 but the newest ten — never a held one, and the first never for its age. While the page
 is empty, `ResumeCard.svelte` offers the three used last. Duplicating a tab copies its
 `sessionStorage`, so the copy lands on the same document — the one case still shared.
