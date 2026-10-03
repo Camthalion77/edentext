@@ -330,6 +330,10 @@ const en = {
     wrapTopBottom: 'Top and bottom',
     wrapBehind: 'Behind text',
     wrapFront: 'In front of text',
+    orderForward: 'Bring forward',
+    orderBackward: 'Send backward',
+    orderFront: 'Bring to front',
+    orderBack: 'Send to back',
   },
   textBox: {
     toolbar: 'Text box options',

@@ -321,6 +321,10 @@ const es: Messages = {
     wrapTopBottom: 'Arriba y abajo',
     wrapBehind: 'Detrás del texto',
     wrapFront: 'Delante del texto',
+    orderForward: 'Traer adelante',
+    orderBackward: 'Enviar atrás',
+    orderFront: 'Traer al frente',
+    orderBack: 'Enviar al fondo',
   },
   textBox: {
     toolbar: 'Opciones del cuadro de texto',

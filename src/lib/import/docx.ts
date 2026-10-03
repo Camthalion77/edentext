@@ -11,7 +11,7 @@ import { builtinStyleSheet, DEFAULT_STYLE, type ParaProps, type Style, type Styl
 import { DEFAULT_OUTLINE_LEVEL, MAX_OUTLINE_LEVELS, type OutlineNumbering } from '../styles/outlineNumbering';
 import { MAX_LIST_LEVELS, type ListLevelStyle, type ListStyle } from '../styles/listStyles';
 import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
-import { cropOf, fitInlineImage, framePx } from '../editor/extensions/image';
+import { cropOf, fitInlineImage, framePx, stackRank } from '../editor/extensions/image';
 import { TEXTBOX_PADDING_CM } from '../editor/extensions/textBox';
 import { formatTabStops } from '../editor/extensions/tabStops';
 import type { CapsMode, LineStyle } from '../editor/extensions/textEffects';
@@ -2407,6 +2407,8 @@ function convertDrawing(drawing: Element, ctx: Ctx): Node | Node[] | null {
     if (distCm != null) attrs.wrapDist = distCm;
     if (alignH && wrap === 'topBottom') attrs.wrapAlign = alignH;
     if (wrap === 'through') attrs.inFront = anchor.getAttribute('behindDoc') !== '1';
+    const rank = stackRank(anchor, null, 'relativeHeight');
+    if (rank) attrs.zIndex = rank;
   } else {
     fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   }
@@ -2562,6 +2564,8 @@ function frameNode(src: string, box: { w: number; h: number }, label: string, an
     if (distCm != null) attrs.wrapDist = distCm;
     if (alignH && wrap === 'topBottom') attrs.wrapAlign = alignH;
     if (wrap === 'through') attrs.inFront = anchor.getAttribute('behindDoc') !== '1';
+    const rank = stackRank(anchor, null, 'relativeHeight');
+    if (rank) attrs.zIndex = rank;
   } else {
     fitInlineImage(attrs, Math.floor(cmToPx(ctx.contentWidthCm)));
   }
@@ -2780,6 +2784,8 @@ function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ct
     if ((wrap === 'topBottom' || wrap === 'through') && offsetCm == null
       && (align === 'center' || align === 'right')) attrs.wrapAlign = align;
     if (wrap === 'through') attrs.inFront = root.getAttribute('behindDoc') !== '1';
+    const rank = stackRank(root, null, 'relativeHeight');
+    if (rank) attrs.zIndex = rank;
   }
 
   const fill = drawingColor(nsChild(spPr, A, 'solidFill'), ctx) ?? null;

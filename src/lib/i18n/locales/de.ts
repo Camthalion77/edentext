@@ -322,6 +322,10 @@ const de: Messages = {
     wrapTopBottom: 'Oben und unten',
     wrapBehind: 'Hinter den Text',
     wrapFront: 'Vor den Text',
+    orderForward: 'Ebene nach vorne',
+    orderBackward: 'Ebene nach hinten',
+    orderFront: 'In den Vordergrund',
+    orderBack: 'In den Hintergrund',
   },
   textBox: {
     toolbar: 'Textfeld-Optionen',

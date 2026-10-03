@@ -434,7 +434,7 @@ try {
   await page.locator('.image-toolbar .it-btn').nth(4).click();
   await settle(page, true);
   const behindBox = await frameBox();
-  check(behindBox.wrap === 'through' && behindBox.z === '-1' && await paraHeight() < inlineHeight,
+  check(behindBox.wrap === 'through' && Number(behindBox.z) < -1 && await paraHeight() < inlineHeight,
     `the behind-text button takes the frame out of the flow (${behindBox.wrap}, z ${behindBox.z}, ${inlineHeight}px → ${await paraHeight()}px)`);
   // setNodeMarkup replaces a leaf, so without putting the node selection back the frame
   // deselects itself on every attribute change and its toolbars close.

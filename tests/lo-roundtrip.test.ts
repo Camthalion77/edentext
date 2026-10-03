@@ -147,6 +147,7 @@ function normalize(node: N, inBox = false): N {
     if (k === 'width' || k === 'height') { attrs[k] = Math.round((v as number) / 3) * 3; continue; } // ±unit noise
     if (k === 'rotation') { attrs.rotation = 'R'; continue; } // exact angle checked leniently below
     if (k === 'wrap') { attrs.wrap = 'W'; continue; } // float survives; exact mode checked leniently
+    if (k === 'zIndex') continue; // LibreOffice numbers every object afresh; wrap-through.test.ts keeps the order
     if (k === 'strokeWidthPt') { attrs.strokeWidthPt = Math.round((v as number) * 4) / 4; continue; } // pt↔in noise
     // Cell borders: LO re-saves widths with pt↔cm noise; quantize to 0.25pt steps.
     if (k.startsWith('border') && typeof v === 'string' && v !== 'none') {

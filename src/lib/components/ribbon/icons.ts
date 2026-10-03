@@ -80,6 +80,12 @@ export const STROKED = {
   // The text runs over the frame's outline; in front, the solid frame covers it (FILLED).
   wrapBehind: ['M5 4.5h6v7H5z', 'M2 5.5h12M2 8h12M2 10.5h12'],
   wrapFront: ['M2 5.5h12M2 8h12M2 10.5h12'],
+  // Overlapping frames, the one the command moves filled: a step over or under one
+  // neighbour, or over or under the pair of them.
+  orderForward: ['M2 2h8v8H2z'],
+  orderBackward: ['M6 6h8v8H6z'],
+  orderFront: ['M1.5 1.5h6v6h-6z', 'M8.5 8.5h6v6h-6z'],
+  orderBack: ['M1.5 1.5h6v6h-6z', 'M8.5 8.5h6v6h-6z'],
   // A capital T beside an arrow running down: the text sets vertically.
   textDirection: ['M3 3.75h6M6 3.75v8.5', 'M12.5 4v7.5M10.9 10l1.6 1.6 1.6-1.6'],
   toc: ['M2 3h6M2 6.5h5M2 10h6M2 13.5h4', 'M11 3h3M10 6.5h4M11 10h3M10 13.5h4'],
@@ -165,6 +171,10 @@ export const FILLED = {
   header: ['M5.4 3.8h5.2v1.7H5.4z'],
   footer: ['M5.4 10.5h5.2v1.7H5.4z'],
   wrapFront: ['M5 4.5h6v7H5z'],
+  orderForward: ['M6 6h8v8H6z'],
+  orderBackward: ['M2 2h8v4H6v4H2z'],
+  orderFront: ['M4.5 4.5h7v7h-7z'],
+  orderBack: ['M7.5 4.5h4v4h-3v3h-4v-4h3z'],
 } as const;
 
 // Constant painted stroke rather than proportional scaling: a 1-unit stroke would

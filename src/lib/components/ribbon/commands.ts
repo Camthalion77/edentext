@@ -18,6 +18,7 @@ const FRAME: Tab[] = ['pictureFormat', 'shapeFormat'];
 const CASES = ['none', 'upper', 'lower', 'capitalize', 'smallCaps'] as const;
 const CASE_MODE = { none: 'none', upper: 'uppercase', lower: 'lowercase', capitalize: 'capitalize', smallCaps: 'smallCaps' } as const;
 const WRAPS = [['inline', 'wrapInline'], ['left', 'wrapLeft'], ['right', 'wrapRight'], ['topBottom', 'wrapTopBottom'], ['behind', 'wrapBehind'], ['front', 'wrapFront']] as const;
+const ORDERS = [['forward', 'orderForward'], ['backward', 'orderBackward'], ['front', 'orderFront'], ['back', 'orderBack']] as const;
 const INDEX_KINDS = ['toc', 'figures', 'tables', 'alphabetical', 'bibliography'] as const;
 
 export const RIBBON_COMMANDS: RibbonCommand[] = [
@@ -166,6 +167,7 @@ export const RIBBON_COMMANDS: RibbonCommand[] = [
   c('tableLayout', 'numberRecognition', (m) => m.table.numberRecognition),
 
   ...WRAPS.map(([k, key]) => c(FRAME, `wrap-${k}`, (m) => m.image[key])),
+  ...ORDERS.map(([k, key]) => c(FRAME, `order-${k}`, (m) => m.image[key])),
   c('pictureFormat', 'altText', (m) => m.ribbon.altText),
   c('shapeFormat', 'shape', (m) => m.textBox.shape),
   c('shapeFormat', 'fillColor', (m) => m.textBox.fillColor),

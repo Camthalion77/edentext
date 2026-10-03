@@ -331,6 +331,10 @@ const uk: Messages = {
     wrapTopBottom: 'Згори й знизу',
     wrapBehind: 'За текстом',
     wrapFront: 'Перед текстом',
+    orderForward: 'Перемістити вперед',
+    orderBackward: 'Перемістити назад',
+    orderFront: 'На передній план',
+    orderBack: 'На задній план',
   },
   textBox: {
     toolbar: 'Параметри текстового поля',

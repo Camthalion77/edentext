@@ -23,6 +23,7 @@ declare module '@tiptap/core' {
     image: {
       setImage: (attrs: { src: string; alt?: string; width?: number | null; height?: number | null; rotation?: number; wrap?: WrapMode }) => ReturnType;
       setImageWrap: (wrap: WrapMode, inFront?: boolean) => ReturnType;
+      restackFrame: (to: 'forward' | 'backward' | 'front' | 'back') => ReturnType;
     };
   }
 }
@@ -128,11 +129,11 @@ export function droppedFrameAttrs(wrap: WrapMode, inFront: boolean, from: unknow
 // Word's behind-text / in-front-of-text, ODF run-through: the text runs over or under
 // the frame, so it reserves nothing. Absolute with no offsets keeps the static position
 // it was anchored at; the file's own offsets ride as margins from there.
-export function applyRunThrough(el: HTMLElement, offsetCm: unknown, offsetYCm: unknown, inFront: boolean, fromPage = false, fromBody = false): void {
+export function applyRunThrough(el: HTMLElement, offsetCm: unknown, offsetYCm: unknown, inFront: boolean, fromPage = false, fromBody = false, rank: unknown = 0): void {
   const px = (cm: unknown) => (typeof cm === 'number' ? Math.round(cmToPx(cm)) : 0);
   el.style.position = 'absolute';
   el.style.margin = `${px(offsetYCm)}px 0 0 ${px(offsetCm)}px`;
-  el.style.zIndex = inFront ? '1' : '-1';
+  el.style.zIndex = stackZ(inFront, rank, el.classList.contains('image-node'));
   // Which side of the text it lands on, for the header/footer layer's stacking.
   if (inFront) el.dataset.inFront = ''; else delete el.dataset.inFront;
   clearPagePlace(el);
@@ -148,6 +149,63 @@ export function applyRunThrough(el: HTMLElement, offsetCm: unknown, offsetYCm: u
   } else if (typeof offsetCm === 'number') {
     el.dataset.columnX = String(px(offsetCm));
   }
+}
+
+// A free frame's layer: in front of the text under the header layer (22), behind it over
+// the sheets (-200), where every picture paints over every shape whatever their ranks, as
+// LibreOffice paints them (frames.md). Past the caps the document order decides.
+export function stackZ(inFront: boolean, rank: unknown, picture: boolean): string {
+  const r = typeof rank === 'number' && rank > 0 ? rank : 0;
+  return String(inFront ? 1 + Math.min(r, 20) : -150 + Math.min(r, 60) + (picture ? 70 : 0));
+}
+
+// A frame's rank among the stacking numbers its file part uses (ODF draw:z-index, DOCX
+// relativeHeight, which runs into the billions): both importers read it this way.
+const partRanks = new WeakMap<Document, Map<number, number>>();
+export function stackRank(el: Element, ns: string | null, attr: string): number {
+  const doc = el.ownerDocument;
+  let ranks = partRanks.get(doc);
+  if (!ranks) {
+    const all = Array.from(doc.getElementsByTagName('*'), (e) => Number(e.getAttributeNS(ns, attr) ?? NaN));
+    ranks = new Map([...new Set(all.filter(Number.isFinite))].sort((a, b) => a - b).map((v, i) => [v, i]));
+    partRanks.set(doc, ranks);
+  }
+  return ranks.get(Number(el.getAttributeNS(ns, attr) ?? NaN)) ?? 0;
+}
+
+// Whether a frame is out of the flow, where frames overlap and their order shows.
+const isFreeFrame = (n: PMNode): boolean =>
+  (n.type.name === 'image' || n.type.name === 'textBox') && (n.attrs.wrap === 'through' || typeof n.attrs.anchorPage === 'number');
+
+// One step past the next free frame in its layer (stackZ), or to that layer's end, as
+// both word processors move one; every free frame is then renumbered from 0. Shared
+// with text boxes, which it also reaches from a caret in their text. Returns false where
+// the frame is already there or not free.
+export function restackFrame(state: EditorState, dispatch: ((tr: Transaction) => void) | undefined, to: 'forward' | 'backward' | 'front' | 'back'): boolean {
+  const sel = state.selection;
+  const { $from } = sel;
+  let from = sel instanceof NodeSelection ? sel.from : -1;
+  for (let d = $from.depth; from < 0 && d > 0; d--) if ($from.node(d).type.name === 'textBox') from = $from.before(d);
+  const node = from >= 0 ? state.doc.nodeAt(from) : null;
+  if (!node || !isFreeFrame(node)) return false;
+  const frames: { pos: number; node: PMNode }[] = [];
+  state.doc.descendants((node, pos) => { if (isFreeFrame(node)) frames.push({ pos, node }); });
+  const rank = (n: PMNode) => (n.attrs.zIndex as number) || 0;
+  frames.sort((a, b) => rank(a.node) - rank(b.node) || a.pos - b.pos);
+  const i = frames.findIndex((f) => f.pos === from);
+  const layer = (f: { node: PMNode }) => (f.node.attrs.inFront === true ? 'front' : f.node.type.name);
+  const peers = frames.map((f, k) => (layer(f) === layer(frames[i]) ? k : -1)).filter((k) => k >= 0);
+  const at = peers.indexOf(i);
+  const j = to === 'forward' ? peers[at + 1] : to === 'backward' ? peers[at - 1] : to === 'front' ? peers[peers.length - 1] : peers[0];
+  if (j == null || j === i) return false;
+  if (dispatch) {
+    const [moved] = frames.splice(i, 1);
+    frames.splice(j, 0, moved);
+    const tr = state.tr;
+    frames.forEach((f, k) => { if (rank(f.node) !== k) tr.setNodeAttribute(f.pos, 'zIndex', k); });
+    dispatch(tr);
+  }
+  return true;
 }
 
 // A frame leaving run-through, or its page, takes no page place along.
@@ -360,6 +418,13 @@ export const Image = Node.create({
         parseHTML: el => (el as HTMLElement).hasAttribute('data-wrap-from-body'),
         renderHTML: () => ({}),
       },
+      // The frame's place among the free frames (restackFrame): 0 up, ties in document
+      // order. The files' draw:z-index / relativeHeight, ranked on import.
+      zIndex: {
+        default: 0,
+        parseHTML: el => parsePx((el as HTMLElement).getAttribute('data-z-index')) ?? 0,
+        renderHTML: () => ({}),
+      },
       // A page-anchored frame's stacking against text (ODF style:run-through): default
       // "background" sits behind; a title page's own cover graphic sets "foreground".
       inFront: {
@@ -406,6 +471,7 @@ export const Image = Node.create({
       ...(node.attrs.vAlign ? { 'data-v-align': String(node.attrs.vAlign) } : {}),
       ...(node.attrs.anchorPage ? { 'data-anchor-page': String(node.attrs.anchorPage) } : {}),
       ...(node.attrs.inFront ? { 'data-in-front': '' } : {}),
+      ...(node.attrs.zIndex ? { 'data-z-index': String(node.attrs.zIndex) } : {}),
       ...(node.attrs.wrapFromPage ? { 'data-wrap-from-page': '' } : {}),
       ...(node.attrs.wrapFromBody ? { 'data-wrap-from-body': '' } : {}),
     })];
@@ -434,6 +500,8 @@ export const Image = Node.create({
           }
           return true;
         },
+
+      restackFrame: (to) => ({ state, dispatch }) => restackFrame(state, dispatch, to),
     };
   },
 
@@ -710,11 +778,11 @@ class ImageView {
     }
     delete d.dataset.anchorPage;
     if (wrap !== 'through' && this.pastZone()) {
-      applyRunThrough(d, this.offX(), this.offY(), true, a.wrapFromPage === true, a.wrapFromBody === true);
+      applyRunThrough(d, this.offX(), this.offY(), true, a.wrapFromPage === true, a.wrapFromBody === true, a.zIndex);
       return;
     }
     if (wrap === 'through') {
-      applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true);
+      applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true, a.zIndex);
       // Deferred like sinkToOffset: the frame has to be laid out before its own page
       // can be read off the grid. Its column only needs it in the document, so a frame
       // already there (a drag, an edit) lands at once instead of a frame late.
@@ -760,7 +828,7 @@ class ImageView {
     d.dataset.anchorPage = String(page);
     const px = (cm: unknown) => Math.round(cmToPx(typeof cm === 'number' ? cm : 0));
     d.style.position = 'absolute';
-    d.style.zIndex = this.node.attrs.inFront ? '1' : '-1';
+    d.style.zIndex = stackZ(this.node.attrs.inFront === true, this.node.attrs.zIndex, true);
     const grid = readVerticalMargins(this.view.dom as HTMLElement).grid;
     d.style.left = `${grid.leftOf(page) + px(this.offX())}px`;
     d.style.top = `${grid.topOf(page) + px(this.offY())}px`;

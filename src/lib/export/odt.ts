@@ -471,7 +471,7 @@ function replaceSectionBreaks(doc: TiptapNode): TiptapNode {
 // bytes is ArrayBuffer-backed to match fflate's zip entry map. rotationDeg is CW;
 // wrap floats the frame at its anchor paragraph (left/right/top-bottom/run-through).
 type WrapMode = 'inline' | 'left' | 'right' | 'topBottom' | 'through';
-type ImageExport = { path: string; bytes: Uint8Array<ArrayBuffer>; mimeType: string; widthCm: number; heightCm: number; alt: string; rotationDeg: number; wrap: WrapMode; wrapOffsetCm: number | null; wrapOffsetYCm: number | null; wrapDistCm: number | null; wrapAlign: string | null; anchorPage: number | null; vAlign: string | null; inFront: boolean; wrapFromPage: boolean; wrapFromBody: boolean; clip: string | null };
+type ImageExport = { path: string; bytes: Uint8Array<ArrayBuffer>; mimeType: string; widthCm: number; heightCm: number; alt: string; rotationDeg: number; wrap: WrapMode; wrapOffsetCm: number | null; wrapOffsetYCm: number | null; wrapDistCm: number | null; wrapAlign: string | null; anchorPage: number | null; vAlign: string | null; inFront: boolean; zIndex: number; wrapFromPage: boolean; wrapFromBody: boolean; clip: string | null };
 
 function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   const bin = atob(b64);
@@ -483,6 +483,9 @@ function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
 // Decode an `image` node's data-URI src into bytes + geometry. width/height are
 // px @96dpi → cm via round3 (sub-pixel, matches table column widths), so an
 // integer-px image round-trips exactly. Returns null for a non-data/empty src.
+// A frame's place in the stack, written as it stands: its rank reads back as itself.
+export const frameRank = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : 0);
+
 function imageDescriptor(node: TiptapNode, index: number, namePrefix = 'image'): ImageExport | null {
   const src = node.attrs?.src;
   if (typeof src !== 'string' || !src.startsWith('data:')) return null;
@@ -521,6 +524,7 @@ function imageDescriptor(node: TiptapNode, index: number, namePrefix = 'image'):
     wrapFromBody: node.attrs?.wrapFromBody === true,
     vAlign: typeof node.attrs?.vAlign === 'string' ? node.attrs.vAlign : null,
     inFront: node.attrs?.inFront === true,
+    zIndex: frameRank(node.attrs?.zIndex),
     clip: foClip(cropOf(node.attrs?.crop), bytes),
   };
 }
@@ -1038,6 +1042,7 @@ type TextBoxExport = {
   wrapFromPage: boolean;
   wrapFromBody: boolean;
   inFront: boolean;
+  zIndex: number;
   paddingCm: number;
   shapeKind: ShapeKind;
   shapePath: string | null;
@@ -1072,6 +1077,7 @@ function textBoxDescriptor(node: TiptapNode): TextBoxExport {
     wrapFromPage: a.wrapFromPage === true,
     wrapFromBody: a.wrapFromBody === true,
     inFront: a.inFront === true,
+    zIndex: frameRank(a.zIndex),
     paddingCm: typeof a.paddingCm === 'number' ? round3(a.paddingCm) : TEXTBOX_PADDING_CM,
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
@@ -4445,7 +4451,7 @@ function imageFrameXml(img: ImageExport, index: number): string {
   const y = img.wrapOffsetYCm != null && (floats || img.vAlign === 'offset')
     ? ` svg:y="${img.wrapOffsetYCm}cm"` : '';
   return (
-    `<draw:frame draw:name="Image${index + 1}"${styleName}${anchor} draw:z-index="${index}"${dims}${x}${y}${imageTransform(img)}>` +
+    `<draw:frame draw:name="Image${index + 1}"${styleName}${anchor} draw:z-index="${img.zIndex}"${dims}${x}${y}${imageTransform(img)}>` +
     `${inner}</draw:frame>`
   );
 }
@@ -4792,7 +4798,7 @@ function textBoxXml(box: TextBoxExport, inner: string, index: number): string {
     : (box.wrapOffsetCm != null ? ` svg:x="${box.wrapOffsetCm}cm"` : '') +
       (box.wrapOffsetYCm != null ? ` svg:y="${box.wrapOffsetYCm}cm"` : '');
   const common =
-    ` draw:style-name="TbxFr${n}" text:anchor-type="${anchor}" draw:z-index="${index}"` +
+    ` draw:style-name="TbxFr${n}" text:anchor-type="${anchor}" draw:z-index="${box.zIndex}"` +
     ` svg:width="${box.widthCm}cm"${at}`;
   // A line is its two endpoints, so ODF gives it its own element rather than a frame
   // with a width and a height. The blocks the schema keeps on the node are dropped:

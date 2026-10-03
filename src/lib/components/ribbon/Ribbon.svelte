@@ -535,6 +535,7 @@
     {:else if tab === 'pictureFormat' || tab === 'shapeFormat'}
       <FrameTabs
         {editor}
+        {tick}
         which={tab === 'pictureFormat' ? 'picture' : 'shape'}
         wrap={(frameAttrs?.wrap ?? 'inline') as never}
         inFront={frameAttrs?.inFront === true}

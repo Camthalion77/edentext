@@ -326,6 +326,10 @@ const fr: Messages = {
     wrapTopBottom: 'En haut et en bas',
     wrapBehind: 'Derrière le texte',
     wrapFront: 'Devant le texte',
+    orderForward: 'Avancer',
+    orderBackward: 'Reculer',
+    orderFront: 'Mettre au premier plan',
+    orderBack: 'Mettre à l’arrière-plan',
   },
   textBox: {
     toolbar: 'Options de la zone de texte',

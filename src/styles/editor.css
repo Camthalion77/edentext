@@ -50,8 +50,8 @@
   overflow-x: clip;
 
   /* The sheets themselves are one box per page (PageSheetLayer), since a section on its
-     own paper makes them differ in size. They sit at z-index -3, under a shape behind
-     the text (-2), a header's page background (.hf-bg-layer, -1) and the body text. */
+     own paper makes them differ in size. They sit at z-index -200, under the frames
+     behind the text (stackZ), a header's page background (.hf-bg-layer, -1) and the text. */
 }
 
 /* View ▸ Field Shadings: the grey every field is drawn on, switched from one place

@@ -323,6 +323,10 @@ const ja: Messages = {
     wrapTopBottom: '上下',
     wrapBehind: '背面',
     wrapFront: '前面',
+    orderForward: '前面へ移動',
+    orderBackward: '背面へ移動',
+    orderFront: '最前面へ移動',
+    orderBack: '最背面へ移動',
   },
   textBox: {
     toolbar: 'テキスト ボックスのオプション',

@@ -60,8 +60,22 @@ function canonNoteIds(doc: N): void {
   })(doc);
 }
 
+// A frame's stacking rank compares as its place in the stack: LibreOffice numbers every
+// object afresh on save, ties in document order, which is how the editor breaks them.
+let frameRanks = new WeakMap<object, number>();
+function canonFrameOrder(doc: N): void {
+  const frames: N[] = [];
+  (function walk(n: N) {
+    if (n.type === 'image' || n.type === 'textBox') frames.push(n);
+    for (const c of n.content ?? []) walk(c);
+  })(doc);
+  const z = (n: N) => Number(n.attrs?.zIndex) || 0;
+  frameRanks = new WeakMap(frames.map((n, i) => ({ n, i })).sort((a, b) => z(a.n) - z(b.n) || a.i - b.i)
+    .map(({ n }, k) => [n, k]));
+}
+
 export function normalize(node: N): N {
-  if (node.type === 'doc') canonNoteIds(node);
+  if (node.type === 'doc') { canonNoteIds(node); canonFrameOrder(node); }
   const out: N = { type: node.type };
   if (node.text != null) out.text = node.text;
   // An inline atom wears the marks of the run around it — a formula's font, a picture's
@@ -101,6 +115,7 @@ export function normalize(node: N): N {
     if (v == null) continue;
     if (k in ORDERED_DEFAULTS && ORDERED_DEFAULTS[k] === v) continue;
     if (volatileKey(k)) continue;
+    if (k === 'zIndex') continue;
     if (k === 'colwidth') { attrs.colwidth = 'CW'; continue; } // ratios compared separately
     // The gap beside a frame is drawn on a side wrap only, and zero is no gap at all.
     if (k === 'wrapDist' && !(Number(v) > 0 && (node.attrs?.wrap === 'left' || node.attrs?.wrap === 'right'))) continue;
@@ -110,6 +125,7 @@ export function normalize(node: N): N {
     attrs[k] = v;
   }
   if (node.attrs?.level != null) attrs.level = node.attrs.level;
+  if (frameRanks.get(node)) attrs.zIndex = frameRanks.get(node);
   if (Object.keys(attrs).length) out.attrs = attrs;
   if (node.content?.length) {
     // merge adjacent identical text nodes so run-splitting differences don't matter

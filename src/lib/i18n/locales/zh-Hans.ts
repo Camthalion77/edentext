@@ -321,6 +321,10 @@ const zhHans: Messages = {
     wrapTopBottom: '上下型环绕',
     wrapBehind: '衬于文字下方',
     wrapFront: '浮于文字上方',
+    orderForward: '上移一层',
+    orderBackward: '下移一层',
+    orderFront: '置于顶层',
+    orderBack: '置于底层',
   },
   textBox: {
     toolbar: '文本框选项',

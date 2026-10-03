@@ -57,6 +57,7 @@ export interface TextBoxAttrs {
   wrapFromPage: boolean;      // …or below the top of the page the anchor lands on
   wrapFromBody: boolean;      // …or below the top of that page's body text
   inFront: boolean;           // over the text rather than behind it (run-through only)
+  zIndex: number;             // place among the free frames (restackFrame in image.ts)
   wrapDist: number | null;    // cm of gap to the text beside it
   wrapAlign: string | null;   // 'center'/'right' = set against the middle/far end
   paddingCm: number;          // inset ring around the text (ODF fo:padding)
@@ -216,6 +217,12 @@ export const TextBox = Node.create({
         parseHTML: el => (el as HTMLElement).hasAttribute('data-in-front'),
         renderHTML: () => ({}),
       },
+      // Its place among the free frames — as on an image.
+      zIndex: {
+        default: 0,
+        parseHTML: el => parsePx((el as HTMLElement).getAttribute('data-z-index')) ?? 0,
+        renderHTML: () => ({}),
+      },
       // Whether wrapOffsetY counts from the top of the frame's page — as on an image.
       wrapFromPage: {
         default: false,
@@ -365,6 +372,7 @@ export const TextBox = Node.create({
       ...(a.rotation ? { 'data-rotation': String(a.rotation) } : {}),
       ...(a.wrap !== 'inline' ? { 'data-wrap': a.wrap } : {}),
       ...(a.inFront ? { 'data-in-front': '' } : {}),
+      ...(a.zIndex ? { 'data-z-index': String(a.zIndex) } : {}),
       ...(a.wrapFromPage ? { 'data-wrap-from-page': '' } : {}),
       ...(a.wrapFromBody ? { 'data-wrap-from-body': '' } : {}),
       ...(a.shapeKind !== 'textbox' ? { 'data-shape': a.shapeKind } : {}),
@@ -869,7 +877,7 @@ class TextBoxView {
     this.rotor.style.left = '';
     clearPagePlace(d);
     if (a.wrap !== 'through' && this.pastZone()) {
-      applyRunThrough(d, this.offX(), this.offY(), true, a.wrapFromPage, a.wrapFromBody);
+      applyRunThrough(d, this.offX(), this.offY(), true, a.wrapFromPage, a.wrapFromBody, a.zIndex);
     } else if (a.wrap === 'left' || a.wrap === 'right') {
       d.style.float = a.wrap;
       d.style.margin = frameMargins(a.wrap, a.wrapOffset, this.wrapperWidth(), null, a.wrapDist);
@@ -877,8 +885,7 @@ class TextBoxView {
       // Behind the text, which is what a shape with no run-through of its own exports as
       // — and under a picture behind the text too (-1), which is the order LibreOffice
       // paints a cover page in; a box the file puts in front of the text sits above both.
-      applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true);
-      if (a.inFront !== true) d.style.zIndex = '-2';
+      applyRunThrough(d, this.offX(), this.offY(), a.inFront === true, a.wrapFromPage === true, a.wrapFromBody === true, a.zIndex);
       // Deferred: the frame has to be laid out before its own page can be read. Its
       // column only needs it in the document, so one already there lands at once.
       if (!a.wrapFromPage && !a.wrapFromBody && d.isConnected) placeInColumn(this.editor.view, d);

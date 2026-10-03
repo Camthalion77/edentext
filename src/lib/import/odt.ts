@@ -9,7 +9,7 @@ import { builtinStyleSheet, DEFAULT_STYLE, type ParaProps, type Style, type Styl
 import { DEFAULT_OUTLINE_LEVEL, MAX_OUTLINE_LEVELS, type OutlineLevel, type OutlineNumbering } from '../styles/outlineNumbering';
 import { LIST_LEVEL_STEP_CM, MAX_LIST_LEVELS, type ListLevelStyle, type ListStyle } from '../styles/listStyles';
 import { HEADER_SHADE } from '../editor/extensions/tableHeaderRow';
-import { cropOf, fitInlineImage, framePx, type Crop } from '../editor/extensions/image';
+import { cropOf, fitInlineImage, framePx, stackRank, type Crop } from '../editor/extensions/image';
 import { odfChartDataUrl } from './chart';
 import { formatTabStops, normalizeLeader } from '../editor/extensions/tabStops';
 import { isEmphasis, type CapsMode, type LineStyle } from '../editor/extensions/textEffects';
@@ -304,6 +304,8 @@ function applyFrameRotationAndWrap(el: Element, attrs: Record<string, unknown>, 
   }
   // "background" (LibreOffice's default) sits behind the text, "foreground" in front.
   if (attrs.wrap === 'through' && gp['style:run-through'] === 'foreground') attrs.inFront = true;
+  const rank = stackRank(el, NS.draw, 'z-index');
+  if (rank) attrs.zIndex = rank;
   // Only the text side of the gap is drawn — the other one is the frame's own offset.
   if (attrs.wrap === 'left' || attrs.wrap === 'right') {
     const side = attrs.wrap === 'right' ? 'fo:margin-left' : 'fo:margin-right';
@@ -813,7 +815,7 @@ function drawBox(el: Element): { x: number; y: number; w: number; h: number } {
 }
 
 const PLACEMENT_ATTRS = ['wrap', 'wrapOffset', 'wrapOffsetY', 'wrapFromPage', 'wrapFromBody', 'wrapAlign',
-  'wrapDist', 'inFront', 'anchorPage', 'vAlign'];
+  'wrapDist', 'inFront', 'anchorPage', 'vAlign', 'zIndex'];
 
 // A draw:g opens as its members, as a DOCX group does: they sit in the anchor's space,
 // the group's style places their bounding box, and the first member carries that
@@ -870,6 +872,7 @@ function convertDrawGroup(g: Element, ctx: Ctx): Node[] {
       ...(place.wrapFromPage ? { wrapFromPage: true } : {}),
       ...(place.wrapFromBody ? { wrapFromBody: true } : {}),
       ...(place.anchorPage ? { anchorPage: place.anchorPage } : {}),
+      ...(place.zIndex ? { zIndex: place.zIndex } : {}),
     },
   }));
   // An as-char carrier reserves the group's place in the line, and the frames over it

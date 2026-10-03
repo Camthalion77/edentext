@@ -331,6 +331,10 @@ const ru: Messages = {
     wrapTopBottom: 'Сверху и снизу',
     wrapBehind: 'За текстом',
     wrapFront: 'Перед текстом',
+    orderForward: 'Переместить вперед',
+    orderBackward: 'Переместить назад',
+    orderFront: 'На передний план',
+    orderBack: 'На задний план',
   },
   textBox: {
     toolbar: 'Параметры надписи',

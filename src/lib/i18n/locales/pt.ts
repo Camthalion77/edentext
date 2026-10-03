@@ -320,6 +320,10 @@ const pt: Messages = {
     wrapTopBottom: 'Em cima e em baixo',
     wrapBehind: 'Atrás do texto',
     wrapFront: 'À frente do texto',
+    orderForward: 'Avançar',
+    orderBackward: 'Recuar',
+    orderFront: 'Trazer para a frente',
+    orderBack: 'Enviar para trás',
   },
   textBox: {
     toolbar: 'Opções de caixa de texto',

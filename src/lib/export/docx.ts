@@ -47,7 +47,7 @@ import { effectiveOrderedDefAt, formatOrdinal, childCycle, orderedTypeDef, ROOT_
 import { effectiveListLevel, listStyleMarginCm, listStyleOverridden, type ListStyle as ListStyleDef } from '../styles/listStyles';
 import { outlineIsEmpty, type OutlineNumbering } from '../styles/outlineNumbering';
 import { defaultBulletChar } from '../utils/bulletListTypes';
-import { normalizeColor, GENERATOR, mergeJoinedParagraphsJson, twinFontName, type HfExport } from './odt';
+import { normalizeColor, GENERATOR, mergeJoinedParagraphsJson, twinFontName, frameRank, type HfExport } from './odt';
 import { MAX_HEADING_LEVEL } from '../styles/headings';
 import { EMPTY_DOC_PROPERTIES, type DocProperties } from '../storage/docProperties';
 import { DEFAULT_PAGE_NUMBERING, type PageNumbering } from '../storage/pageNumbering';
@@ -983,6 +983,10 @@ function paraOffsetEmu(cm: number): number {
 
 // offsetCm places the frame in the text column (Word's posOffset); without one it is
 // flush to its side. offsetYCm is how far below the anchor paragraph it sits.
+// relativeHeight as Word numbers a new drawing; the frame's rank counts up from it, so
+// it reads back as itself (stackRank).
+const RELATIVE_HEIGHT_BASE = 251658240;
+
 function floatingFor(wrap: string, offsetCm: number | null, offsetYCm: number | null, alignH?: string | null, distCm?: number | null, inFront?: boolean, fromPage?: boolean, fromBody?: boolean): IFloating | undefined {
   if (wrap === 'inline') return undefined;
   // The gap beside the frame, on both sides as Word writes it; none above or below.
@@ -1077,12 +1081,13 @@ function imageRun(node: TiptapNode): ImageRun | null {
   const crop = cropOf(node.attrs?.crop);
   docCrops ||= !!crop;
   const mark = crop ? `${CROP}${[crop.l, crop.t, crop.r, crop.b].join(',')}${CROP}` : '';
+  const floating = floatingFor(wrap, offsetCm, offsetYCm, node.attrs?.wrapAlign as string | null, distCm, node.attrs?.inFront === true, node.attrs?.wrapFromPage === true, node.attrs?.wrapFromBody === true);
   return new ImageRun({
     type: decoded.type,
     data: decoded.bytes,
     altText: alt ? { name: alt + mark, title: alt, description: alt } : mark ? { name: mark } : undefined,
     transformation: { width, height, rotation: rotation || undefined },
-    floating: floatingFor(wrap, offsetCm, offsetYCm, node.attrs?.wrapAlign as string | null, distCm, node.attrs?.inFront === true, node.attrs?.wrapFromPage === true, node.attrs?.wrapFromBody === true),
+    floating: floating && { ...floating, zIndex: RELATIVE_HEIGHT_BASE + frameRank(node.attrs?.zIndex) },
   });
 }
 
@@ -1101,6 +1106,7 @@ type TextBoxDocx = {
   fromPage: boolean;
   fromBody: boolean;
   inFront: boolean;
+  zIndex: number;
   shapeKind: ShapeKind;
   shapePath: string | null;
   shapeTextArea: TextArea | null;
@@ -1134,6 +1140,7 @@ function textBoxDocxDescriptor(node: TiptapNode): TextBoxDocx {
     fromPage: a.wrapFromPage === true,
     fromBody: a.wrapFromBody === true,
     inFront: a.inFront === true,
+    zIndex: frameRank(a.zIndex),
     shapeKind: isShapeKind(a.shapeKind) ? a.shapeKind : 'textbox',
     shapePath: typeof a.shapePath === 'string' && a.shapePath ? a.shapePath : null,
     shapeTextArea: asTextArea(a.shapeTextArea),
@@ -1570,7 +1577,7 @@ function textBoxDrawingXml(box: TextBoxDocx, index: number, parts: TxbxParts): s
     : `<wp:align>${align}</wp:align>`;
   return (
     `<w:drawing><wp:anchor ${WP_NS} distT="0" distB="0" distL="${emu(box.distCm ?? 0)}" distR="${emu(box.distCm ?? 0)}"` +
-    ` simplePos="0" relativeHeight="${251658240 + index}" behindDoc="${box.wrap === 'through' && !box.inFront ? 1 : 0}" locked="0" layoutInCell="1" allowOverlap="${box.wrap === 'through' ? 1 : 0}">` +
+    ` simplePos="0" relativeHeight="${RELATIVE_HEIGHT_BASE + box.zIndex}" behindDoc="${box.wrap === 'through' && !box.inFront ? 1 : 0}" locked="0" layoutInCell="1" allowOverlap="${box.wrap === 'through' ? 1 : 0}">` +
     `<wp:simplePos x="0" y="0"/>` +
     `<wp:positionH relativeFrom="margin">${posH}</wp:positionH>` +
     (box.fromPage || box.fromBody

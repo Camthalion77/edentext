@@ -322,6 +322,10 @@ const zhHant: Messages = {
     wrapTopBottom: '上及下',
     wrapBehind: '文字在前',
     wrapFront: '文字在後',
+    orderForward: '上移一層',
+    orderBackward: '下移一層',
+    orderFront: '移到最上層',
+    orderBack: '移到最下層',
   },
   textBox: {
     toolbar: '文字方塊選項',
