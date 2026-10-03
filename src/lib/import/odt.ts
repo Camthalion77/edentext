@@ -1,4 +1,5 @@
 import { strFromU8 } from 'fflate';
+import en from '../i18n/locales/en';
 import { StyleResolver, NS, WATERMARK_NAME, lengthToPt, lengthToCm, layerTextProps, langTagsOfProps, type PropMap } from './styleResolver';
 import { cjkDocFont, odfFromTag, tagFromOdf } from '../storage/documentLanguage';
 import { ASIAN_SCRIPT_RE } from '../utils/script';
@@ -54,6 +55,9 @@ import { cellPaddingAttr, DEFAULT_CELL_PADDING, type CellPadding } from '../edit
 import { fromWriterFormula } from '../utils/tableFormula';
 import { cellFormatFromSpec, type CellFormat, type FormatKind } from '../utils/cellFormat';
 import { TEXTBOX_PADDING_CM } from '../editor/extensions/textBox';
+
+// Warnings are the English catalog text; localizeImportMessage maps them at display time.
+const WARN = en.importWarn;
 
 // .odt → TipTap JSON, inverting export/odt.ts. Editor-expressible content becomes its
 // native node/mark/attr; values matching the editor's defaults are suppressed so round
@@ -444,10 +448,10 @@ function convertFrame(frame: Element, ctx: Ctx): Node | null {
     // The frame still occupies its box, so an undrawable picture comes in as a
     // placeholder of that size rather than collapsing the layout around it.
     if (wCm == null || hCm == null) {
-      ctx.warnings.add('Some images could not be read and were skipped');
+      ctx.warnings.add(WARN.imagesSkipped);
       return null;
     }
-    ctx.warnings.add('Images in a format the browser can’t display (e.g. WMF, EMF, SVM) were replaced by a placeholder');
+    ctx.warnings.add(WARN.imagesPlaceholder);
     src = placeholderImage('Image', cmToPx(wCm), cmToPx(hCm));
   }
   const attrs: Record<string, unknown> = { src };
@@ -549,7 +553,7 @@ export function unnestBoxes(blocks: Node[], ctx: { warnings: Set<string> }): Nod
   for (const block of blocks) {
     const boxes = (block.content ?? []).filter(n => n.type === 'textBox');
     if (!boxes.length) { out.push(block); continue; }
-    ctx.warnings.add('Text boxes nested in other text boxes were flattened');
+    ctx.warnings.add(WARN.textBoxFlattened);
     block.content = block.content!.filter(n => n.type !== 'textBox');
     if (block.content.length) out.push(block);
     for (const b of boxes) out.push(...(b.content ?? [{ type: 'paragraph' }]));
@@ -688,7 +692,7 @@ function convertShape(el: Element, ctx: Ctx): Node | null {
     }
   }
   if (!kind) {
-    ctx.warnings.add('Unsupported shapes were removed');
+    ctx.warnings.add(WARN.shapesRemoved);
     return null;
   }
   const attrs: Record<string, unknown> = {};
@@ -754,7 +758,7 @@ function convertFreeform(el: Element, ctx: Ctx): Node | null {
   const path = cmds.length && vb.length === 4 && vb[2] > 0 && vb[3] > 0
     ? fitPath(cmds, vb[2], vb[3], vb[0], vb[1]) : '';
   if (!path || !wCm || !hCm) {
-    ctx.warnings.add('Unsupported shapes were removed');
+    ctx.warnings.add(WARN.shapesRemoved);
     return null;
   }
   const attrs: Record<string, unknown> = {
@@ -844,7 +848,7 @@ function convertDrawGroup(g: Element, ctx: Ctx): Node[] {
     const node = conv?.inline ?? conv?.block;
     if (node) members.push({ node, box: drawBox(leaf) });
   }
-  if (!members.length) { ctx.warnings.add('Drawings were removed'); return []; }
+  if (!members.length) { ctx.warnings.add(WARN.drawingsRemoved); return []; }
 
   const minX = Math.min(...members.map((m) => m.box.x));
   const minY = Math.min(...members.map((m) => m.box.y));
@@ -913,7 +917,7 @@ function convertDrawElement(e: Element, ctx: Ctx): { inline?: Node; block?: Node
     if (img) return { inline: img };
     // A frame with neither image nor text box (OLE object, …) — report the drop;
     // an unreadable image already warned inside convertFrame.
-    if (!hasImage) ctx.warnings.add('Drawings were removed');
+    if (!hasImage) ctx.warnings.add(WARN.drawingsRemoved);
     return null;
   }
   if (e.localName === 'line') {
@@ -943,7 +947,7 @@ function convertDrawElement(e: Element, ctx: Ctx): { inline?: Node; block?: Node
     }
     return null;
   }
-  ctx.warnings.add('Drawings were removed');
+  ctx.warnings.add(WARN.drawingsRemoved);
   return null;
 }
 
@@ -1064,7 +1068,7 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
       language = code;
     } else {
       language = NO_LANGUAGE;
-      warnings.add(`Spell-check language "${docLangs.main}" has no bundled dictionary — spell check was turned off`);
+      warnings.add(WARN.noDictionary(docLangs.main!));
     }
   }
 
@@ -1280,7 +1284,7 @@ const COLUMNS_ALLOWED = new Set(['paragraph', 'heading', 'bulletList', 'orderedL
 function pushColumnRuns(inner: Node[], cols: { count: number; gapCm: number }, out: Node[], ctx: Ctx): void {
   let count = cols.count;
   if (count > 3) {
-    ctx.warnings.add('Sections with more than 3 columns were reduced to 3 columns');
+    ctx.warnings.add(WARN.columnsReduced);
     count = 3;
   }
   let run: Node[] = [];
@@ -1293,7 +1297,7 @@ function pushColumnRuns(inner: Node[], cols: { count: number; gapCm: number }, o
       run.push(block);
     } else {
       if (block.type !== 'columns') {
-        ctx.warnings.add('Tables and text boxes inside a multi-column layout were moved out of the columns');
+        ctx.warnings.add(WARN.movedOutOfColumns);
       }
       flush();
       out.push(block);
@@ -1308,7 +1312,7 @@ function pushColumnRuns(inner: Node[], cols: { count: number; gapCm: number }, o
 function hiddenParagraph(el: Element, ctx: Ctx): boolean {
   if (el.localName !== 'p') return false;
   if (ctx.resolver.paraTextProps(el.getAttributeNS(NS.text, 'style-name'))['text:display'] !== 'none') return false;
-  ctx.warnings.add('Hidden text was removed');
+  ctx.warnings.add(WARN.hiddenText);
   return true;
 }
 
@@ -1374,7 +1378,7 @@ function convertBlocks(elements: Element[], ctx: Ctx, kind: BlockKind, boldByDef
         }
       } else {
         // The editor (and its export) can't nest tables in cells/list items.
-        ctx.warnings.add('Nested tables were flattened to paragraphs');
+        ctx.warnings.add(WARN.nestedTables);
         out.push(...flattenTable(el, ctx));
       }
     } else if (el.namespaceURI === NS.draw) {
@@ -3056,7 +3060,7 @@ function convertList(el: Element, ctx: Ctx, inheritedStyleName: string | null, d
         const nested = convertList(child, ctx, styleName, depth + 1, inChain, childBaseCycle);
         if (nested) blocks.push(nested);
       } else if (child.namespaceURI === NS.table && child.localName === 'table') {
-        ctx.warnings.add('Nested tables were flattened to paragraphs');
+        ctx.warnings.add(WARN.nestedTables);
         blocks.push(...flattenTable(child, ctx));
       }
     }

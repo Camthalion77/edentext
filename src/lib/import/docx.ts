@@ -1,4 +1,5 @@
 import { strFromU8 } from 'fflate';
+import en from '../i18n/locales/en';
 import { DocxStyles, parseRunProps, mergeRunProps, readNumPr, readSpacing, readTabStops, toggle as onOff, wVal, W, R, WP, A, B, WPS, WPG, MC, VML, O, PKG_REL, type RunProps, type ParaSpacing } from './docxStyles';
 import { mostlyAsian } from '../utils/script';
 import { lengthToPt, WATERMARK_NAME } from './styleResolver';
@@ -50,6 +51,9 @@ import { DEFAULT_LINE_GRID, normalizeLineGrid, type LineGrid } from '../storage/
 import { clampColumnGap } from '../editor/extensions/columns';
 import { astToLatex } from '../math/latex';
 import { parseOmml, OMML_NS } from '../math/omml';
+
+// Warnings are the English catalog text; localizeImportMessage maps them at display time.
+const WARN = en.importWarn;
 
 // .docx → TipTap JSON, inverting export/docx.ts. Editor-expressible OOXML becomes its
 // native node/mark/attr; values matching the editor's defaults are suppressed so round
@@ -433,7 +437,7 @@ function documentLanguage(run: RunProps, body: Element, warnings: Set<string>): 
   if (!main) return { language: null, main, other };
   const [language, country] = main.split('-');
   const code = languageFromOdf(language, country);
-  if (!code) warnings.add(`Spell-check language "${main}" has no bundled dictionary — spell check was turned off`);
+  if (!code) warnings.add(WARN.noDictionary(main));
   return { language: code ?? NO_LANGUAGE, main, other };
 }
 
@@ -750,7 +754,7 @@ function convertBlocks(children: Element[], ctx: Ctx, kind: BlockKind, boldByDef
         if (t && pageBreak) applyBreakBefore(t);
         if (t) out.push(t);
       } else {
-        ctx.warnings.add('Nested tables were flattened to paragraphs');
+        ctx.warnings.add(WARN.nestedTables);
         out.push(...flattenTable(el, ctx));
       }
     } else if (el.localName === 'sdt') {
@@ -1853,7 +1857,7 @@ function convertInline(p: Element, ctx: Ctx, baseRun: RunProps, defaults: BlockD
             .find((c) => c.namespaceURI === MC && c.localName === 'Fallback')
             ?.getElementsByTagNameNS(W, 'pict')[0];
           if (pict) drawn(pict, convertPict);
-          else ctx.warnings.add('Drawings were removed');
+          else ctx.warnings.add(WARN.drawingsRemoved);
         }
         continue;
       }
@@ -2037,7 +2041,7 @@ function formulaNode(el: Element, ctx: Ctx): Node | null {
   // Stored verbatim, not trimmed: a macro's own trailing space is what makes the
   // source re-serialize to itself, so trimming it would rewrite the formula on edit.
   const latex = astToLatex(ast);
-  if (!latex.trim()) { ctx.warnings.add('Some formulas could not be read and were skipped'); return null; }
+  if (!latex.trim()) { ctx.warnings.add(WARN.formulasSkipped); return null; }
   return { type: 'formula', attrs: { latex, display } };
 }
 
@@ -2363,19 +2367,19 @@ function convertDrawing(drawing: Element, ctx: Ctx): Node | Node[] | null {
       // cannot draw still occupies its box, as a placeholder of that size.
       const drawn = chartImage(drawing, boxPx, ctx);
       if (drawn) return frameNode(drawn, boxPx, 'Chart', anchor, ctx);
-      ctx.warnings.add('Charts and other drawings were replaced by a placeholder');
+      ctx.warnings.add(WARN.chartsReplaced);
       return frameNode(placeholderImage('Chart', boxPx.w, boxPx.h), boxPx, 'Chart', anchor, ctx);
     }
-    ctx.warnings.add('Drawings were removed');
+    ctx.warnings.add(WARN.drawingsRemoved);
     return null;
   }
   const src = blipSrc(blip, ctx);
   if (!src) {
     if (boxPx.w > 0 && boxPx.h > 0) {
-      ctx.warnings.add('Images in a format the browser can’t display (e.g. WMF, EMF) were replaced by a placeholder');
+      ctx.warnings.add(WARN.imagesPlaceholder);
       return frameNode(placeholderImage('Image', boxPx.w, boxPx.h), boxPx, 'Image', anchor, ctx);
     }
-    ctx.warnings.add('Some images could not be read and were skipped');
+    ctx.warnings.add(WARN.imagesSkipped);
     return null;
   }
 
@@ -2469,7 +2473,7 @@ function convertGroup(wgp: Element, root: Element, anchor: Element | undefined, 
     attrs.wrapOffsetY = off('wrapOffsetY', box.y - first.y);
     over.push({ ...node, attrs });
   }
-  if (!carrier.length) ctx.warnings.add('Drawings were removed');
+  if (!carrier.length) ctx.warnings.add(WARN.drawingsRemoved);
   // An inline carrier is what the line reserves the group's box with, and the frames
   // over it take their static position from the paragraph — so they precede it.
   return anchor ? [...carrier, ...over] : [...over, ...carrier];
@@ -2755,7 +2759,7 @@ function convertWpsShape(wsp: Element, root: Element, isAnchor: boolean, ctx: Ct
   const geo = preset ? presetGeometry(preset, ew, eh) : own;
   const outline = geo.path;
   const kind = outline ? 'textbox' : known;
-  if (!kind) { ctx.warnings.add('Unsupported shapes were removed'); return null; }
+  if (!kind) { ctx.warnings.add(WARN.shapesRemoved); return null; }
 
   const attrs: Record<string, unknown> = {};
   if (kind !== 'textbox') attrs.shapeKind = kind;
@@ -2837,7 +2841,7 @@ function convertPict(pict: Element, ctx: Ctx): Node | null {
   // Fold-mark lines ride the flag (storage/foldMarks.ts), never the zone's content.
   const vmlLine = Array.from(pict.children).find((c) => c.namespaceURI === VML && c.localName === 'line');
   if (vmlLine?.getAttribute('id')?.startsWith(FOLD_MARK_NAME)) return null;
-  if (!shape) { ctx.warnings.add('Drawings were removed'); return null; }
+  if (!shape) { ctx.warnings.add(WARN.drawingsRemoved); return null; }
   // The watermark rides the page decoration (storage/pageDecor.ts), not the header's
   // content, so it must not also arrive here as a shape.
   if (shape.getAttribute('id') === WATERMARK_NAME) return null;
@@ -2864,8 +2868,8 @@ function convertPict(pict: Element, ctx: Ctx): Node | null {
     const src = loadImageDataUrl(path, ctx);
     if (!src) {
       ctx.warnings.add(ctx.files[path]
-        ? 'Images in a format the browser can’t display (e.g. WMF, EMF, TIFF) were removed'
-        : 'Some images could not be read and were skipped');
+        ? WARN.imagesRemoved
+        : WARN.imagesSkipped);
       return null;
     }
     const imgAttrs: Record<string, unknown> = { src };
@@ -2881,7 +2885,7 @@ function convertPict(pict: Element, ctx: Ctx): Node | null {
   const coord = (shape.getAttribute('coordsize') ?? '').split(',').map(Number);
   const outline = coord.length === 2 && coord[0] > 0 && coord[1] > 0 && shape.getAttribute('path')
     ? fitPath(parseVmlPath(shape.getAttribute('path') ?? ''), coord[0], coord[1]) : '';
-  if (!txbxContent && !outline) { ctx.warnings.add('Drawings were removed'); return null; }
+  if (!txbxContent && !outline) { ctx.warnings.add(WARN.drawingsRemoved); return null; }
 
   const attrs: Record<string, unknown> = {};
   if (outline) attrs.shapePath = outline;
@@ -3513,7 +3517,7 @@ function sectPrColumns(sectPr: Element | null, ctx: Ctx): { count: number; gapCm
   if (!num || num <= 1) return null;
   let count = num;
   if (count > 3) {
-    ctx.warnings.add('Sections with more than 3 columns were reduced to 3 columns');
+    ctx.warnings.add(WARN.columnsReduced);
     count = 3;
   }
   const space = intAttr(cols, W, 'space') ?? (colEls[0] ? intAttr(colEls[0], W, 'space') : null) ?? 283;
@@ -3540,7 +3544,7 @@ function pushColumnRuns(inner: Node[], cols: { count: number; gapCm: number }, o
     if (COLUMNS_ALLOWED.has(block.type)) {
       run.push(block);
     } else {
-      ctx.warnings.add('Tables and text boxes inside a multi-column layout were moved out of the columns');
+      ctx.warnings.add(WARN.movedOutOfColumns);
       flush();
       out.push(block);
     }
