@@ -6,7 +6,7 @@ import type { PageMargins } from './pageMargins';
 import type { PageFormat } from './pageFormat';
 import type { Orientation } from './pageOrientation';
 import type { NoteNumFormat } from './noteSettings';
-import { docKey } from './docScope';
+import { docKey, docStore } from './docScope';
 
 export type HfZone = 'header' | 'footer';
 export type HfVariant = 'default' | 'first' | 'even';
@@ -77,7 +77,7 @@ export function hfSetIsEmpty(s: HfSet): boolean {
 const EXTRA_KEY = docKey('edentext-hf-sections');
 
 export function loadExtraHfSections(): HfSet[] {
-  const raw = localStorage.getItem(EXTRA_KEY);
+  const raw = docStore.getItem(EXTRA_KEY);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -88,8 +88,8 @@ export function loadExtraHfSections(): HfSet[] {
 }
 
 export function saveExtraHfSections(sections: HfSet[]): void {
-  if (sections.length) localStorage.setItem(EXTRA_KEY, JSON.stringify(sections));
-  else localStorage.removeItem(EXTRA_KEY);
+  if (sections.length) docStore.setItem(EXTRA_KEY, JSON.stringify(sections));
+  else docStore.removeItem(EXTRA_KEY);
 }
 
 const KEYS: Record<HfZone, Record<HfVariant, string>> = {
@@ -103,21 +103,21 @@ const DIFFERENT_FIRST_KEY = docKey('edentext-hf-different-first');
 const DIFFERENT_ODD_EVEN_KEY = docKey('edentext-hf-odd-even');
 
 export function loadDifferentFirstPage(): boolean {
-  return localStorage.getItem(DIFFERENT_FIRST_KEY) === 'true';
+  return docStore.getItem(DIFFERENT_FIRST_KEY) === 'true';
 }
 
 export function saveDifferentFirstPage(on: boolean): void {
-  if (on) localStorage.setItem(DIFFERENT_FIRST_KEY, 'true');
-  else localStorage.removeItem(DIFFERENT_FIRST_KEY);
+  if (on) docStore.setItem(DIFFERENT_FIRST_KEY, 'true');
+  else docStore.removeItem(DIFFERENT_FIRST_KEY);
 }
 
 export function loadDifferentOddEven(): boolean {
-  return localStorage.getItem(DIFFERENT_ODD_EVEN_KEY) === 'true';
+  return docStore.getItem(DIFFERENT_ODD_EVEN_KEY) === 'true';
 }
 
 export function saveDifferentOddEven(on: boolean): void {
-  if (on) localStorage.setItem(DIFFERENT_ODD_EVEN_KEY, 'true');
-  else localStorage.removeItem(DIFFERENT_ODD_EVEN_KEY);
+  if (on) docStore.setItem(DIFFERENT_ODD_EVEN_KEY, 'true');
+  else docStore.removeItem(DIFFERENT_ODD_EVEN_KEY);
 }
 
 // Default distance from the page edge to the header/footer text; the body margin stays
@@ -141,7 +141,7 @@ export function clampHfDistance(n: number): number {
 }
 
 export function loadHfDistances(): HfDistances {
-  const raw = localStorage.getItem(DIST_KEY);
+  const raw = docStore.getItem(DIST_KEY);
   if (!raw) return { ...DEFAULT_HF_DISTANCES };
   try {
     const p = JSON.parse(raw);
@@ -155,11 +155,11 @@ export function loadHfDistances(): HfDistances {
 }
 
 export function saveHfDistances(d: HfDistances): void {
-  localStorage.setItem(DIST_KEY, JSON.stringify(d));
+  docStore.setItem(DIST_KEY, JSON.stringify(d));
 }
 
 export function loadHfDoc(zone: HfZone, variant: HfVariant = 'default'): HfDoc {
-  const raw = localStorage.getItem(KEYS[zone][variant]);
+  const raw = docStore.getItem(KEYS[zone][variant]);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -170,8 +170,8 @@ export function loadHfDoc(zone: HfZone, variant: HfVariant = 'default'): HfDoc {
 }
 
 export function saveHfDoc(zone: HfZone, doc: HfDoc, variant: HfVariant = 'default'): void {
-  if (hfIsEmpty(doc)) localStorage.removeItem(KEYS[zone][variant]);
-  else localStorage.setItem(KEYS[zone][variant], JSON.stringify(doc));
+  if (hfIsEmpty(doc)) docStore.removeItem(KEYS[zone][variant]);
+  else docStore.setItem(KEYS[zone][variant], JSON.stringify(doc));
 }
 
 type ZoneNode = { type?: string; content?: ZoneNode[]; attrs?: Record<string, unknown> };

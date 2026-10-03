@@ -24,8 +24,10 @@ const en = {
     confirmDelete: 'Delete this document from the browser? It cannot be restored.',
     resume: 'Continue where you left off',
     showAll: 'All documents…',
-    forgetClosed: 'Delete closed documents from this browser at the next start',
-    forgetClosedHint: 'Password-protected documents are always deleted, since their copy here is not encrypted.',
+    retention: { keep: 'Keep documents in this browser', closed: 'Delete closed documents at the next start', none: 'Do not save documents in this browser' },
+    noneHint: 'Takes effect at the next start; word completion and the user dictionary are then off.',
+    protectedHint: 'Password-protected documents are always deleted, since their copy here is not encrypted.',
+    restartNeeded: 'Takes effect when the page is next loaded.',
   },
   docProps: {
     title: 'Document properties',
@@ -80,6 +82,7 @@ const en = {
     minLength: 'Minimum word length',
     clear: 'Delete collected words',
     collected: (n: number) => `${n} word${n === 1 ? '' : 's'} collected`,
+    offUnstored: 'Off while documents are not saved in this browser',
   },
   navigator: {
     title: 'Navigator',

@@ -25,8 +25,10 @@ const zhHant: Messages = {
     confirmDelete: '要從瀏覽器中刪除此文件嗎？刪除後無法復原。',
     resume: '繼續處理',
     showAll: '所有文件…',
-    forgetClosed: '下次啟動時從此瀏覽器中刪除已關閉的文件',
-    forgetClosedHint: '受密碼保護的文件一律會被刪除，因為其在此處的副本未加密。',
+    retention: { keep: '在此瀏覽器中保留文件', closed: '下次啟動時刪除已關閉的文件', none: '不在此瀏覽器中儲存文件' },
+    noneHint: '自下次啟動起生效；屆時字詞自動完成與使用者字典將關閉。',
+    protectedHint: '受密碼保護的文件一律會被刪除，因為其在此處的副本未加密。',
+    restartNeeded: '在下次載入頁面時生效。',
   },
   docProps: {
     title: '文件屬性',
@@ -79,6 +81,7 @@ const zhHant: Messages = {
     minLength: '最短字詞長度',
     clear: '刪除已收集的字詞',
     collected: (n: number) => `已收集 ${n} 個字詞`,
+    offUnstored: '在不於此瀏覽器中儲存文件期間關閉',
   },
   navigator: {
     title: '導覽',

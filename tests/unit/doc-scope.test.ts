@@ -80,7 +80,7 @@ describe('deleteDocument', () => {
     localStorage.setItem('edentext-live@d3', String(Date.now()));
     localStorage.setItem('edentext-doc@d3', text);
     localStorage.setItem('edentext-doc@d9', text);
-    scope.saveKeepDocuments(false);
+    scope.saveRetention('closed');
     await scope.pruneOldDocuments();
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
     expect(keys.sort()).toEqual(['edentext-doc@d3', 'edentext-doc@d9', 'edentext-keep-documents', 'edentext-live@d3', 'edentext-live@d9']);
@@ -101,4 +101,43 @@ describe('deleteDocument', () => {
     await scope.pruneOldDocuments();
     expect((await scope.listDocuments()).map((d) => d.id).sort()).toEqual(['d2', 'd9']);
   });
+
+  it('keeps nothing at all when nothing is to be stored, this tab\'s own copy included', async () => {
+    localStorage.clear();
+    sessionStorage.setItem('edentext-tab-doc', 'd9');
+    localStorage.setItem('edentext-keep-documents', 'none');
+    vi.resetModules();
+    const scope = await import('../../src/lib/storage/docScope');
+    const autosave = await import('../../src/lib/storage/autosave');
+    const text = '{"content":[{"type":"paragraph","content":[{"text":"x"}]}]}';
+    localStorage.setItem('edentext-live@d1', String(-(Date.now() - MIN)));
+    localStorage.setItem('edentext-doc@d1', text);
+    localStorage.setItem('edentext-doc@d9', text);
+    localStorage.setItem('edentext-live@d3', String(Date.now()));
+    localStorage.setItem('edentext-doc@d3', text);
+    expect(scope.volatile).toBe(true);
+    await scope.pruneOldDocuments();
+    autosave.saveDocument(() => JSON.parse(text));
+    scope.docStore.setItem(scope.docKey('edentext-doc-name'), 'kept in memory');
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+    expect(keys.sort()).toEqual(['edentext-doc@d3', 'edentext-keep-documents', 'edentext-live@d3']);
+    expect(scope.docStore.getItem('edentext-doc-name@d9')).toBe('kept in memory');
+    expect(scope.docStore.length).toBe(1);
+    expect(scope.docStore.key(0)).toBe('edentext-doc-name@d9');
+  });
+
+  it('collects no words and keeps no user dictionary when nothing is to be stored', async () => {
+    localStorage.clear();
+    localStorage.setItem('edentext-keep-documents', 'none');
+    vi.resetModules();
+    const completion = await import('../../src/lib/storage/wordCompletion.svelte');
+    const { spellController, personalDictionary } = await import('../../src/lib/spell/controller');
+    completion.rememberWord('Donaudampfschifffahrt');
+    spellController.addWord('Donaudampfschifffahrt');
+    expect(personalDictionary).toBe(false);
+    expect(completion.wordCompletion().words).toEqual([]);
+    expect(localStorage.getItem('edentext-user-dictionary')).toBeNull();
+    expect(localStorage.getItem('edentext-word-completion')).toBeNull();
+  });
 });
+

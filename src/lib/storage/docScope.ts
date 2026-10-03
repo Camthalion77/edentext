@@ -44,6 +44,7 @@ export function pickSlot(marks: Record<string, number>, now: number): string {
 }
 
 function mark(id: string, at: number): void {
+  if (volatile) return;
   try {
     localStorage.setItem(LIVE + id, String(at));
   } catch { /* a full localStorage costs the marker, not the document */ }
@@ -65,6 +66,41 @@ function resolve(): string {
   }
 }
 
+// Whether documents stay in this browser (app-wide): absent = kept, `'0'` = those no tab
+// holds are dropped at the next start, `'none'` = never written at all. A password-protected
+// document is dropped like `'0'`, since its copy here is unencrypted.
+const KEEP_KEY = 'edentext-keep-documents';
+export type Retention = 'keep' | 'closed' | 'none';
+
+export function loadRetention(): Retention {
+  const v = localStorage.getItem(KEEP_KEY);
+  return v === 'none' ? 'none' : v === '0' ? 'closed' : 'keep';
+}
+
+export function saveRetention(r: Retention): void {
+  if (r === 'keep') localStorage.removeItem(KEEP_KEY);
+  else localStorage.setItem(KEEP_KEY, r === 'none' ? 'none' : '0');
+}
+
+// Read once: the open document already sits in localStorage, so `'none'` takes effect
+// at the next start, when the prune drops this tab's own copy too.
+export const volatile = (() => { try { return loadRetention() === 'none'; } catch { return false; } })();
+
+function memoryStorage(): Storage {
+  const map = new Map<string, string>();
+  return {
+    get length() { return map.size; },
+    key: (i) => [...map.keys()][i] ?? null,
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => void map.set(k, String(v)),
+    removeItem: (k) => void map.delete(k),
+    clear: () => map.clear(),
+  };
+}
+
+/** Where this tab's document keys live: localStorage, or the page's memory when `volatile`. */
+export const docStore: Storage = volatile ? memoryStorage() : localStorage;
+
 export const docId = resolve();
 
 // Every scoped name, gathered as the storage modules resolve their keys at load: the
@@ -77,7 +113,7 @@ export function docKey(name: string): string {
   return docId === '' ? name : `${name}@${docId}`;
 }
 
-/** Keep this tab's marker fresh, and sign it off when the tab goes away. */
+/** Keep this tab's marker fresh, and sign it off when the tab goes away; `mark` writes none when `volatile`. */
 export function startTabPresence(): void {
   navigator.locks?.request(LOCK + docId, () => new Promise<never>(() => {})).catch(() => {});
   setInterval(() => mark(docId, Date.now()), BEAT_MS);
@@ -109,20 +145,6 @@ async function heldBy(): Promise<(id: string, at: number) => boolean> {
   return (id) => ids.has(id);
 }
 
-// Whether documents stay in this browser once no tab holds them (app-wide, absent = on).
-// Off, or for a password-protected document whose copy here is unencrypted, the next
-// start drops them; a reload keeps its own, since the tab's id survives in sessionStorage.
-const KEEP_KEY = 'edentext-keep-documents';
-
-export function loadKeepDocuments(): boolean {
-  return localStorage.getItem(KEEP_KEY) !== '0';
-}
-
-export function saveKeepDocuments(on: boolean): void {
-  if (on) localStorage.removeItem(KEEP_KEY);
-  else localStorage.setItem(KEEP_KEY, '0');
-}
-
 // The start's prune, which listing waits for so it never offers a document being dropped.
 let pruning: Promise<void> = Promise.resolve();
 
@@ -139,9 +161,12 @@ async function prune(): Promise<void> {
   const isHeld = await heldBy();
   let docs = Object.entries(markers()).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   const drop = (id: string) => { dropDocument(id); localStorage.removeItem(LIVE + id); };
-  const keep = loadKeepDocuments();
-  const forget = docs.filter(([id, at]) => id !== docId && !isHeld(id, at)
-    && (!keep || localStorage.getItem(keyOf(id, 'edentext-doc-protected')) === '1'));
+  // A reload keeps its own document, since the tab's id survives in sessionStorage —
+  // unless nothing is to be stored, where the copy from before the switch goes too.
+  if (volatile && !docs.some(([id]) => id === docId)) docs.push([docId, 0]);
+  const keep = loadRetention() === 'keep';
+  const forget = docs.filter(([id, at]) => (id === docId ? volatile : !isHeld(id, at)
+    && (!keep || localStorage.getItem(keyOf(id, 'edentext-doc-protected')) === '1')));
   for (const [id] of forget) drop(id);
   // Their pictures go now, not at the next save that happens to have pictures of its own.
   if (forget.length) await sweepImages();

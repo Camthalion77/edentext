@@ -23,8 +23,10 @@ const de: Messages = {
     confirmDelete: 'Dieses Dokument aus dem Browser löschen? Es lässt sich nicht wiederherstellen.',
     resume: 'Weiterarbeiten an',
     showAll: 'Alle Dokumente…',
-    forgetClosed: 'Geschlossene Dokumente beim nächsten Start aus diesem Browser löschen',
-    forgetClosedHint: 'Passwortgeschützte Dokumente werden immer gelöscht, weil ihre Kopie hier nicht verschlüsselt ist.',
+    retention: { keep: 'Dokumente in diesem Browser behalten', closed: 'Geschlossene Dokumente beim nächsten Start löschen', none: 'Dokumente nicht in diesem Browser speichern' },
+    noneHint: 'Wirkt ab dem nächsten Start; Wortergänzung und Benutzerwörterbuch sind dann aus.',
+    protectedHint: 'Passwortgeschützte Dokumente werden immer gelöscht, weil ihre Kopie hier nicht verschlüsselt ist.',
+    restartNeeded: 'Wirkt, sobald die Seite neu geladen wird.',
   },
   docProps: {
     title: 'Dokumenteigenschaften',
@@ -77,6 +79,7 @@ const de: Messages = {
     minLength: 'Mindestwortlänge',
     clear: 'Gesammelte Wörter löschen',
     collected: (n) => `${n} ${n === 1 ? 'Wort' : 'Wörter'} gesammelt`,
+    offUnstored: 'Aus, solange Dokumente nicht in diesem Browser gespeichert werden',
   },
   navigator: {
     title: 'Navigator',

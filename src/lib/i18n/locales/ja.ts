@@ -25,8 +25,10 @@ const ja: Messages = {
     confirmDelete: 'この文書をブラウザーから削除しますか? 元に戻すことはできません。',
     resume: '作業を再開',
     showAll: 'すべての文書…',
-    forgetClosed: '閉じた文書を次回起動時にこのブラウザーから削除する',
-    forgetClosedHint: 'パスワードで保護された文書は、ここにあるコピーが暗号化されていないため、常に削除されます。',
+    retention: { keep: '文書をこのブラウザーに保持する', closed: '閉じた文書を次回起動時に削除する', none: '文書をこのブラウザーに保存しない' },
+    noneHint: '次回起動時から有効になります。その間、単語補完とユーザー辞書は無効になります。',
+    protectedHint: 'パスワードで保護された文書は、ここにあるコピーが暗号化されていないため、常に削除されます。',
+    restartNeeded: 'ページを次に読み込んだときに有効になります。',
   },
   docProps: {
     title: '文書プロパティ',
@@ -79,6 +81,7 @@ const ja: Messages = {
     minLength: '最小の単語長',
     clear: '収集した単語を削除',
     collected: (n: number) => `${n} 語を収集済み`,
+    offUnstored: '文書をこのブラウザーに保存しない間は無効です',
   },
   navigator: {
     title: 'ナビゲーター',

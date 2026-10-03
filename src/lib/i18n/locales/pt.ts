@@ -23,8 +23,10 @@ const pt: Messages = {
     confirmDelete: 'Eliminar este documento do navegador? Não poderá ser recuperado.',
     resume: 'Continuar a trabalhar em',
     showAll: 'Todos os documentos…',
-    forgetClosed: 'Eliminar deste navegador os documentos fechados no próximo arranque',
-    forgetClosedHint: 'Os documentos protegidos por palavra-passe são sempre eliminados, porque a sua cópia aqui não está encriptada.',
+    retention: { keep: 'Manter os documentos neste navegador', closed: 'Eliminar os documentos fechados no próximo arranque', none: 'Não guardar documentos neste navegador' },
+    noneHint: 'Aplica-se a partir do próximo arranque; o preenchimento automático de palavras e o dicionário do utilizador ficam desativados.',
+    protectedHint: 'Os documentos protegidos por palavra-passe são sempre eliminados, porque a sua cópia aqui não está encriptada.',
+    restartNeeded: 'Aplica-se quando a página voltar a ser carregada.',
   },
   docProps: {
     title: 'Propriedades do documento',
@@ -77,6 +79,7 @@ const pt: Messages = {
     minLength: 'Comprimento mínimo da palavra',
     clear: 'Eliminar palavras coletadas',
     collected: (n) => `${n} ${n === 1 ? 'palavra recolhida' : 'palavras recolhidas'}`,
+    offUnstored: 'Desativado enquanto os documentos não forem guardados neste navegador',
   },
   navigator: {
     title: 'Navegador',

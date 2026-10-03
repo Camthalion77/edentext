@@ -3,7 +3,7 @@
 // 'none' disables checking.
 
 import { resolveBrowserLocale } from '../i18n/config';
-import { docKey } from './docScope';
+import { docKey, docStore } from './docScope';
 
 export const NO_LANGUAGE = 'none';
 
@@ -127,7 +127,7 @@ function isValid(code: string): boolean {
 // dictionary rather than the US one; resolveBrowserLocale covers the rest. A tag no entry
 // claims leaves checking off rather than guessing.
 export function loadDocumentLanguage(): DocumentLanguage {
-  const code = localStorage.getItem(KEY);
+  const code = docStore.getItem(KEY);
   if (code && isValid(code)) return code;
   const fromTag = codeForTag(navigator.language ?? '');
   if (fromTag) return fromTag;
@@ -136,17 +136,17 @@ export function loadDocumentLanguage(): DocumentLanguage {
 }
 
 export function saveDocumentLanguage(code: DocumentLanguage): void {
-  localStorage.setItem(KEY, code);
+  docStore.setItem(KEY, code);
 }
 
 export function loadDocumentLanguageOther(): string | null {
-  const tag = localStorage.getItem(OTHER_KEY);
+  const tag = docStore.getItem(OTHER_KEY);
   return tag && odfFromTag(tag) ? tag : null;
 }
 
 export function saveDocumentLanguageOther(tag: string | null): void {
-  if (tag) localStorage.setItem(OTHER_KEY, tag);
-  else localStorage.removeItem(OTHER_KEY);
+  if (tag) docStore.setItem(OTHER_KEY, tag);
+  else docStore.removeItem(OTHER_KEY);
 }
 
 // → ODF fo:language/fo:country for export; null when checking is off.

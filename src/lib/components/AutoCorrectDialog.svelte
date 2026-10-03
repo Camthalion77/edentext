@@ -3,6 +3,7 @@
   import { autoCorrect, setAutoCorrect } from '../storage/autoCorrect.svelte';
   import { DEFAULT_WORD_COMPLETION } from '../storage/wordCompletion';
   import { wordCompletion, setWordCompletion } from '../storage/wordCompletion.svelte';
+  import { volatile } from '../storage/docScope';
   import { t } from '../i18n/i18n.svelte';
 
   // LibreOffice's Tools ▸ AutoCorrect Options: one checkbox per rule, applied while typing.
@@ -46,10 +47,11 @@
     <label class="row">
       <input
         type="checkbox"
-        checked={wordCompletion().enabled}
+        checked={wordCompletion().enabled && !volatile}
+        disabled={volatile}
         onchange={(e) => setWordCompletion({ ...wordCompletion(), enabled: e.currentTarget.checked })}
       />
-      <span>{t().wordCompletion.enabled}<em>{t().wordCompletion.hint}</em></span>
+      <span>{t().wordCompletion.enabled}<em>{volatile ? t().wordCompletion.offUnstored : t().wordCompletion.hint}</em></span>
     </label>
     <label class="row">
       <input

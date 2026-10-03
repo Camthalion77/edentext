@@ -65,7 +65,8 @@ EdenText is a web-based, powerful word processor for everything from quick notes
   processing runs locally; works offline as an installable app. The site counts
   anonymous visits (GoatCounter, EU-hosted, no cookies); the editor sends nothing.
   Documents are autosaved in the browser; Recent documents can drop closed ones
-  at the next start, and a private window leaves nothing behind once it is closed
+  at the next start or not save them there at all, and a private window leaves
+  nothing behind once it is closed
 - **Any current browser** — in Chrome and Edge, Save writes back to the opened
   file, and so does Brave once `brave://flags/#file-system-access-api` is
   enabled; otherwise each save is a download, so turn on "Always ask where to

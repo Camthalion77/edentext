@@ -53,9 +53,15 @@ a quit fires no `pagehide`. `edentext-live@<id>` is the marker — epoch ms whil
 negated on `pagehide`, refreshed every 60 s: the last use, and where Web Locks are missing
 (an insecure origin) the hold itself, abandoned after 10 min. Only the holding tab ever
 writes its own marker, so no two tabs race over one key.
-`pruneOldDocuments()` (from `main.ts`) first drops every document no tab holds when
-`edentext-keep-documents` is `'0'` (the checkbox in *Recent documents*), and a protected one
-always, since its copy here is unencrypted; their pictures are swept at once, and
+`edentext-keep-documents` (app-wide, the three choices in *Recent documents*) is absent =
+keep, `'0'` = drop closed documents at the next start, `'none'` = store nothing. `volatile`
+is read once at load, so `'none'` takes effect at the next start: every document key then goes
+through `docStore`, a Map in memory instead of localStorage, and `saveDocument`, the font
+store, the tab's `edentext-live@` marker, recent files, collected words, the user dictionary
+and `ResumeCard` are all off — a reload starts empty. `docScope.ts`'s own readers
+(`markers`, `storedDoc`, `isEmpty`, `labelOf`, `dropDocument`) read other documents and stay
+on localStorage. `pruneOldDocuments()` (from `main.ts`) first drops every document no tab holds
+unless documents are kept, this tab's own when `volatile`, and a protected one always, since its copy here is unencrypted; their pictures are swept at once, and
 `listDocuments` waits for the prune. Then it drops every empty document no tab holds, then all
 but the newest ten — never a held one, and the first never for its age. While the page
 is empty, `ResumeCard.svelte` offers the three used last. Duplicating a tab copies its

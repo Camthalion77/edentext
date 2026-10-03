@@ -23,8 +23,10 @@ const fr: Messages = {
     confirmDelete: 'Supprimer ce document du navigateur ? Il ne pourra pas être restauré.',
     resume: 'Reprendre le travail',
     showAll: 'Tous les documents…',
-    forgetClosed: 'Supprimer de ce navigateur les documents fermés au prochain démarrage',
-    forgetClosedHint: 'Les documents protégés par mot de passe sont toujours supprimés, car leur copie ici n’est pas chiffrée.',
+    retention: { keep: 'Conserver les documents dans ce navigateur', closed: 'Supprimer les documents fermés au prochain démarrage', none: 'Ne pas enregistrer les documents dans ce navigateur' },
+    noneHint: 'Prend effet au prochain démarrage ; la saisie semi-automatique et le dictionnaire personnel sont alors désactivés.',
+    protectedHint: 'Les documents protégés par mot de passe sont toujours supprimés, car leur copie ici n’est pas chiffrée.',
+    restartNeeded: 'Prend effet au prochain chargement de la page.',
   },
   docProps: {
     title: 'Propriétés du document',
@@ -77,6 +79,7 @@ const fr: Messages = {
     minLength: 'Longueur minimale des mots',
     clear: 'Supprimer les mots collectés',
     collected: (n) => `${n} ${n === 1 ? 'mot collecté' : 'mots collectés'}`,
+    offUnstored: 'Désactivée tant que les documents ne sont pas enregistrés dans ce navigateur',
   },
   navigator: {
     title: 'Navigateur',

@@ -8,7 +8,7 @@
   import { spellErrorAt, spellLangAt } from '../editor/extensions/spellCheck';
   import { grammarErrorAt, grammarFix } from '../editor/extensions/grammarCheck';
   import { ignoreGrammar, type GrammarFix } from '../spell/grammar.svelte';
-  import { spellController } from '../spell/controller';
+  import { spellController, personalDictionary } from '../spell/controller';
   import { isInTable, selectedRect } from '@tiptap/pm/tables';
   import { currentCellFormat, currentCellFormula, currentCellName, guessFormula } from '../editor/extensions/tableFormula';
   import type { CellFormat } from '../utils/cellFormat';
@@ -603,7 +603,7 @@ import { EMPTY_PAGE_DECOR, type PageDecor } from '../storage/pageDecor';
       spell = {
         suggestions: spellController.suggest(word, spellLangAt(view.state, range.from)).slice(0, 6),
         onReplace: replaceSpellWord,
-        onAdd: addSpellWord,
+        onAdd: personalDictionary ? addSpellWord : undefined,
         onIgnore: ignoreSpellWord,
       };
     }

@@ -1,4 +1,4 @@
-import { docKey } from './docScope';
+import { docKey, docStore } from './docScope';
 
 // The user-visible document name (without the .odt extension). Drives the
 // suggested filename on save; empty falls back to the heading-derived name.
@@ -6,11 +6,11 @@ import { docKey } from './docScope';
 const KEY = docKey('edentext-doc-name');
 
 export function loadDocName(): string {
-  return localStorage.getItem(KEY) ?? '';
+  return docStore.getItem(KEY) ?? '';
 }
 
 export function saveDocName(name: string): void {
-  localStorage.setItem(KEY, name);
+  docStore.setItem(KEY, name);
 }
 
 // Drop a trailing .odt or .ott (case-insensitive) so the field shows just the name.
@@ -44,12 +44,12 @@ export type DocumentFormat = 'odt' | 'docx';
 const FORMAT_KEY = docKey('edentext-doc-format');
 
 export function loadDocFormat(): DocumentFormat {
-  return localStorage.getItem(FORMAT_KEY) === 'docx' ? 'docx' : 'odt';
+  return docStore.getItem(FORMAT_KEY) === 'docx' ? 'docx' : 'odt';
 }
 
 export function saveDocFormat(format: DocumentFormat): void {
-  if (format === 'docx') localStorage.setItem(FORMAT_KEY, format);
-  else localStorage.removeItem(FORMAT_KEY);
+  if (format === 'docx') docStore.setItem(FORMAT_KEY, format);
+  else docStore.removeItem(FORMAT_KEY);
 }
 
 // Whether the open document is password-protected. The password itself is never
@@ -57,12 +57,12 @@ export function saveDocFormat(format: DocumentFormat): void {
 const PROTECTED_KEY = docKey('edentext-doc-protected');
 
 export function loadDocProtected(): boolean {
-  return localStorage.getItem(PROTECTED_KEY) === '1';
+  return docStore.getItem(PROTECTED_KEY) === '1';
 }
 
 export function saveDocProtected(on: boolean): void {
-  if (on) localStorage.setItem(PROTECTED_KEY, '1');
-  else localStorage.removeItem(PROTECTED_KEY);
+  if (on) docStore.setItem(PROTECTED_KEY, '1');
+  else docStore.removeItem(PROTECTED_KEY);
 }
 
 // The file the document was last opened from or saved to: its recent-files id (the
@@ -74,7 +74,7 @@ export type DocFile = { id: string; modified: number };
 
 export function loadDocFile(): DocFile | null {
   try {
-    const f = JSON.parse(localStorage.getItem(FILE_KEY) ?? 'null');
+    const f = JSON.parse(docStore.getItem(FILE_KEY) ?? 'null');
     return f && typeof f.id === 'string' && typeof f.modified === 'number' ? f : null;
   } catch {
     return null;
@@ -82,6 +82,6 @@ export function loadDocFile(): DocFile | null {
 }
 
 export function saveDocFile(file: DocFile | null): void {
-  if (file) localStorage.setItem(FILE_KEY, JSON.stringify(file));
-  else localStorage.removeItem(FILE_KEY);
+  if (file) docStore.setItem(FILE_KEY, JSON.stringify(file));
+  else docStore.removeItem(FILE_KEY);
 }
