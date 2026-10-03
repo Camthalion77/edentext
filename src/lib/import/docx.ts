@@ -238,10 +238,10 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
   try {
     files = unzipArchive(bytes);
   } catch {
-    throw new Error('Not a valid .docx file (could not read the archive).');
+    throw new Error(en.importError.docxArchive);
   }
   const docBytes = files['word/document.xml'];
-  if (!docBytes) throw new Error('Not a valid .docx file (word/document.xml is missing).');
+  if (!docBytes) throw new Error(en.importError.docxMissing);
 
   const docDoc = parseXml(strFromU8(docBytes));
   const stylesDoc = files['word/styles.xml'] ? parseXml(strFromU8(files['word/styles.xml'])) : null;
@@ -255,7 +255,7 @@ export function importDocx(bytes: Uint8Array, convertedImages: ConvertedImages =
   for (const [id, def] of styles.namedParagraphStyles()) styleNames.set(id, registryName(id, def.name, id === defaultStyleId));
   const charStyleNames = styles.namedCharacterStyles();
   const body = docDoc.getElementsByTagNameNS(W, 'body')[0];
-  if (!body) throw new Error('Not a Word document (no w:body).');
+  if (!body) throw new Error(en.importError.docxNoBody);
 
   const docLangs = documentLanguage(styles.paragraphRun(null), body, warnings);
 

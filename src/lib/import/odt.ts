@@ -998,10 +998,10 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
   try {
     files = unzipArchive(bytes);
   } catch {
-    throw new Error('Not a valid .odt file (could not read the archive).');
+    throw new Error(en.importError.odtArchive);
   }
   const contentBytes = files['content.xml'];
-  if (!contentBytes) throw new Error('Not a valid .odt file (content.xml is missing).');
+  if (!contentBytes) throw new Error(en.importError.odtContentMissing);
 
   const contentDoc = parseXml(strFromU8(contentBytes));
   const stylesDoc = files['styles.xml'] ? parseXml(strFromU8(files['styles.xml'])) : null;
@@ -1009,7 +1009,7 @@ export function importOdt(bytes: Uint8Array, convertedImages: ConvertedImages = 
   const warnings = new Set<string>();
 
   const body = contentDoc.getElementsByTagNameNS(NS.office, 'text')[0];
-  if (!body) throw new Error('Not a text document (no office:text body).');
+  if (!body) throw new Error(en.importError.odtNoBody);
 
   const styleNames = new Map<string, string>();
   for (const [name, def] of resolver.namedParagraphStyles()) styleNames.set(name, displayStyleName(name, def.display));
