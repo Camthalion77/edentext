@@ -1,5 +1,6 @@
 {
   "name": "edentext-desktop",
+  "productName": "EdenText",
   "private": true,
   "type": "module",
   "main": "main.mjs",
