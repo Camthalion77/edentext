@@ -24,7 +24,7 @@
 
 ---
 
-EdenText is a web-based, powerful word processor for everything from quick notes to full-length books. No server, no account — processing runs locally and your documents never leave your computer. Just one URL away, or completely offline as a slim browser app — under 2 MB on first load[^1]. The interface comes in English, German, Spanish, French, Portuguese, Russian, Ukrainian, Japanese and Chinese (simplified and traditional).
+EdenText is a web-based, powerful word processor for everything from quick notes to full-length books. No server, no account — processing runs locally and your documents never leave your computer. Just one URL away, or completely offline as a slim browser app — it opens with under 2 MB of download, dictionaries and fonts follow as needed[^1]. The interface comes in English, German, Spanish, French, Portuguese, Russian, Ukrainian, Japanese and Chinese (simplified and traditional).
 
 > [!NOTE]
 > EdenText is young, in **beta** and actively developed — more features are on
@@ -176,7 +176,7 @@ own licenses — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 *EdenText is an independent project, not affiliated with Microsoft or The
 Document Foundation. `.docx` and `.odt` are supported for interoperability.*
 
-[^1]: Over the wire, compressed: ~0.4 MB of app code, the rest the bundled fonts a
-    page shows and the spell checker with its dictionary. Further fonts, dictionaries
-    and thesauri load on demand; the complete offline install is ~30 MB, or ~38 MB with
-    the English grammar check switched on.
+[^1]: Over the wire, compressed: ~0.6 MB of app code, the rest the spell checker with
+    the dictionary for the browser's language and the fonts a page shows. Everything else
+    is fetched and kept for offline use once it is needed; all fonts, dictionaries and
+    thesauri together are ~15 MB, or ~23 MB with the English grammar check.
