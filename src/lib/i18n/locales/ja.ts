@@ -1211,6 +1211,7 @@ const ja: Messages = {
     couldNotOpen: 'このファイルを開けませんでした。',
     chooseFormat: 'どの形式で保存しますか？',
     couldNotSave: 'このファイルを保存できませんでした。',
+    fileChangedElsewhere: (name: string) => `「${name}」は、前回開いたか保存した後に EdenText の外部で変更されています。それでも上書きしますか？上書きしない場合は、新しい名前で保存します。`,
     scriptBlocked: 'アプリの一部を読み込めませんでした — スクリプトブロッカー (uBlock Origin、NoScript、厳格なプライバシーモード)がブロックしています。このサイトを許可してもう一度お試しください。',
     couldNotLoadGrammar: '文法チェックを読み込めませんでした。',
     couldNotLoadThesaurus: '類義語の一覧を読み込めませんでした。',

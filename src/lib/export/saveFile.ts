@@ -98,6 +98,18 @@ export async function saveDocument(
   return target;
 }
 
+// A handle restored after a reload has lost its permission until asked again, inside
+// the click that saves; Electron grants it without asking.
+export async function allowWrite(handle: FileSystemFileHandle): Promise<boolean> {
+  const h = handle as FileSystemFileHandle & {
+    queryPermission?: (d: { mode: string }) => Promise<PermissionState>;
+    requestPermission?: (d: { mode: string }) => Promise<PermissionState>;
+  };
+  let state = (await h.queryPermission?.({ mode: 'readwrite' })) ?? 'granted';
+  if (state === 'prompt') state = (await h.requestPermission?.({ mode: 'readwrite' })) ?? 'denied';
+  return state === 'granted';
+}
+
 // Prompt for an .odt/.ott/.docx to open, capturing its handle so a later save can
 // overwrite the same file. Returns null if cancelled. Only call when supportsFsAccess().
 export async function openOdt(): Promise<{ bytes: Uint8Array; handle: FileSystemFileHandle; name: string } | null> {

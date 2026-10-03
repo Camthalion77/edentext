@@ -1209,6 +1209,7 @@ const pt: Messages = {
     couldNotOpen: 'Não foi possível abrir este ficheiro.',
     chooseFormat: 'Em que formato guardar?',
     couldNotSave: 'Não foi possível guardar este ficheiro.',
+    fileChangedElsewhere: (name: string) => `«${name}» foi alterado fora do EdenText desde a última vez que foi aberto ou guardado. Substituí-lo mesmo assim? Caso contrário, o documento é guardado com um novo nome.`,
     scriptBlocked: 'Não foi possível carregar parte da aplicação: um bloqueador de scripts (uBlock Origin, NoScript ou modo de privacidade estrito) está a bloqueá-la. Autorize este site e tente novamente.',
     couldNotLoadGrammar: 'Não foi possível carregar a verificação gramatical.',
     couldNotLoadThesaurus: 'Não foi possível carregar a lista de sinónimos.',

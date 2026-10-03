@@ -1214,6 +1214,7 @@ const fr: Messages = {
     couldNotOpen: 'Impossible d’ouvrir ce fichier.',
     chooseFormat: 'Dans quel format enregistrer ?',
     couldNotSave: 'Impossible d’enregistrer ce fichier.',
+    fileChangedElsewhere: (name: string) => `« ${name} » a été modifié en dehors d’EdenText depuis sa dernière ouverture ou son dernier enregistrement. L’écraser quand même ? Sinon, le document sera enregistré sous un nouveau nom.`,
     scriptBlocked: 'Une partie de l’application n’a pas pu être chargée : un bloqueur de scripts (uBlock Origin, NoScript ou mode de confidentialité strict) la bloque. Autorisez ce site et réessayez.',
     couldNotLoadGrammar: 'Impossible de charger la vérification grammaticale.',
     couldNotLoadThesaurus: 'Impossible de charger la liste de synonymes.',

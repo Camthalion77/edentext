@@ -10,8 +10,8 @@
   import FindReplaceBar from './lib/components/FindReplaceBar.svelte';
   import type { TiptapNode } from 'odf-kit';
   import { exportPdf, printPdf, printRaster } from './lib/export/pdf';
-  import { supportsFsAccess, saveDocument, openOdt } from './lib/export/saveFile';
-  import { loadRecentFiles, rememberRecentFile, readRecentFile, forgetRecentFile, forgetRecentFiles, pruneRecentFiles, type RecentFile } from './lib/storage/recentFiles';
+  import { supportsFsAccess, saveDocument, openOdt, allowWrite } from './lib/export/saveFile';
+  import { loadRecentFiles, rememberRecentFile, readRecentFile, forgetRecentFile, forgetRecentFiles, pruneRecentFiles, getHandle, type RecentFile } from './lib/storage/recentFiles';
   import { isProtected, decryptPackage, WRONG_PASSWORD } from './lib/crypto/protect';
   import { convertUnsupportedImages } from './lib/import/imageFormats';
   import { repairContent, repairZones } from './lib/import/repairContent';
@@ -41,7 +41,7 @@
   import { DEFAULT_NOTE_SETTINGS } from './lib/storage/noteSettings';
   import { builtinStyleSheet, type StyleFamily } from './lib/styles/styleSheet';
   import { loadHfDoc, saveHfDoc, loadHfDistances, saveHfDistances, loadDifferentFirstPage, saveDifferentFirstPage, loadDifferentOddEven, saveDifferentOddEven, hfIsEmpty, DEFAULT_HF_DISTANCES, loadExtraHfSections, saveExtraHfSections, type HfDoc, type HfZone, type HfDistances, type HfSet } from './lib/storage/headerFooter';
-  import { loadDocName, saveDocName, loadDocFormat, saveDocFormat, stripOdtExtension, sanitizeNameForFile, deriveFilename, filenameFor, loadDocProtected, saveDocProtected, type DocumentFormat } from './lib/storage/documentName';
+  import { loadDocName, saveDocName, loadDocFormat, saveDocFormat, stripOdtExtension, sanitizeNameForFile, deriveFilename, filenameFor, loadDocProtected, saveDocProtected, loadDocFile, saveDocFile, type DocumentFormat } from './lib/storage/documentName';
   import { loadDocProperties, saveDocProperties, EMPTY_DOC_PROPERTIES, type DocProperties } from './lib/storage/docProperties';
   import { loadHyphenation, saveHyphenation } from './lib/storage/hyphenation';
   import { loadPageNumbering, savePageNumbering, DEFAULT_PAGE_NUMBERING, type PageNumbering } from './lib/storage/pageNumbering';
@@ -590,9 +590,10 @@
     return { destroy() { window.removeEventListener('mousedown', handler); } };
   }
 
-  // The file the document is saved to (File System Access API). Session-only: a
-  // reload restores the doc from localStorage but the first Save re-prompts.
+  // The file the document is saved to (File System Access API), and its modification
+  // time as last read or written, so a save notices the file changed elsewhere.
   let fileHandle: FileSystemFileHandle | null = $state(null);
+  let fileModified = 0;
   // The password the document is saved with. Session-only: it is never written to
   // localStorage, and the autosaved copy there stays unencrypted.
   let docPassword: string | null = $state(null);
@@ -610,6 +611,18 @@
   const fsSupported = supportsFsAccess();
   let recentFiles: RecentFile[] = $state(fsSupported ? loadRecentFiles() : []);
   if (fsSupported) void pruneRecentFiles().then((list) => (recentFiles = list));
+  // A reload keeps the document's file, as long as the recent list still holds its handle.
+  const boundFile = fsSupported ? loadDocFile() : null;
+  if (boundFile) void getHandle(boundFile.id).then((h) => {
+    if (h && !fileHandle) { fileHandle = h; fileModified = boundFile.modified; }
+  });
+
+  // Remember the file just opened or saved for the next reload and the next save's check.
+  async function bindFile(): Promise<void> {
+    const id = fileHandle && recentFiles[0]?.id;
+    fileModified = (await fileHandle?.getFile().catch(() => null))?.lastModified ?? 0;
+    saveDocFile(id ? { id, modified: fileModified } : null);
+  }
   let fileInput: HTMLInputElement | null = $state(null);
   let pdfBusy = $state(false);
   let exportMenuOpen = $state(false);
@@ -710,6 +723,8 @@
     docProps = { ...EMPTY_DOC_PROPERTIES };
     saveDocProperties(docProps);
     fileHandle = null;
+    fileModified = 0;
+    saveDocFile(null);
     documentFormat = 'odt';
     documentHasFile = false;
     docPassword = null;
@@ -935,6 +950,7 @@
       documentHasFile = !isTemplate;
       markSaved();
       if (sourceName) recentFiles = await rememberRecentFile(sourceName, isTemplate ? null : handle);
+      await bindFile();
 
       // Warn about fonts the document uses but the browser can't render, so text
       // silently shown in a substitute (Liberation Serif) is at least flagged.
@@ -1051,11 +1067,19 @@
     if (!(await ensurePassword())) return;
     const json = editor.getJSON() as TiptapNode;
     try {
+      // Someone else's changes to the file are not overwritten unasked: declining saves
+      // under another name instead.
+      if (fileHandle) {
+        if (!(await allowWrite(fileHandle))) throw new DOMException('', 'NotAllowedError');
+        const { lastModified } = await fileHandle.getFile();
+        if (fileModified && lastModified !== fileModified && !confirm(t().dialogs.fileChangedElsewhere(fileHandle.name))) return handleSaveAs(documentFormat);
+      }
       // A document opened as .docx round-trips through the same format, like both
       // reference word processors — not silently rewritten to .odt under its old name.
       const name = documentFormat === 'docx' ? suggestedFilenameDocx(json) : suggestedFilename(json);
       fileHandle = await saveDocument(await buildBytes(documentFormat, json), name, documentFormat, fileHandle, docPassword);
       recentFiles = await rememberRecentFile(fileHandle?.name ?? name, fileHandle);
+      await bindFile();
       documentHasFile = true;
       markSaved();
     } catch (err) {
@@ -1081,6 +1105,7 @@
       fileHandle = await saveDocument(await buildBytes(kind, json), name, kind, null, docPassword);
       documentFormat = kind;
       recentFiles = await rememberRecentFile(fileHandle?.name ?? name, fileHandle);
+      await bindFile();
       documentHasFile = true;
       markSaved();
     } catch (err) {

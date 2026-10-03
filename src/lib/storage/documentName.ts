@@ -64,3 +64,24 @@ export function saveDocProtected(on: boolean): void {
   if (on) localStorage.setItem(PROTECTED_KEY, '1');
   else localStorage.removeItem(PROTECTED_KEY);
 }
+
+// The file the document was last opened from or saved to: its recent-files id (the
+// handle lives in that store's IndexedDB) and its modification time then, so a reload
+// keeps Save writing there and a save notices the file changed elsewhere.
+const FILE_KEY = docKey('edentext-doc-file');
+
+export type DocFile = { id: string; modified: number };
+
+export function loadDocFile(): DocFile | null {
+  try {
+    const f = JSON.parse(localStorage.getItem(FILE_KEY) ?? 'null');
+    return f && typeof f.id === 'string' && typeof f.modified === 'number' ? f : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDocFile(file: DocFile | null): void {
+  if (file) localStorage.setItem(FILE_KEY, JSON.stringify(file));
+  else localStorage.removeItem(FILE_KEY);
+}

@@ -1209,6 +1209,7 @@ const zhHans: Messages = {
     couldNotOpen: '无法打开此文件。',
     chooseFormat: '要保存为哪种格式？',
     couldNotSave: '无法保存此文件。',
+    fileChangedElsewhere: (name: string) => `“${name}”自上次打开或保存后已在 EdenText 之外被修改。仍要覆盖吗？否则将以新名称保存文档。`,
     scriptBlocked: '应用的一部分未能载入——脚本拦截器（uBlock Origin、NoScript、严格的隐私模式）拦截了它。请为本站点放行后重试。',
     couldNotLoadGrammar: '无法载入语法检查。',
     couldNotLoadThesaurus: '无法载入同义词列表。',
