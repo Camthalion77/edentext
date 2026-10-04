@@ -149,12 +149,12 @@
 
       {:else}
         <div class="row stack">
-          <div class="info"><div class="name">{t().settings.documents}</div><div class="desc">{t().browserDocs.intro}</div></div>
+          <div class="info"><div class="name">{t().settings.documents}</div><div class="desc">{t().settings.autosaveHint}</div></div>
           <div class="choices" role="radiogroup" aria-label={t().settings.documents}>
             {#each LEVELS as level (level)}
               <label class="choice" class:on={retention === level}>
                 <input type="radio" name="retention" checked={retention === level} onchange={() => saveRetention((retention = level))} />
-                <span>{t().settings.retention[level]}{#if level === 'none'}<em>{t().settings.noneHint}</em>{/if}</span>
+                <span><span class="name">{t().settings.retention[level]}</span><em>{t().settings.retentionHint[level]}</em></span>
               </label>
             {/each}
           </div>
