@@ -1865,7 +1865,17 @@
   <AutoTextDialog bind:open={autoTextOpen} editor={activeEditor} />
   <ThesaurusDialog bind:open={thesaurusOpen} editor={activeEditor} />
   <BrowserDocumentsDialog bind:open={browserDocsOpen} />
-  <SettingsDialog bind:open={settingsOpen} />
+  <SettingsDialog
+    bind:open={settingsOpen}
+    {themeMode}
+    onSelectTheme={selectTheme}
+    bind:showRuler
+    bind:showFormattingMarks
+    bind:showFieldShading
+    recentCount={recentFiles.length}
+    onClearRecent={() => { forgetRecentFiles(); recentFiles = []; }}
+    onAutoCorrect={() => (autoCorrectOpen = true)}
+  />
   <ResumeCard show={!volatile && tick >= 0 && !!editor && !isDocNonEmpty()} onShowAll={() => (browserDocsOpen = true)} />
   <DocPropertiesDialog bind:open={docPropsOpen} props={docProps} onApply={(p) => { docProps = p; saveDocProperties(p); }} />
   <PasswordDialog
