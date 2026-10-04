@@ -482,7 +482,7 @@
         aria-haspopup="menu"
         aria-expanded={isMenuOpen('appearance')}
       >
-        <Icon name="ribbon" size={16} />
+        <Icon name="theme" size={16} />
       </button>
       {#if isMenuOpen('appearance')}
         <RibbonMenu align="right" minWidth={220} heading={t().appearance.title}>
