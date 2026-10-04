@@ -96,7 +96,7 @@ const ja: Messages = {
     clear: '収集した単語を削除',
     collected: (n: number) => `${n} 語を収集済み`,
     offUnstored: '自動保存がオフの間は無効です',
-    appendSpaceHint: '確定した単語の後にスペースを入れ、すぐ次の単語を入力できます',
+    appendSpaceHint: '確定した単語の後にスペースを入れます',
     minLengthHint: 'この長さ以上の単語だけを収集して候補にします',
   },
   navigator: {

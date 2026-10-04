@@ -94,7 +94,7 @@ const de: Messages = {
     clear: 'Gesammelte Wörter löschen',
     collected: (n) => `${n} ${n === 1 ? 'Wort' : 'Wörter'} gesammelt`,
     offUnstored: 'Aus, solange das automatische Speichern aus ist',
-    appendSpaceHint: 'Nach einem angenommenen Wort folgt ein Leerzeichen, bereit für das nächste',
+    appendSpaceHint: 'Nach einem angenommenen Wort folgt ein Leerzeichen',
     minLengthHint: 'Nur Wörter ab dieser Länge werden gesammelt und vorgeschlagen',
   },
   navigator: {

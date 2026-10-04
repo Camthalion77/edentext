@@ -94,7 +94,7 @@ const fr: Messages = {
     clear: 'Supprimer les mots collectés',
     collected: (n) => `${n} ${n === 1 ? 'mot collecté' : 'mots collectés'}`,
     offUnstored: 'Désactivée tant que l’enregistrement automatique est désactivé',
-    appendSpaceHint: 'Un espace suit le mot accepté, prêt pour le suivant',
+    appendSpaceHint: 'Un espace suit le mot accepté',
     minLengthHint: 'Seuls les mots de cette longueur ou plus sont collectés et proposés',
   },
   navigator: {

@@ -96,7 +96,7 @@ const zhHant: Messages = {
     clear: '刪除已收集的字詞',
     collected: (n: number) => `已收集 ${n} 個字詞`,
     offUnstored: '自動儲存關閉期間無法使用',
-    appendSpaceHint: '接受字詞後自動加上空格，方便繼續輸入下一個字',
+    appendSpaceHint: '接受字詞後自動加上空格',
     minLengthHint: '只收集並建議達到此長度的字詞',
   },
   navigator: {

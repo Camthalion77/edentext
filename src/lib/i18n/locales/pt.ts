@@ -94,7 +94,7 @@ const pt: Messages = {
     clear: 'Eliminar palavras coletadas',
     collected: (n) => `${n} ${n === 1 ? 'palavra recolhida' : 'palavras recolhidas'}`,
     offUnstored: 'Desativado enquanto a gravação automática estiver desativada',
-    appendSpaceHint: 'Depois de aceitar uma palavra segue-se um espaço, pronto para a seguinte',
+    appendSpaceHint: 'Depois de aceitar uma palavra segue-se um espaço',
     minLengthHint: 'Só são recolhidas e sugeridas palavras com este comprimento ou mais',
   },
   navigator: {
