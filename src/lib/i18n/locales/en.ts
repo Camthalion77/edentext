@@ -97,6 +97,8 @@ const en = {
     clear: 'Delete collected words',
     collected: (n: number) => `${n} word${n === 1 ? '' : 's'} collected`,
     offUnstored: 'Off while autosave is off',
+    appendSpaceHint: 'A space follows a word you accept, ready for the next one',
+    minLengthHint: 'Only words this long or longer are collected and offered',
   },
   navigator: {
     title: 'Navigator',

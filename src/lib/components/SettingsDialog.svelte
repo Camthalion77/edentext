@@ -107,12 +107,12 @@
             onchange={(on) => setWordCompletion({ ...wc, enabled: on })} />
         </div>
         <div class="row sub" class:dim={!wc.enabled || volatile}>
-          <div class="info"><div class="name">{t().wordCompletion.appendSpace}</div></div>
+          <div class="info"><div class="name">{t().wordCompletion.appendSpace}</div><div class="desc">{t().wordCompletion.appendSpaceHint}</div></div>
           <Toggle label={t().wordCompletion.appendSpace} checked={wc.appendSpace} disabled={!wc.enabled || volatile}
             onchange={(on) => setWordCompletion({ ...wc, appendSpace: on })} />
         </div>
         <div class="row sub" class:dim={!wc.enabled || volatile}>
-          <div class="info"><div class="name">{t().wordCompletion.minLength}</div></div>
+          <div class="info"><div class="name">{t().wordCompletion.minLength}</div><div class="desc">{t().wordCompletion.minLengthHint}</div></div>
           <input class="num" type="number" min="5" max="20" value={wc.minLength} disabled={!wc.enabled || volatile}
             onchange={(e) => setWordCompletion({ ...wc, minLength: Math.min(20, Math.max(5, Number(e.currentTarget.value) || wc.minLength)) })} />
         </div>

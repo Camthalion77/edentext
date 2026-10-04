@@ -95,6 +95,8 @@ const zhHans: Messages = {
     clear: '删除已收集的字词',
     collected: (n: number) => `已收集 ${n} 个字词`,
     offUnstored: '自动保存关闭期间不可用',
+    appendSpaceHint: '接受单词后自动添加空格，便于继续输入下一个词',
+    minLengthHint: '只收集并建议达到此长度的单词',
   },
   navigator: {
     title: '导航',

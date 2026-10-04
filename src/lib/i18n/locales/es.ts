@@ -94,6 +94,8 @@ const es: Messages = {
     clear: 'Eliminar las palabras recopiladas',
     collected: (n) => `${n} ${n === 1 ? 'palabra recopilada' : 'palabras recopiladas'}`,
     offUnstored: 'Desactivado mientras el autoguardado esté desactivado',
+    appendSpaceHint: 'Tras aceptar una palabra se añade un espacio, listo para la siguiente',
+    minLengthHint: 'Solo se recopilan y proponen palabras de esta longitud o más',
   },
   navigator: {
     title: 'Navegador',
