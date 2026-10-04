@@ -23,6 +23,10 @@ const de: Messages = {
     confirmDelete: 'Dieses Dokument aus dem Browser löschen? Es lässt sich nicht wiederherstellen.',
     resume: 'Weiterarbeiten an',
     showAll: 'Alle Dokumente…',
+  },
+  settings: {
+    title: 'Einstellungen',
+    documents: 'Dokumente in diesem Browser',
     retention: { keep: 'Dokumente in diesem Browser behalten', closed: 'Geschlossene Dokumente beim nächsten Start löschen', none: 'Dokumente nicht in diesem Browser speichern' },
     noneHint: 'Wirkt ab dem nächsten Start; Wortergänzung und Benutzerwörterbuch sind dann aus.',
     protectedHint: 'Passwortgeschützte Dokumente werden immer gelöscht, weil ihre Kopie hier nicht verschlüsselt ist.',

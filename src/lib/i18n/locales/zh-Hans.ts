@@ -24,6 +24,10 @@ const zhHans: Messages = {
     confirmDelete: '要从浏览器中删除此文档吗？删除后无法恢复。',
     resume: '继续处理',
     showAll: '所有文档…',
+  },
+  settings: {
+    title: '设置',
+    documents: '此浏览器中的文档',
     retention: { keep: '在此浏览器中保留文档', closed: '下次启动时删除已关闭的文档', none: '不在此浏览器中保存文档' },
     noneHint: '从下次启动起生效；届时单词补全和用户词典将关闭。',
     protectedHint: '受密码保护的文档始终会被删除，因为它们在此处的副本未加密。',

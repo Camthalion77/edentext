@@ -23,6 +23,10 @@ const es: Messages = {
     confirmDelete: '¿Eliminar este documento del navegador? No se podrá recuperar.',
     resume: 'Seguir trabajando en',
     showAll: 'Todos los documentos…',
+  },
+  settings: {
+    title: 'Configuración',
+    documents: 'Documentos en este navegador',
     retention: { keep: 'Conservar los documentos en este navegador', closed: 'Eliminar los documentos cerrados en el próximo inicio', none: 'No guardar documentos en este navegador' },
     noneHint: 'Se aplica a partir del próximo inicio; el autocompletado de palabras y el diccionario de usuario quedan desactivados.',
     protectedHint: 'Los documentos protegidos con contraseña se eliminan siempre, porque su copia aquí no está cifrada.',

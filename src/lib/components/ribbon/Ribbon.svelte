@@ -88,7 +88,7 @@
     onSelectTheme,
     pdfBusy = false,
     hasPassword = false,
-    onNew, onNewFromTemplate, onOpen, onSave, onSaveAs, onSaveTemplate, onExportPdf, onPrintPdf, onPrint, onAbout, onDocProperties, onBrowserDocuments, onProtect, onAutoCorrect, onAutoText, onNewComment,
+    onNew, onNewFromTemplate, onOpen, onSave, onSaveAs, onSaveTemplate, onExportPdf, onPrintPdf, onPrint, onAbout, onSettings, onDocProperties, onBrowserDocuments, onProtect, onAutoCorrect, onAutoText, onNewComment,
     navigatorOpen = false, onToggleNavigator,
     recentFiles = [], onOpenRecent, onForgetRecent,
   }: {
@@ -145,6 +145,7 @@
     onPrintPdf?: () => void;
     onPrint?: () => void;
     onAbout?: () => void;
+    onSettings?: () => void;
     onDocProperties?: () => void;
     onBrowserDocuments?: () => void;
     onProtect?: () => void;
@@ -506,6 +507,10 @@
         </RibbonMenu>
       {/if}
     </div>
+
+    <button class="qa-btn" onclick={() => run(onSettings)} title={t().settings.title} aria-label={t().settings.title}>
+      <Icon name="settings" size={16} />
+    </button>
 
     <UiLanguagePicker />
 

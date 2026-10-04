@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listDocuments, openDocument, deleteDocument, loadRetention, saveRetention, volatile, type BrowserDocument, type Retention } from '../storage/docScope';
+  import { listDocuments, openDocument, deleteDocument, type BrowserDocument } from '../storage/docScope';
   import { t, locale } from '../i18n/i18n.svelte';
   import { localeTag } from '../utils/dateTime';
 
@@ -9,13 +9,11 @@
 
   let dialogEl = $state<HTMLDialogElement | null>(null);
   let docs = $state<BrowserDocument[]>([]);
-  let retention = $state<Retention>(loadRetention());
-  const LEVELS: Retention[] = ['keep', 'closed', 'none'];
 
   $effect(() => {
     const el = dialogEl;
     if (!el) return;
-    if (open && !el.open) { retention = loadRetention(); void listDocuments().then((d) => (docs = d)); el.showModal(); }
+    if (open && !el.open) { void listDocuments().then((d) => (docs = d)); el.showModal(); }
     else if (!open && el.open) el.close();
   });
 
@@ -38,16 +36,6 @@
   <div class="body">
     <h2>{t().browserDocs.title}</h2>
     <p class="intro">{t().browserDocs.intro}</p>
-    <fieldset class="retention">
-      {#each LEVELS as level (level)}
-        <label>
-          <input type="radio" name="retention" checked={retention === level} onchange={() => saveRetention((retention = level))} />
-          <span>{t().browserDocs.retention[level]}{#if level === 'none'}<em>{t().browserDocs.noneHint}</em>{/if}</span>
-        </label>
-      {/each}
-      <em>{t().browserDocs.protectedHint}</em>
-      {#if (retention === 'none') !== volatile}<strong>{t().browserDocs.restartNeeded}</strong>{/if}
-    </fieldset>
 
     <ul>
       {#each docs as d (d.id)}
@@ -99,10 +87,6 @@
 
   h2 { font-size: 1rem; }
   .intro { color: var(--color-text-muted); }
-  .retention { border: 0; display: flex; flex-direction: column; gap: 4px; }
-  .retention label { display: flex; align-items: baseline; gap: 8px; }
-  .retention em { display: block; font-style: normal; color: var(--color-text-muted); font-size: 0.78rem; }
-  .retention strong { font-weight: 600; font-size: 0.78rem; }
 
   ul { list-style: none; display: flex; flex-direction: column; }
   li {

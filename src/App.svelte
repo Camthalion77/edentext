@@ -60,6 +60,7 @@
   import GrammarToggle from './lib/components/GrammarToggle.svelte';
   import UiLanguagePicker from './lib/components/UiLanguagePicker.svelte';
   import AboutDialog from './lib/components/AboutDialog.svelte';
+  import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import TemplateGalleryDialog from './lib/components/TemplateGalleryDialog.svelte';
   import type { TemplateEntry } from './lib/templates/types';
   import DocPropertiesDialog from './lib/components/DocPropertiesDialog.svelte';
@@ -279,6 +280,7 @@
   let docProps: DocProperties = $state(loadDocProperties());
   let docPropsOpen = $state(false);
   let browserDocsOpen = $state(false);
+  let settingsOpen = $state(false);
   let hyphenate = $state(loadHyphenation());
   let pageNumbering: PageNumbering = $state(loadPageNumbering());
   let pageDecor: PageDecor = $state(loadPageDecor());
@@ -1429,6 +1431,7 @@
       onPrintPdf={handlePrintPdf}
       onPrint={handlePrint}
       onAbout={() => (aboutOpen = true)}
+      onSettings={() => (settingsOpen = true)}
       onDocProperties={() => (docPropsOpen = true)}
       onBrowserDocuments={() => (browserDocsOpen = true)}
       onProtect={() => (passwordSetOpen = true)}
@@ -1647,6 +1650,9 @@
               <span>{t().thesaurus.title}</span>
               <span class="theme-option-hint">{shortcutHint('thesaurus')}</span>
             </button>
+            <button class="theme-option" onclick={() => { themeOpen = false; settingsOpen = true; }} role="menuitem">
+              <span>{t().settings.title}</span>
+            </button>
             <div class="theme-heading">{t().ribbon.chrome.title}</div>
             <button
               class="theme-option"
@@ -1859,6 +1865,7 @@
   <AutoTextDialog bind:open={autoTextOpen} editor={activeEditor} />
   <ThesaurusDialog bind:open={thesaurusOpen} editor={activeEditor} />
   <BrowserDocumentsDialog bind:open={browserDocsOpen} />
+  <SettingsDialog bind:open={settingsOpen} />
   <ResumeCard show={!volatile && tick >= 0 && !!editor && !isDocNonEmpty()} onShowAll={() => (browserDocsOpen = true)} />
   <DocPropertiesDialog bind:open={docPropsOpen} props={docProps} onApply={(p) => { docProps = p; saveDocProperties(p); }} />
   <PasswordDialog

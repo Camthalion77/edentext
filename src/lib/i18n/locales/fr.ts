@@ -23,6 +23,10 @@ const fr: Messages = {
     confirmDelete: 'Supprimer ce document du navigateur ? Il ne pourra pas être restauré.',
     resume: 'Reprendre le travail',
     showAll: 'Tous les documents…',
+  },
+  settings: {
+    title: 'Paramètres',
+    documents: 'Documents dans ce navigateur',
     retention: { keep: 'Conserver les documents dans ce navigateur', closed: 'Supprimer les documents fermés au prochain démarrage', none: 'Ne pas enregistrer les documents dans ce navigateur' },
     noneHint: 'Prend effet au prochain démarrage ; la saisie semi-automatique et le dictionnaire personnel sont alors désactivés.',
     protectedHint: 'Les documents protégés par mot de passe sont toujours supprimés, car leur copie ici n’est pas chiffrée.',

@@ -53,7 +53,7 @@ a quit fires no `pagehide`. `edentext-live@<id>` is the marker — epoch ms whil
 negated on `pagehide`, refreshed every 60 s: the last use, and where Web Locks are missing
 (an insecure origin) the hold itself, abandoned after 10 min. Only the holding tab ever
 writes its own marker, so no two tabs race over one key.
-`edentext-keep-documents` (app-wide, the three choices in *Recent documents*) is absent =
+`edentext-keep-documents` (app-wide, the three choices in `SettingsDialog.svelte`, the ribbon's gear) is absent =
 keep, `'0'` = drop closed documents at the next start, `'none'` = store nothing. `volatile`
 is read once at load, so `'none'` takes effect at the next start: every document key then goes
 through `docStore`, a Map in memory instead of localStorage, and `saveDocument`, the font
