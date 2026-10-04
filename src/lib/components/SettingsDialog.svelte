@@ -93,7 +93,7 @@
           <div class="segmented" role="radiogroup" aria-label={t().appearance.title}>
             {#each THEMES as m (m)}
               <button role="radio" aria-checked={themeMode === m} class:on={themeMode === m} onclick={() => onSelectTheme(m)}>
-                <span class="swatch {m}" aria-hidden="true"></span>{t().appearance[m]}
+                {#if m === 'dark'}<Icon name="themeDark" size={14} />{:else}<span class="swatch {m}" aria-hidden="true"></span>{/if}{t().appearance[m]}
               </button>
             {/each}
           </div>
@@ -330,7 +330,6 @@
   .chrome-opt small { font-size: 0.72rem; color: var(--color-text-muted); }
   .swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--w-border-strong); }
   .swatch.light { background: #fff; }
-  .swatch.dark { background: #2b2f36; }
   .swatch.allBlack { background: #000; }
   .swatch.auto { background: linear-gradient(135deg, #fff 50%, #2b2f36 50%); }
 
