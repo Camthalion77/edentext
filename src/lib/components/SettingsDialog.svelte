@@ -3,7 +3,7 @@
   import { wordCompletion, setWordCompletion } from '../storage/wordCompletion.svelte';
   import { grammarEnabled, setGrammarEnabled } from '../spell/grammar.svelte';
   import { numberRecognition, setNumberRecognition } from '../storage/tableOptions.svelte';
-  import type { ThemeMode } from '../storage/theme';
+  import type { ChromeMode, ThemeMode } from '../storage/theme';
   import { LOCALES, LOCALE_LABELS, isLocale } from '../i18n/config';
   import { t, locale, setLocale } from '../i18n/i18n.svelte';
   import Icon from './ribbon/Icon.svelte';
@@ -18,6 +18,7 @@
     showRuler = $bindable(),
     showFormattingMarks = $bindable(),
     showFieldShading = $bindable(),
+    chromeMode = $bindable(),
     recentCount,
     onClearRecent,
     onAutoCorrect,
@@ -28,6 +29,7 @@
     showRuler: boolean;
     showFormattingMarks: boolean;
     showFieldShading: boolean;
+    chromeMode: ChromeMode;
     recentCount: number;
     onClearRecent: () => void;
     onAutoCorrect: () => void;
@@ -96,6 +98,19 @@
             {/each}
           </div>
         </div>
+        <!-- The modern chrome is still a beta, so only a development build offers the choice. -->
+        {#if import.meta.env.DEV}
+          <div class="row stack">
+            <div class="info"><div class="name">{t().ribbon.chrome.title}</div></div>
+            <div class="segmented two" role="radiogroup" aria-label={t().ribbon.chrome.title}>
+              {#each (['ribbon', 'modern'] as const) as c (c)}
+                <button role="radio" aria-checked={chromeMode === c} class:on={chromeMode === c} onclick={() => (chromeMode = c)}>
+                  <span class="chrome-opt">{t().ribbon.chrome[c]}<small>{t().ribbon.chrome[`${c}Hint`]}</small></span>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
 
       {:else if section === 'editing'}
         <div class="row">
@@ -310,6 +325,9 @@
   }
   .segmented button:hover { color: var(--color-text); }
   .segmented button.on { background: var(--color-surface); color: var(--color-text); box-shadow: 0 1px 3px rgb(0 0 0 / 15%); }
+  .segmented.two { grid-template-columns: repeat(2, 1fr); }
+  .chrome-opt { display: flex; flex-direction: column; align-items: center; }
+  .chrome-opt small { font-size: 0.72rem; color: var(--color-text-muted); }
   .swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--w-border-strong); }
   .swatch.light { background: #fff; }
   .swatch.dark { background: #2b2f36; }

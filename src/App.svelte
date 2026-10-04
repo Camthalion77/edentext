@@ -1380,7 +1380,6 @@
     <Ribbon
       editor={activeEditor}
       tick={activeTick}
-      bind:chromeMode
       bind:documentName
       {documentFormat}
       {dirty}
@@ -1653,15 +1652,6 @@
             <button class="theme-option" onclick={() => { themeOpen = false; settingsOpen = true; }} role="menuitem">
               <span>{t().settings.title}</span>
             </button>
-            <div class="theme-heading">{t().ribbon.chrome.title}</div>
-            <button
-              class="theme-option"
-              onclick={() => { chromeMode = 'ribbon'; themeOpen = false; }}
-              role="menuitem"
-            >
-              <span>{t().ribbon.chrome.ribbon}</span>
-              <span class="theme-option-hint">{t().ribbon.chrome.ribbonHint}</span>
-            </button>
           </div>
         {/if}
       </div>
@@ -1872,6 +1862,7 @@
     bind:showRuler
     bind:showFormattingMarks
     bind:showFieldShading
+    bind:chromeMode
     recentCount={recentFiles.length}
     onClearRecent={() => { forgetRecentFiles(); recentFiles = []; }}
     onAutoCorrect={() => (autoCorrectOpen = true)}

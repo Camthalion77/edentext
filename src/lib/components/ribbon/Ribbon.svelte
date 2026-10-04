@@ -34,7 +34,7 @@
   import { OPEN_BOOKMARK_DIALOG_EVENT, bookmarkNames, findBookmark } from '../../editor/extensions/bookmark';
   import { OPEN_CROSS_REF_DIALOG_EVENT } from '../../editor/extensions/crossReference';
   import { EDIT_FORMULA_EVENT } from '../../editor/extensions/formula';
-  import { loadRibbonCollapsed, saveRibbonCollapsed, type ChromeMode, type ThemeMode } from '../../storage/theme';
+  import { loadRibbonCollapsed, saveRibbonCollapsed, type ThemeMode } from '../../storage/theme';
   import type { StyleFamily } from '../../styles/styleSheet';
   import { DEFAULT_MARGINS, type PageMargins } from '../../storage/pageMargins';
   import type { Orientation } from '../../storage/pageOrientation';
@@ -49,7 +49,6 @@
   let {
     editor,
     tick,
-    chromeMode = $bindable<ChromeMode>('ribbon'),
     documentName = $bindable(''),
     documentFormat = 'odt',
     dirty = false,
@@ -94,7 +93,6 @@
   }: {
     editor: Editor | null;
     tick: number;
-    chromeMode?: ChromeMode;
     documentName?: string;
     documentFormat?: 'odt' | 'docx';
     dirty?: boolean;
@@ -487,17 +485,7 @@
         <Icon name="ribbon" size={16} />
       </button>
       {#if isMenuOpen('appearance')}
-        <RibbonMenu align="right" minWidth={220} heading={t().ribbon.chrome.title}>
-          <button class:selected={chromeMode === 'ribbon'} onclick={() => { chromeMode = 'ribbon'; closeMenu(); }}>
-            {t().ribbon.chrome.ribbon}<span class="menu-sub">{t().ribbon.chrome.ribbonHint}</span>
-          </button>
-          {#if import.meta.env.DEV}
-            <button class:selected={chromeMode === 'modern'} onclick={() => { chromeMode = 'modern'; closeMenu(); }}>
-              {t().ribbon.chrome.modern}<span class="menu-sub">{t().ribbon.chrome.modernHint}</span>
-            </button>
-          {/if}
-          <hr />
-          <div class="rb-menu-label">{t().appearance.title}</div>
+        <RibbonMenu align="right" minWidth={220} heading={t().appearance.title}>
           {#each (['light', 'dark', 'allBlack', 'auto'] as const) as m}
             <button class:selected={themeMode === m} onclick={() => { onSelectTheme?.(m); closeMenu(); }}>
               {t().appearance[m]}
