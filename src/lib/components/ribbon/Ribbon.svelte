@@ -336,6 +336,7 @@
     }
     act(c.id);
   }
+  const THEME_ICON = { light: 'themeLight', dark: 'themeDark', allBlack: 'themeAllBlack', auto: 'themeAuto' } as const;
 </script>
 
 <div class="ribbon">
@@ -482,7 +483,7 @@
         aria-haspopup="menu"
         aria-expanded={isMenuOpen('appearance')}
       >
-        <Icon name="theme" size={16} />
+        <Icon name={THEME_ICON[themeMode]} size={16} />
       </button>
       {#if isMenuOpen('appearance')}
         <RibbonMenu align="right" minWidth={220} heading={t().appearance.title}>

@@ -1616,9 +1616,8 @@
             </svg>
           {:else}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="1" y="2" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-              <line x1="5.5" y1="14" x2="10.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              <line x1="8" y1="11" x2="8" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="8" cy="8" r="5.75" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M12.07 3.93a5.75 5.75 0 0 1-8.14 8.14z" fill="currentColor"/>
             </svg>
           {/if}
         </button>

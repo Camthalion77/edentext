@@ -31,8 +31,14 @@ export const STROKED = {
   redo: ['M13.5 6.5H6.75a3.75 3.75 0 0 0 0 7.5H10.5', 'M10.75 3.5 13.5 6.5l-2.75 3'],
   info: ['M8 14.5A6.5 6.5 0 1 0 8 1.5a6.5 6.5 0 0 0 0 13z', 'M8 7.25v4'],
   lock: ['M3.75 7.25h8.5v6.25h-8.5z', 'M5.75 7.25V5a2.25 2.25 0 0 1 4.5 0v2.25'],
-  // Light and dark: a disc, its right half filled (FILLED).
-  theme: ['M8 13.75a5.75 5.75 0 1 0 0-11.5 5.75 5.75 0 0 0 0 11.5z'],
+  // The four themes, as the appearance button shows the current one. Auto is a disc split
+  // on the diagonal like its swatch in Settings, its dark half in FILLED.
+  themeLight: [
+    'M8 10.8a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6z',
+    'M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41',
+  ],
+  themeDark: ['M13.5 10A6 6 0 0 1 6 2.5a6 6 0 1 0 7.5 7.5z'],
+  themeAuto: ['M8 13.75a5.75 5.75 0 1 0 0-11.5 5.75 5.75 0 0 0 0 11.5z'],
 
   cut: ['M4 2.5 11 12', 'M12 2.5 5 12', 'M3.6 13.9a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z', 'M12.4 13.9a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z'],
   copy: ['M5.5 5.5h7.25v8.25H5.5z', 'M10.5 5.5V2.25H3.25V10.5H5.5'],
@@ -168,7 +174,8 @@ export const STROKED = {
 } as const;
 
 export const FILLED = {
-  theme: ['M8 2.25a5.75 5.75 0 0 1 0 11.5z'],
+  themeAllBlack: ['M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11z'],
+  themeAuto: ['M12.07 3.93a5.75 5.75 0 0 1-8.14 8.14z'],
   infoDot: ['M8 4.4a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z'],
   header: ['M5.4 3.8h5.2v1.7H5.4z'],
   footer: ['M5.4 10.5h5.2v1.7H5.4z'],
